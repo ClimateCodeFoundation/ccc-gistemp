@@ -17,7 +17,7 @@ import sys
 # http://www.python.org/doc/2.4.4/lib/module-urllib.html
 import urllib
 
-def doit(output=sys.stdout):
+def doit(prefix='input/', output=sys.stdout):
     """Single function to download everything."""
 
     # See
@@ -35,11 +35,21 @@ def doit(output=sys.stdout):
 
     output = sys.stdout
 
+    # Attempt to create the directories required for prefix
+    from os import makedirs
+    try:
+        makedirs(prefix)
+    except OSError:
+        # Expected if the directories already exist
+        pass
+
     for url in all:
         def hook(n, bs, ts):
             output.write("\r%s %d" % (url, n*bs))
             output.flush()
-        urllib.urlretrieve(url, url.split('/')[-1], hook)
+        # Make a local filename
+        local = prefix + url.split('/')[-1]
+        urllib.urlretrieve(url, local, hook)
         output.write('\n')
 
 # Guido's main, http://www.artima.com/weblogs/viewpost.jsp?thread=4829

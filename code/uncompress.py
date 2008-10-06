@@ -6,6 +6,7 @@
 systems.
 """
 
+# http://www.python.org/doc/2.4.4/lib/module-sys.html
 import sys
 
 # The reference for this implementation is
@@ -40,7 +41,7 @@ import sys
 # (BB&0x80) then the CLEAR code, 257, resets the tables and therefore resets
 # the current code width to 9.
 #
-# Notes of maximum code width
+# Notes on maximum code width
 #
 # Compressors may choose to restrict the maximum code width, it is
 # possible to do this with the -b option to compress(1) for example.
@@ -74,6 +75,7 @@ rmask = map(lambda s: ~(~0<<s), range(9))
 
 def MAXCODE(n):
     """Maximum code value for a code comprised of n bits."""
+
     # zopen.c line 99
     return (1 << n) - 1
 
@@ -99,7 +101,6 @@ class Zfile:
         self.maxbits &= BIT_MASK
         if self.maxbits > BITS:
             raise 'Compressed codes have too many bits'
-
 
     # zcode.c line 560
     def getcode(self):
@@ -223,7 +224,3 @@ class Zfile:
 z = Zfile(fd=sys.stdin)
 for i,c in enumerate(z.read1()):
     sys.stdout.write(c)
-
-# TODO
-# None for EOF in getcode
-

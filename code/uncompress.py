@@ -89,8 +89,6 @@ class Zfile:
         self.maxmaxcode = 1 << BITS
         # Is 0/1 in C, but only used as a boolean
         self.clear_flg = False
-        self.roffset = 0
-        self.size = 0
 
         self.header = self.f.read(sizeof_header)
         # :todo: make exception
@@ -101,74 +99,80 @@ class Zfile:
         self.maxbits &= BIT_MASK
         if self.maxbits > BITS:
             raise 'Compressed codes have too many bits'
+
+
+    # zcode.c line 560
+    def getcode(self):
+        """Yield input as an iterable sequence of codes."""
+
+        n_bits = INIT_BITS
+        maxcode = MAXCODE(n_bits)
+        roffset = 0
+        size = 0
+
+        while True:
+            if (self.clear_flg or
+                    roffset >= size or
+                    len(self.prefixof) > maxcode):
+                if len(self.prefixof) > maxcode:
+                    n_bits += 1
+                    if n_bits == self.maxbits:
+                        maxcode = self.maxmaxcode
+                    else:
+                        maxcode = MAXCODE(n_bits)
+                if self.clear_flg:
+                    n_bits = INIT_BITS
+                    maxcode = MAXCODE(n_bits)
+                    self.clear_flg = False
+                gbuf = map(ord, self.f.read(n_bits))
+                if not gbuf:
+                    return
+                roffset = 0
+                # zcode.c line 597
+                # Cute optimisation.  size is used to detect when the
+                # buffer needs refilling (see roffset >= size, above).
+                # It should be no more than the number of bits
+                # occupied by entire codes and more than the number of bits
+                # occupied by all the codes except the last.
+                size = (len(gbuf) << 3) - (n_bits - 1)
+            r_off = roffset
+            bits = n_bits
+
+            # In this Python version bp is a string index, from 0.
+            bp = r_off >> 3
+            r_off &= 7
+
+            # print gbuf, roffset, bits, bp
+            gcode = gbuf[bp] >> r_off ; bp += 1
+            bits -= 8 - r_off
+            r_off = 8 - r_off       # Now, roffset into gcode word
+
+            # Middle 8-bit byte, if any
+            if bits >= 8:
+                gcode |= gbuf[bp] << r_off ; bp += 1
+                r_off += 8
+                bits -= 8
+            # High order bits
+            if bits:
+                gcode |= (gbuf[bp] & rmask[bits]) << r_off
+            roffset += n_bits
+
+            yield gcode
         
-        self.n_bits = INIT_BITS
-        self.maxcode = MAXCODE(self.n_bits)
+    def read1(self):
+        """Yield the characters of the uncompressed stream one at a
+        time.  Returns an iterator.
+        """
+
         self.prefixof = [0] * 256
         self.suffixof = range(256)
         if self.block_compress:
             self.prefixof.append(None)
             self.suffixof.append(None)
 
-
-    # zcode.c line 560
-    def getcode(self):
-        """Read one code from the input.  If EOF, return None."""
-
-        if (self.clear_flg or
-                self.roffset >= self.size or
-                len(self.prefixof) > self.maxcode):
-            if len(self.prefixof) > self.maxcode:
-                self.n_bits += 1
-                if self.n_bits == self.maxbits:
-                    self.maxcode = self.maxmaxcode
-                else:
-                    self.maxcode = MAXCODE(self.n_bits)
-            if self.clear_flg:
-                self.n_bits = INIT_BITS
-                self.maxcode = MAXCODE(self.n_bits)
-                self.clear_flg = False
-            self.gbuf = map(ord, self.f.read(self.n_bits))
-            if not self.gbuf:
-                return None
-            self.roffset = 0
-            # zcode.c line 597
-            # Cute optimisation.  self.size is used to detected when the
-            # buffer needs refilling (see self.roffset >= self.size,
-            # above).  It should be no more than the number of bits
-            # occupied by entire codes and more than the number of bits
-            # occupied by all the codes except the last.
-            self.size = (len(self.gbuf) << 3) - (self.n_bits - 1)
-        r_off = self.roffset
-        bits = self.n_bits
-
-        # In this Python version bp is a string index, from 0.
-        bp = r_off >> 3
-        r_off &= 7
-
-        # print self.gbuf, self.roffset, bits, bp
-        gcode = self.gbuf[bp] >> r_off ; bp += 1
-        bits -= 8 - r_off
-        r_off = 8 - r_off       # Now, roffset into gcode word
-
-        # Middle 8-bit byte, if any
-        if bits >= 8:
-            gcode |= self.gbuf[bp] << r_off ; bp += 1
-            r_off += 8
-            bits -= 8
-        # High order bits
-        if bits:
-            gcode |= (self.gbuf[bp] & rmask[bits]) << r_off
-        self.roffset += self.n_bits
-
-        return gcode
-        
-    def read1(self):
         # zcode.c line 505
-        finchar = oldcode = self.getcode()
-        if oldcode is None:
-            # EOF
-            return
+        codes = self.getcode()
+        finchar = oldcode = codes.next()
         yield chr(finchar)
 
         # In the C code, zcode.c, the variable free_ent records the
@@ -181,18 +185,16 @@ class Zfile:
 
         # A list of characters (length 1 strings)
         de_stack = []
+        # This loop is exited when codes, which is an iterator, is
+        # exhausted and the call to its next method (see codes.next(),
+        # below) raises the StopIteration exception.  Sneaky.
         while True:
-            code = self.getcode()
-            if code is None:
-                break
+            code = codes.next()
             if code == CLEAR and self.block_compress:
                 self.prefixof = [0]*256
                 self.suffixof = self.suffixof[:256]
                 self.clear_flg = True
-                code = self.getcode()
-                if code is None:
-                    # :todo: Insert ObShakespeare quote
-                    break
+                code = codes.next()
             incode = code
 
             # Special case for KwKwK string
@@ -216,7 +218,6 @@ class Zfile:
                 self.prefixof.append(oldcode)
                 self.suffixof.append(finchar)
             oldcode = incode
-        # EOF
 
 
 z = Zfile(fd=sys.stdin)

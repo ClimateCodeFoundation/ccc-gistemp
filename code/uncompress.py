@@ -87,7 +87,8 @@ class Zfile:
 
         # Mostly from zopen, zopen.c line 686
         self.maxmaxcode = 1 << BITS
-        self.clear_flg = 0
+        # Is 0/1 in C, but only used as a boolean
+        self.clear_flg = False
         self.roffset = 0
         self.size = 0
 
@@ -126,7 +127,7 @@ class Zfile:
             if self.clear_flg:
                 self.n_bits = INIT_BITS
                 self.maxcode = MAXCODE(self.n_bits)
-                self.clear_flg = 0
+                self.clear_flg = False
             self.gbuf = map(ord, self.f.read(self.n_bits))
             if not self.gbuf:
                 return -1
@@ -187,7 +188,7 @@ class Zfile:
             if code == CLEAR and self.block_compress:
                 self.prefixof = [0]*256
                 self.suffixof = self.suffixof[:256]
-                self.clear_flg = 1
+                self.clear_flg = True
                 code = self.getcode()
                 if code == -1:
                     # :todo: Insert ObShakespeare quote
@@ -223,6 +224,5 @@ for i,c in enumerate(z.read1()):
     sys.stdout.write(c)
 
 # TODO
-# self.clear_flg to bool
 # None for EOF in getcode
 

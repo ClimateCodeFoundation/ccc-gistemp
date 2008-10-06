@@ -222,5 +222,4 @@ class Zfile:
 
 
 z = Zfile(fd=sys.stdin)
-for c in z.read1():
-    sys.stdout.write(c)
+sys.stdout.writelines(z.read1())

@@ -15,13 +15,43 @@ import sys
 # by compress/uncompress.  Here is one reconstructed from the zcode.c source
 # code:
 #
-# Each code is a number of bits wide.  Codes are packed into 8-bit bytes
-# sequentially by considering the byte sequences as a bit sequence, each
-# byte being "fille up" from "right to left"; that's means bit i of the
+# A compress'd file is a sequence of octets.  It comprises a header,
+# followed by a body.  The header is 3 octets: 0x1F 0x9D BB. BB is the
+# only variable part of the header; it specifies the maximum width of
+# codes used and whether block compression (enabling the CLEAR code) is
+# used.
+#
+# BB & 0x1f gives the maximum code word width in bits (which must be
+# between 9 and 16, see notes below).  BB & 0x80 is 1 if block compression
+# is enabled which means that the CLEAR code is used.
+#
+# The body consists of a sequence of codes packed into octets,
+# essentially by filling up each octet from the right (least
+# significant) end first.  Codes are packed into a bit sequence, the
+# least significant bit of the code becomes the next bit of the
+# sequence, then the next to least signiificant bit, and so on.
+# The bit sequence is split into octets: bit i of the
 # bit sequence corresponds to bit (i%8) of byte (i//8), where bit j of a
 # byte is the bit corresponding to 2**j.
+#
+# codes start at 9 bits wide; subsequently the width of the codes in the
+# body is always exactly enough to represent the largest possible code
+# currently, up to a maximum width of 16.  If block compression is enabled
+# (BB&0x80) then the CLEAR code, 257, resets the tables and therefore resets
+# the current code width to 9.
+#
+# Notes of maximum code width
+#
+# Compressors may choose to restrict the maximum code width, it is
+# possible to do this with the -b option to compress(1) for example.
+# Some Unix systems are only capable of decompressing files with a
+# maximum code width of 14 or less, so this is the portable maximum; in
+# practice almost all reasonable Unix systems used a default maximum
+# code width of 16, so this is what is typically found.
+#
+# This uncompressor copes with a maximum code width of up to 16 bits.
 
-# zopen line 79
+# zopen.c line 79
 BITS = 16
 # zopen.c line 90
 BIT_MASK = 0x1f

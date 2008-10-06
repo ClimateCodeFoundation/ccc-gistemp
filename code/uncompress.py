@@ -113,7 +113,7 @@ class Zfile:
 
     # zcode.c line 560
     def getcode(self):
-        """Read one code from the input.  If EOF, return -1."""
+        """Read one code from the input.  If EOF, return None."""
 
         if (self.clear_flg or
                 self.roffset >= self.size or
@@ -130,7 +130,7 @@ class Zfile:
                 self.clear_flg = False
             self.gbuf = map(ord, self.f.read(self.n_bits))
             if not self.gbuf:
-                return -1
+                return None
             self.roffset = 0
             # zcode.c line 597
             # Cute optimisation.  self.size is used to detected when the
@@ -166,9 +166,9 @@ class Zfile:
     def read1(self):
         # zcode.c line 505
         finchar = oldcode = self.getcode()
-        if oldcode == -1:
+        if oldcode is None:
             # EOF
-            yield ''
+            return
         yield chr(finchar)
 
         # In the C code, zcode.c, the variable free_ent records the
@@ -183,14 +183,14 @@ class Zfile:
         de_stack = []
         while True:
             code = self.getcode()
-            if code == -1:
+            if code is None:
                 break
             if code == CLEAR and self.block_compress:
                 self.prefixof = [0]*256
                 self.suffixof = self.suffixof[:256]
                 self.clear_flg = True
                 code = self.getcode()
-                if code == -1:
+                if code is None:
                     # :todo: Insert ObShakespeare quote
                     break
             incode = code

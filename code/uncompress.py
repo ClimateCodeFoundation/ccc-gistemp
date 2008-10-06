@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # $Id$
-# David Jones.  Copyright (C) 2008 Ravebrook Limited.
+# David Jones.  Copyright (C) 2008 Ravenbrook Limited.
 
 """Compatible implementation of uncompress(1) from traditional Unix
 systems.

@@ -221,5 +221,40 @@ class Zfile:
             oldcode = incode
 
 
-z = Zfile(fd=sys.stdin)
-sys.stdout.writelines(z.read1())
+def uncompress(input):
+    z = Zfile(fd=input)
+    sys.stdout.writelines(z.read1())
+
+# Guido's main, http://www.artima.com/weblogs/viewpost.jsp?thread=4829
+class Usage(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+def main(argv=None):
+    import getopt
+    if argv is None:
+        argv = sys.argv
+    try:
+        try:
+            opts, args = getopt.getopt(argv[1:], "", ["help"])
+            for o,a in opts:
+                if o in ('--help',):
+                    print __doc__
+                    return 0
+        except getopt.error, msg:
+             raise Usage(msg)
+        if not args:
+            args = ['-']
+        for f in args:
+            if f == '-':
+                uncompress(sys.stdin)
+            else:
+                uncompress(open(f, 'rb'))
+    except Usage, err:
+        print >>sys.stderr, err.msg
+        print >>sys.stderr, "for help use --help"
+        return 2
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

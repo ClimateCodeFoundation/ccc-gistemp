@@ -165,16 +165,19 @@ class Zfile:
         time.  Returns an iterator.
         """
 
+        # A list of codes.
         self.prefixof = [0] * 256
-        self.suffixof = range(256)
+        # A list of _characters_, length 1 strings.
+        self.suffixof = map(chr, range(256))
         if self.block_compress:
             self.prefixof.append(None)
             self.suffixof.append(None)
 
         # zcode.c line 505
         codes = self.getcode()
-        finchar = oldcode = codes.next()
-        yield chr(finchar)
+        oldcode = codes.next()
+        finchar = chr(oldcode)
+        yield finchar
 
         # In the C code, zcode.c, the variable free_ent records the
         # index of the next free entry in the coding table.  In this
@@ -200,15 +203,15 @@ class Zfile:
 
             # Special case for KwKwK string
             if code >= len(self.prefixof):
-                de_stack += chr(finchar)
+                de_stack += finchar
                 code = oldcode
 
             # Generate output characters in reverse order
             while code >= 256:
-                de_stack += chr(self.suffixof[code])
+                de_stack += self.suffixof[code]
                 code = self.prefixof[code]
             finchar = self.suffixof[code]
-            de_stack += chr(finchar)
+            de_stack += finchar
 
             while de_stack:
                 yield de_stack.pop()

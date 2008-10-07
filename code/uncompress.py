@@ -223,6 +223,16 @@ class Zfile:
                 self.suffixof.append(finchar)
             oldcode = incode
 
+# Tests for doctest
+# See http://www.python.org/doc/2.4.4/lib/doctest-basic-api.html
+__test__ = dict(
+    t0 = r"""
+        >>> from StringIO import StringIO
+        >>> ''.join(Zfile(fd=StringIO('\x1f\x9d\x90H\xca\xb0a\xf3\x06\xc4\x957r\xd8\x90\t\xa1\x00')).read1())
+        'Hello World!\n'
+        """,
+    )
+
 
 def uncompress(input):
     z = Zfile(fd=input)
@@ -239,11 +249,17 @@ def main(argv=None):
         argv = sys.argv
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "", ["help"])
+            opts, args = getopt.getopt(argv[1:], 'cTv', ['help', 'test'])
             for o,a in opts:
                 if o in ('--help',):
                     print __doc__
                     return 0
+                # The -c option is ignored, it's there for compatibility
+                # with uncompress(1).
+                if o in ('-T', '--test'):
+                    # http://www.python.org/doc/2.4.4/lib/module-doctest.html
+                    import doctest
+                    return doctest.testmod()[0]
         except getopt.error, msg:
              raise Usage(msg)
         if not args:

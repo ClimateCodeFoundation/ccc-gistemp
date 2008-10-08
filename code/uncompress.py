@@ -229,7 +229,7 @@ class Zfile:
             oldcode = incode
 
     def readline(self):
-        """Return the next uncompress line."""
+        """Return the next uncompressed line."""
 
         s = ''
         try:

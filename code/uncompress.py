@@ -102,6 +102,8 @@ class Zfile:
         if self.maxbits > BITS:
             raise 'Compressed codes have too many bits'
 
+        self.citer = self._citer()
+
     # zcode.c line 560
     def getcode(self):
         """Yield input as an iterable sequence of codes."""
@@ -161,10 +163,13 @@ class Zfile:
             yield gcode
         
     def read1(self):
-        """Yield the characters of the uncompressed stream one at a
-        time.  Returns an iterator.
+        """An iterator that yields the characters of the uncompressed
+        stream one at a time.
         """
 
+        return self.citer
+
+    def _citer(self):
         # A list of codes.
         self.prefixof = [0] * 256
         # A list of _characters_, length 1 strings.
@@ -222,6 +227,31 @@ class Zfile:
                 self.prefixof.append(oldcode)
                 self.suffixof.append(finchar)
             oldcode = incode
+
+    def readline(self):
+        """Return the next uncompress line."""
+
+        s = ''
+        try:
+            while True:
+                s += self.citer.next()
+                if s.endswith('\n'):
+                    return s
+        except StopIteration:
+            return s
+
+    def __iter__(self):
+        """Iterate over all lines in the uncompressed file."""
+
+        return self
+
+    def next(self):
+        """Implements iterator protocol."""
+
+        r = self.readline()
+        if r:
+            return r
+        raise StopIteration
 
 # Tests for doctest
 # See http://www.python.org/doc/2.4.4/lib/doctest-basic-api.html

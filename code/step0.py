@@ -40,6 +40,32 @@ import itertools
 import math
 import re
 
+# Should probably be moved elsewhere
+def open_or_uncompress(filename):
+    """Opens the text file `filename` for reading.  If this fails then
+    it attempts to find a compressed version of the file by appending
+    '.Z' to the name and opening that (uncompressing it on the fly).
+    """
+
+    try:
+        return open(filename)
+    except IOError:
+        # When neither filename nor filename.Z exists we want to pretend
+        # that the exception comes from the original call to open,
+        # above.  Otherwise the user can be confused by claims that
+        # "foo.Z" does not exist when they tried to open "foo".  In
+        # order to maintain this pretence, we have to get the exception
+        # info and save it. See
+        # http://blog.ianbicking.org/2007/09/12/re-raising-exceptions/
+        import sys
+        exception = sys.exc_info()
+        try:
+            import uncompress
+            return uncompress.Zfile(filename + '.Z')
+        except IOError:
+            pass
+        raise exception[0], exception[1], exception[2]
+
 def read_antarc_station_ids(filename):
     """Reads a SCAR station ID file and returns a dictionary
     mapping station name to the WMO triple
@@ -165,7 +191,7 @@ def read_GHCN(filename):
     """An iterator to read a GHCN data file (usually v2.mean)."""
 
     GHCN_last_year = 0
-    for line in open('input/%s' % filename):
+    for line in open_or_uncompress('input/%s' % filename):
         country_code = int(line[:3])
         WMO_station = int(line[3:8])
         modifier = int(line[8:11])
@@ -221,7 +247,7 @@ def read_USHCN():
     # initialize hash from WMO station ID to results
     for (USHCN_id, (WMO_station, modifier)) in stations.items():
         hash[(WMO_station, modifier)] = {}
-    for line in open('input/hcn_doe_mean_data'):
+    for line in open_or_uncompress('input/hcn_doe_mean_data'):
         # " 3A" indicates mean Filnet temperatures.
         if line[11:14] != ' 3A':
             continue

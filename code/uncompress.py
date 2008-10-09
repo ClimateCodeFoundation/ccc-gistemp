@@ -256,10 +256,22 @@ class Zfile:
 # Tests for doctest
 # See http://www.python.org/doc/2.4.4/lib/doctest-basic-api.html
 __test__ = dict(
+    # Generally the strings passed to StringIO are produced by using the
+    # compress(1) utility on OS X.
     t0 = r"""
         >>> from StringIO import StringIO
         >>> ''.join(Zfile(fd=StringIO('\x1f\x9d\x90H\xca\xb0a\xf3\x06\xc4\x957r\xd8\x90\t\xa1\x00')).read1())
         'Hello World!\n'
+        """,
+    # Mostly a test of iteration.
+    t1 = r"""
+        >>> from StringIO import StringIO
+        >>> f=Zfile(fd=StringIO('\x1f\x9d\x901\x14\xc8P0C\x01\r\x055\x14\xd8PpC\x01\x0e\x059\x14\xc4\x80\xa1\x00'))
+        >>> l=list(f)
+        >>> len(l)
+        10
+        >>> ''.join(l)
+        '1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n'
         """,
     )
 

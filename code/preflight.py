@@ -18,9 +18,14 @@ def checkit(log):
     """
 
     def missing_input(name):
-        """Complain about a missing input."""
+        """Complain about a missing input file."""
 
-        log.write('MISSING: %s\n' % name)
+        log.write('MISSING: input/%s\n' % name)
+
+    def missing_config(name):
+        """Complain about a missing config file."""
+
+        log.write('MISSING: config/%s\n' % name)
 
     def missing_big_files(list):
         """Check list (of names) and reutnr mising ones.  .Z extension
@@ -69,6 +74,27 @@ def checkit(log):
                   '         Please sort it out by hand.\n' %
                 ' '.join(step0big))
         rc = max(rc, 2)
+
+    step1 = """
+        mcdw.tbl
+        ushcn.tbl
+        sumofday.tbl
+        v2.inv
+        """.split()
+    step1_config = """
+        combine_pieces_helena.in
+        Ts.strange.RSU.list.IN
+        Ts.discont.RS.alter.IN
+        """.split()
+    for name in step1:
+        if not input_ok(name):
+            missing_input(name)
+            rc = max(rc, 2)
+    for name in step1_config:
+        if not config_ok(name):
+            missing_config(name)
+            rc = max(rc, 2)
+
     return rc
 
 def input_ok(name):
@@ -76,7 +102,14 @@ def input_ok(name):
     reading.  Return a true value if okay, false otherwise.
     """
 
-    n = 'input/' + name
+    return file_readable('input/' + name)
+
+def config_ok(name):
+    return file_readable('config/' + name)
+
+def file_readable(n):
+    """Return True if file name n exists, and can be opened for reading."""
+
     try:
         f = open(n)
     except IOError:

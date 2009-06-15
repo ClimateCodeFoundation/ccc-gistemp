@@ -28,7 +28,7 @@ def checkit(log):
         log.write('MISSING: config/%s\n' % name)
 
     def missing_big_files(list):
-        """Check list (of names) and reutnr mising ones.  .Z extension
+        """Check list (of names) and return mising ones.  .Z extension
         is also tried if supplied name is not found.
         """
 

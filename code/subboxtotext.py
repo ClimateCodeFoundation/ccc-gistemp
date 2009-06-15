@@ -41,7 +41,8 @@ import fort
 import struct
 import sys
 
-def totext(file, output=sys.stdout, error=sys.stderr, metaonly=False):
+def totext(file, output=sys.stdout, error=sys.stderr, metaonly=False,
+  bos='>'):
     """Convert binary gridded subbox file to text format.
     
     If metaonly is True then only the subbox metadata is output, the
@@ -58,7 +59,7 @@ def totext(file, output=sys.stdout, error=sys.stderr, metaonly=False):
     # replaced.
     fmt = '%%0%dx' % (2*w)
 
-    f = fort.File(file)
+    f = fort.File(file, bos=bos)
 
     r = f.readline()
 
@@ -104,15 +105,18 @@ def main(argv=None):
         argv = sys.argv
 
     metaonly = False
-    opt, arg = getopt.getopt(argv[1:], 'm')
+    bos = '>'
+    opt, arg = getopt.getopt(argv[1:], 'mb:')
     for o,v in opt:
         if o == '-m':
             metaonly = True
+        if o == '-b':
+            bos = v
     if len(arg) == 0:
-        totext(sys.stdin, metaonly=metaonly)
+        totext(sys.stdin, metaonly=metaonly, bos=bos)
     else:
         for n in arg:
-            totext(open(n, 'rb'), metaonly=metaonly)
+            totext(open(n, 'rb'), metaonly=metaonly, bos=bos)
 
 if __name__ == '__main__':
     main()

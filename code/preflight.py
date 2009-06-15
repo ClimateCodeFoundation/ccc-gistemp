@@ -86,7 +86,10 @@ def checkit(log):
         Ts.strange.RSU.list.IN
         Ts.discont.RS.alter.IN
         """.split()
-    for name in step1:
+    step5 = """
+        SBBX.HadR2
+        """.split()
+    for name in step1 + step5:
         if not input_ok(name):
             missing_input(name)
             rc = max(rc, 2)

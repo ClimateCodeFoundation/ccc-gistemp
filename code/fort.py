@@ -8,6 +8,14 @@ method (for reading records) and the iterator protocol (for reading)."""
 
 import struct
 
+class Error(Exception):
+    """An Exception."""
+    pass
+
+class FormatError(Error):
+    """A problem with the expected format of a file."""
+    pass
+
 class File :
   """A Fortran file object."""
   
@@ -91,6 +99,12 @@ class File :
     # to self.w.  So, for now, we don't.
     assert self.w == 4
 
+    # Location of start of record.
+    at = 'unknown'
+    try:
+        at = self.fd.tell()
+    except:
+        pass
     # Get record length in bytes ...
     l = self.readi()
     if l is None :
@@ -100,6 +114,11 @@ class File :
     # then check the terminating word is also equal to l
     check = self.readi()
 
+    if check != l:
+        at = str(at)
+        raise FormatError(
+          "Record prefix %d does not match suffix %r;"
+          " record starting at %s." % (l, check, at))
     # :todo: Should really raise a (documented) exception here.
     # Instead...
     assert check == l

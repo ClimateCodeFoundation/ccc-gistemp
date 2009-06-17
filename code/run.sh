@@ -100,21 +100,25 @@ done
 bin/invnt.exe work/Ts.GHCN.CL.PA > work/Ts.GHCN.CL.PA.station.list
 
 echo "====> STEP 3 ===="
+
+# We produce big-endian outputs because that's what GISS do, and we can
+# compare their outputs (which are published) with ours, more easily.
 python code/step3.py
-mv work/SBBX1880.Ts.GHCN.CL.PA.1200 work/fort.10
-GFORTRAN_CONVERT_UNIT="big_endian:10" bin/trimSBBX.exe
+mv work/SBBX1880.Ts.GHCN.CL.PA.1200 work/SBBX1880.Ts.GHCN.CL.PA.1200-untrimmed
+cp work/SBBX1880.Ts.GHCN.CL.PA.1200-untrimmed work/fort.10
+GFORTRAN_CONVERT_UNIT="big_endian" bin/trimSBBX.exe
 mv work/fort.11 work/SBBX1880.Ts.GHCN.CL.PA.1200
 
 echo "====> skipping STEP 4; see code/STEP4_5/do_comb_step4.sh ===="
 
 echo "====> STEP 5 ===="
 # At least for now, our SBBX.HadR2 file is generated on a GISS AIX
-# machine, so has big-endian binary data.  So we use
-# GFORTRAN_CONVERT_UNIT to tell that to Fortran.
+# machine, so has big-endian binary data.  Our STEP 3 outputs are also
+# big-endian.  GFORTRAN_CONVERT_UNIT magic.
 
-GFORTRAN_CONVERT_UNIT="big_endian:11" bin/SBBXotoBX.exe 100 0 > log/SBBXotoBX.log
-bin/zonav.exe > log/zonav.Ts.ho2.GHCN.CL.PA.log
-bin/annzon.exe  > log/annzon.Ts.ho2.GHCN.CL.PA.log
+GFORTRAN_CONVERT_UNIT="big_endian" bin/SBBXotoBX.exe 100 0 > log/SBBXotoBX.log
+GFORTRAN_CONVERT_UNIT="big_endian" bin/zonav.exe > log/zonav.Ts.ho2.GHCN.CL.PA.log
+GFORTRAN_CONVERT_UNIT="big_endian" bin/annzon.exe  > log/annzon.Ts.ho2.GHCN.CL.PA.log
 
 python code/step5res.py result/GLB.Ts.ho2.GHCN.CL.PA.txt > result/google-chart.url
 echo "See result/google-chart.url"

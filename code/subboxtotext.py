@@ -42,11 +42,22 @@ import struct
 import sys
 
 def totext(file, output=sys.stdout, error=sys.stderr, metaonly=False,
-  bos='>'):
+  bos='>', trimmed='fromfile'):
     """Convert binary gridded subbox file to text format.
     
     If metaonly is True then only the subbox metadata is output, the
-    time series are not."""
+    time series are not.
+    
+    `trimmed` determines whether the input file is trimmed; it can be
+    one of ``True`` (file is trimmed), ``False`` (file is not trimmed),
+    or ``'fromfile'`` (will examine file to determine if it is trimmed
+    or not).
+    """
+
+    assert trimmed in [True, False, 'fromfile']
+    if trimmed == 'fromfile':
+        raise NotImplementedError(
+          'Detecting trimmed/untrimmed from file is not implemented')
 
     # Compute the width of a standard word according to Python's struct
     # module...
@@ -65,7 +76,7 @@ def totext(file, output=sys.stdout, error=sys.stderr, metaonly=False,
 
     # Number of words in header, preceding title.
     n = 8
-    info = struct.unpack('%di' % n, r[:n*w])
+    info = struct.unpack(bos + ('%di' % n), r[:n*w])
     print info
     print r[n*w:]
     yrbeg = info[5]
@@ -75,19 +86,23 @@ def totext(file, output=sys.stdout, error=sys.stderr, metaonly=False,
         km = 12
 
     for r in f:
-        trail = r[-7*w:]
-        box = struct.unpack('4i', trail[:4*w])
+        if trimmed:
+            meta = r[1*w:8*w]
+            r = r[8*w:]
+        else:
+            meta = r[-7*w:]
+            r = r[:-7*w]
+        box = struct.unpack(bos + '4i', meta[:4*w])
         box = tuple(map(lambda x: x/100.0, box))
-        nstns, nstmns = struct.unpack('2I', trail[4*w:6*w])
-        d = struct.unpack('f', trail[6*w:])[0]
+        nstns, nstmns = struct.unpack(bos + '2I', meta[4*w:6*w])
+        d = struct.unpack(bos + 'f', meta[6*w:])[0]
         loc = '%+06.2f%+06.2f%+07.2f%+07.2f' % box
         output.write('%s META %3d %6d %f\n' % (loc, nstns, nstmns, d))
         if metaonly:
             continue
         
-        r = r[:-7*w]
         n = len(r)//wf  # number of time series entries
-        t = struct.unpack('%df' % n, r)
+        t = struct.unpack(bos + ('%df' % n), r)
         # 12 entries per output line, which is usually one year's worth,
         # (but see km).
         p = 12
@@ -106,17 +121,23 @@ def main(argv=None):
 
     metaonly = False
     bos = '>'
-    opt, arg = getopt.getopt(argv[1:], 'mb:')
+    trimmed = 'fromfile'
+    opt, arg = getopt.getopt(argv[1:], 'b:mtu')
     for o,v in opt:
         if o == '-m':
             metaonly = True
         if o == '-b':
             bos = v
+        if o == '-t':
+            trimmed = True
+        if o == '-u':
+            trimmed = False
     if len(arg) == 0:
-        totext(sys.stdin, metaonly=metaonly, bos=bos)
+        totext(sys.stdin, metaonly=metaonly, bos=bos, trimmed=trimmed)
     else:
         for n in arg:
-            totext(open(n, 'rb'), metaonly=metaonly, bos=bos)
+            totext(open(n, 'rb'), metaonly=metaonly, bos=bos,
+              trimmed=trimmed)
 
 if __name__ == '__main__':
     main()

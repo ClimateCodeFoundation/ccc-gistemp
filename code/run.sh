@@ -17,10 +17,6 @@ fi
 
 # Compile all the FORTRAN
 mkdir -p bin
-${fortran_compile} code/STEP2/text_to_binary.f -o bin/text_to_binary.exe
-${fortran_compile} code/STEP2/split_binary.f -o bin/split_binary.exe
-${fortran_compile} code/STEP2/trim_binary.f -o bin/trim_binary.exe
-${fortran_compile} code/STEP2/invnt.f -o bin/invnt.exe
 ${fortran_compile} code/STEP2/toANNanom.f -o bin/toANNanom.exe
 ${fortran_compile} code/STEP2/PApars.f code/STEP2/tr2.f code/STEP2/t2fit.f -o bin/PApars.exe
 ${fortran_compile} code/STEP2/flags.f -o  bin/flags.exe
@@ -41,20 +37,16 @@ python code/step1.py
 
 echo "====> STEP 2 ===="
 echo "converting text to binary file"
-bin/text_to_binary.exe `cat work/GHCN.last_year`
+python code/text_to_binary.py `cat work/GHCN.last_year`
 
 echo "breaking up Ts.bin into 6 zonal files"
-bin/split_binary.exe
+python code/split_binary.py
 
 echo "trimming Ts.bin1-6"
-bin/trim_binary.exe
-
-for i in 1 2 3 4 5 6
-  do  mv work/Ts.bin$i.trim work/Ts.GHCN.CL.$i
-done
+python code/trim_binary.py
 
 echo "preparations for urban adjustment"
-bin/invnt.exe work/Ts.GHCN.CL > work/Ts.GHCN.CL.station.list
+python code/invnt.py work/Ts.GHCN.CL > work/Ts.GHCN.CL.station.list
 
 echo "Creating annual anomalies"
 for n in 1 2 3 4 5 6

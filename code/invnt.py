@@ -33,7 +33,6 @@ def invntSingleFile(fileNumber):
     fname = "%s.%d" % (args[0], fileNumber)
     progress = script_support.countReport(
             50, fmt="File %s: %%d records processed\n" % fname)
-    base = os.path.basename(fname)
     f15 = fort.open(fname, "rb")
     header = ccc_binary.CCHeader(data=f15.readline())
     n1 = header.info[0]
@@ -56,7 +55,7 @@ def invntSingleFile(fileNumber):
         if ID <= rec.ID:
             sys.stdout.write(
                 "%s %9d %-30s lat,lon (.1deg)%5d%6d %s%s%s cc=%3s\n" % (
-                    base, rec.ID, rec.name[:30], rec.Lat, rec.Lon,
+                    fname, rec.ID, rec.name[:30], rec.Lat, rec.Lon,
                     rec.name[31], rec.name[30], rec.name[32],
                     rec.name[33:36],
                 ))

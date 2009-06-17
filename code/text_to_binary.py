@@ -60,8 +60,6 @@ def main(args):
 
     lastyr = script_support.parseIntArg(0, args)
     MTOT = 12 * (lastyr - iyear1 + 1)
-    if options.verbose >= 1:
-        print "Last year with data: %s" % (lastyr,)
     idata = [array.array("i", [0] * MTOT) for i in range(multm + 1)]
 
     header = ccc_binary.CCHeader()
@@ -97,7 +95,7 @@ def main(args):
     rec = ccc_binary.CCRecord(MTOT)
     while line:
         ict = ict + 1
-        if ict % 1000 == 0 and options.verbose >= 2:
+        if ict % 1000 == 0:
             print "%d processed so far" % ict
         lat, lon, sid, ht, name = fort.unpackRecord(line, 2,
                 "i4,i5,a12,i4,a36")
@@ -126,8 +124,7 @@ def main(args):
                         writeRecord(f2, rec, idata[m], lato, lono, id[m],
                                 hto, nameo, MTOT)
                     else:
-                        if options.verbose >= 1:
-                            f88.write("Dropped %s %s\n" % (id[m], nameo))
+                        f88.write("%12d  %sdropped\n" % (id[m], nameo))
 
             mult = 0
             id1o = id1
@@ -155,14 +152,14 @@ def main(args):
                     idata[mult][ix + m] = idatum
                     iok[m - 1] = iok[m - 1] + 1
                     mmax[mult] = max(mmax[mult], iok[m - 1])
-                    monmin = min(monmin, ix + m)
-                    monmax = ix + m
+                    monmin = min(monmin, ix + m + 1)
+                    monmax = ix + m + 1
 
             # F: goto 20
         # F: 30    continue
 
-        f99.write("%s %s %s %s %s %s\n" % (
-                mult, id[mult], mmax[mult],lim, monmin,monmax))
+        f99.write("%12d%12d%12d%12d%12d%12d\n" % (
+                mult, id[mult], mmax[mult],lim, monmin, monmax))
         lato = lat
         lono = lon
         hto = ht
@@ -174,8 +171,7 @@ def main(args):
                 writeRecord(f2, rec, idata[m], lato, lono, id[m],
                         hto, nameo, MTOT)
             else:
-                if options.verbose >= 1:
-                    f88.write("Dropped %s %s\n" % (id[m], nameo))
+                f88.write("%12d  %sdropped\n" % (id[m], nameo))
 
     for f in (f1, f2, f3, f88, f99):
         f.close()

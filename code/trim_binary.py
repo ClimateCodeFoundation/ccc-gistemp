@@ -26,7 +26,7 @@ def trimSingleFile(fileNumber):
     """
     filei = "work/Ts.bin%s" % fileNumber
     f2 = fort.open(filei, "rb")
-    fileo = "%s%s" % (filei, ".trim")
+    fileo = "work/Ts.GHCN.CL.%s" % fileNumber
     f3 = ccc_binary.BufferedOutputRecordFile(fileo)
 
     header = ccc_binary.CCHeader(f2.readline())

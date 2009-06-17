@@ -41,7 +41,7 @@ import fort
 import struct
 import sys
 
-def totext(file, output=sys.stdout, error=sys.stderr, metaonly=False,
+def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
   bos='>', trimmed='fromfile'):
     """Convert binary gridded subbox file to text format.
     
@@ -55,9 +55,6 @@ def totext(file, output=sys.stdout, error=sys.stderr, metaonly=False,
     """
 
     assert trimmed in [True, False, 'fromfile']
-    if trimmed == 'fromfile':
-        raise NotImplementedError(
-          'Detecting trimmed/untrimmed from file is not implemented')
 
     # Compute the width of a standard word according to Python's struct
     # module...
@@ -84,6 +81,9 @@ def totext(file, output=sys.stdout, error=sys.stderr, metaonly=False,
     km = 1
     if mavg == 6:
         km = 12
+    if trimmed == 'fromfile':
+        trimmed = info[0] != 1
+        print >>log, "Determined that trimmed=%s from file." % trimmed
 
     for r in f:
         if trimmed:

@@ -97,11 +97,11 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
         nstns, nstmns = struct.unpack(bos + '2I', meta[4*w:6*w])
         d = struct.unpack(bos + 'f', meta[6*w:])[0]
         loc = '%+06.2f%+06.2f%+07.2f%+07.2f' % box
-        output.write('%s META %3d %6d %f\n' % (loc, nstns, nstmns, d))
+        n = len(r)//wf  # number of time series entries
+        output.write('%s META %6d %3d %6d %f\n' % (loc, n, nstns, nstmns, d))
         if metaonly:
             continue
         
-        n = len(r)//wf  # number of time series entries
         t = struct.unpack(bos + ('%df' % n), r)
         # 12 entries per output line, which is usually one year's worth,
         # (but see km).

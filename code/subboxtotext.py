@@ -19,7 +19,7 @@
 # Record 3: ...
 #
 # The header comprises of 8 words followed by 80 characters:
-# INFO(1)   1 (not trimmed)
+# INFO(1)   1 (when not trimmed); NM1 (when trimmed)
 #     (2)   KQ
 #     (3)   MAVG
 #     (4)   MONM (length of each time series)
@@ -28,14 +28,43 @@
 #     (7)   BAD (bad data value, as integer)
 #     (8)   precipitation trace flag
 # TITLE     80-character string.
+
+# (input) Files can be trimmed or untrimmed (see trimSBBX.f).
 #
-# Each subbox record consists of:
-# MONM single-precision floats;
-# 4 (signed) integers for the bounds of the subbox
-# nstns is the number of stations combined into the subbox time series
-# nstmn is the total number of data used from all the combined stations
-# d is an approximation to the distance from the box centre of the
-# nearest station used.
+# For a trimmed file the first word of each record determines the number
+# of months of station data for the next record.  Python does not need
+# this and generally ignores it.  But, it uses this value in the first
+# record (which is the header, above) to determine in the file is
+# trimmed or not.
+#
+# The order of data for the remaining records of the file (all the
+# records subsequent to the first header record) depends on whether the
+# file is trimmed or not.
+#
+# Each record (except the first) consists of the data series for a
+# single subbox.  Comprising:
+# - for untrimmed:
+#      - single-precision floats;
+#      - record metadata.
+# - for trimmed:
+#      - NMi (the number of data in the _next_ record);
+#      - record metadata;
+#      - single-precision floats.
+#
+# The single-precision floats are the record data.  For untrimmed files
+# their are MONM floats (see header for MONM); for trimmed files the
+# number of floats is given by the first word in the previous record
+# (denoted NMi above).  For either trimmed or untrimmed the metadata is
+# the same (but where it appears in the record differs):
+#
+# 4 (signed) integers for the bounds of the subbox (in centidegrees,
+#   with the usual Earth co-ordinate system).
+# nstns (unsigned integer) is the number of stations combined into
+#   the subbox time series
+# nstmn (unsigned integer) is the total number of data used from all
+#   the combined stations
+# d (single precision float) is an approximation to the distance from the
+#   box centre to the nearest station used.
 
 import fort
 import struct

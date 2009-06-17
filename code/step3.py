@@ -497,8 +497,10 @@ def subbox_grid(infile,
         beginning of the _previous_ record.
         """
 
-        # Assertion only true when flush_out has been called (see
-        # below); in that case, there should be no subsequent output.
+        # The assertion only fire after flush_out has been called (see
+        # below); once flush_out has been called, no-one should be
+        # calling this function, so this assertion provides a check that
+        # no-one is.
         assert output_line_buffer[0] is not IOError
 
         # Only the first record output (the header row) is allowed to

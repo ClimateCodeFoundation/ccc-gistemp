@@ -104,10 +104,6 @@ echo "====> STEP 3 ===="
 # We produce big-endian outputs because that's what GISS do, and we can
 # compare their outputs (which are published) with ours, more easily.
 python code/step3.py
-mv work/SBBX1880.Ts.GHCN.CL.PA.1200 work/SBBX1880.Ts.GHCN.CL.PA.1200-untrimmed
-cp work/SBBX1880.Ts.GHCN.CL.PA.1200-untrimmed work/fort.10
-GFORTRAN_CONVERT_UNIT="big_endian" bin/trimSBBX.exe
-mv work/fort.11 work/SBBX1880.Ts.GHCN.CL.PA.1200
 
 echo "====> skipping STEP 4; see code/STEP4_5/do_comb_step4.sh ===="
 

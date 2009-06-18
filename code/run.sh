@@ -17,7 +17,6 @@ fi
 
 # Compile all the FORTRAN
 mkdir -p bin
-${fortran_compile} code/STEP2/toANNanom.f -o bin/toANNanom.exe
 ${fortran_compile} code/STEP2/PApars.f code/STEP2/tr2.f code/STEP2/t2fit.f -o bin/PApars.exe
 ${fortran_compile} code/STEP2/flags.f -o  bin/flags.exe
 ${fortran_compile} code/STEP2/padjust.f -o bin/padjust.exe
@@ -49,13 +48,7 @@ echo "preparations for urban adjustment"
 python code/invnt.py work/Ts.GHCN.CL > work/Ts.GHCN.CL.station.list
 
 echo "Creating annual anomalies"
-for n in 1 2 3 4 5 6
-do ln work/Ts.GHCN.CL.$n work/fort.2
-   if bin/toANNanom.exe
-   then mv work/fort.3 work/ANN.dTs.GHCN.CL.$n
-   else rm work/fort.[23] ; echo "no luck with Ts.GHCN.CL.$n" ; exit ; fi
-   rm work/fort.2
-done
+python code/toANNanom.py
 
 for n in 1 2 3 4 5 6
 do

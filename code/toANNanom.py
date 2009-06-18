@@ -114,8 +114,7 @@ _fixMap = {
 }
 
 
-def fixRoundingIssue(fixData, yIdx, v, frac):
-    recordIdx, fname = fixData
+def fixRoundingIssue(recordIdx, yIdx, v, frac):
     key = recordIdx, yIdx, v
     hv = v
     if v < 0:
@@ -127,7 +126,7 @@ def fixRoundingIssue(fixData, yIdx, v, frac):
     return v + _fixMap.get(key, 0)
 
 
-def annav(mon, nyrs, iy1, ibad, m1, emuBug=False, fixData=()):
+def annav(mon, nyrs, iy1, ibad, m1, recordIdx, emuBug=False):
     # Work out the average for each month of the year (Jan, Feb, ..., Dec).
     # First group values for each month of the year.
     if emuBug:
@@ -180,7 +179,7 @@ def annav(mon, nyrs, iy1, ibad, m1, emuBug=False, fixData=()):
             w = w + 0.5
             a, b = w * 0.9999950, w * 1.0000050
             if a < absV < b:
-                iann[yIdx] = fixRoundingIssue(fixData, yIdx, iann[yIdx], frac)
+                iann[yIdx] = fixRoundingIssue(recordIdx, yIdx, iann[yIdx], frac)
 
             iy2n = iy1 + yIdx
             if iy1n == ibad:
@@ -189,10 +188,10 @@ def annav(mon, nyrs, iy1, ibad, m1, emuBug=False, fixData=()):
     return iy1n, iy2n, iann
     
 
-def do_th_stuff():
-    fname = "work/fort.2"
-    f2 = fort.open("work/fort.2", "rb")
-    f3 = ccc_binary.BufferedOutputRecordFile("work/fort.3")
+def toANNanom(i):
+    fname = "work/Ts.GHCN.CL.%d" % i
+    f2 = fort.open(fname, "rb")
+    f3 = ccc_binary.BufferedOutputRecordFile("work/ANN.dTs.GHCN.CL.%d" % i)
     header = ccc_binary.CCHeader(data=f2.readline())
     ibad = header.info[7 - 1]
     if header.info[1 - 1] == ibad:
@@ -208,7 +207,7 @@ def do_th_stuff():
     m2 = header.info[8]
 
     progress = script_support.countReport(
-            50, fmt="File %s: %%d records processed\n" % "fort.2")
+            50, fmt="File %s: %%d records processed\n" % fname)
     f3.writeRecord(outHdr)
     doneHeader = False
 
@@ -224,8 +223,8 @@ def do_th_stuff():
         if nyrs < 0:
             sys.exit('no station records  -  impossible')
 
-        i1, i2, iann = annav(inRec.idata[0:nMonths], nyrs, iy1, ibad, m1,
-                emuBug=(m2 % 12 == 0), fixData=(recordCount, fname))
+        i1, i2, iann = annav(inRec.idata[0:nMonths], nyrs, iy1, ibad, m1, recordCount,
+                emuBug=(m2 % 12 == 0))
         m1, m2 = inRec.m1, inRec.m2
         if i1 == ibad:
             continue
@@ -259,7 +258,8 @@ def main(args):
 
     This simply invokes invntSingleFile for n = 1, 2, ... 6.
     """
-    do_th_stuff()
+    for i in range(1,7):
+        toANNanom(i)
 
 
 if __name__ == "__main__":

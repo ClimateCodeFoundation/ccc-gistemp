@@ -84,7 +84,5 @@ if __name__ == "__main__":
     usage = "usage: %prog [options]"
     parser = script_support.makeParser(usage)
     options, args = script_support.parseArgs(parser, __doc__, (1, 1))
-    if not options.no_psyco:
-        script_support.enablePysco(__file__, main, invntSingleFile)
     main(args)
 

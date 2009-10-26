@@ -1,0 +1,26 @@
+Notes on the use of input, output, and intermediate files in Fortran
+STEP4.
+
+Nick Barnes, Ravenbrook Limited, 2009-06-23
+
+input_files/SBBX.HadR2         (originally from ????)
+input_files/oiv2mon<yyyy><mm>  (optionally for several consecutive values of <mm> at once,
+                                from <ftp://ftp.emc.ncep.noaa.gov/cmb/sst/oimonth_v2/> and gunzipped).
+input_files/SBBX_LtSN.LnWE.dat (distributed as .gz with GISTEMP)
+input_files/oisstv2_mod4.clim  (distributed as .gz with GISTEMP)
+
+-> do_comb_step4.sh <yyyy> <m1> [<m2>]
+   (driving convert1.HadR2_mod4.f) ->
+
+SBBX.HadR2.upd
+
+-> trimSBBX
+   (driving trimSBBX.f) ->
+
+SBBX.HadR2.upd.trim
+
+[instructions then say mv SBBX.HadR2.upd.trim input_files/SBBX.HadR2]
+
+The program convert.HadR2_mod4.upto15full_yrs.f, driven by
+do.mult_year.TocnHR2.upd, does the same, but for up to 15 consecutive
+years together (requires a lot of oiv2mon<yyyy><mm> files).

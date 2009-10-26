@@ -31,101 +31,6 @@ def yearMonthEnumerate(monthData, m1):
             yearIdx += 1
 
 
-# Map providing adjustment for a few values that round the wrong way wrt the
-# fortran code. The key is (recordIdx, yearIdx, calcValue. The value is an
-# adjustment, which should only ever be 1, 0 or -1.
-#
-# This is a stop-gap measure to make it easier to verify correct operation
-# as we develop Python equivalents of each Fortran program.
-#
-# Note: Entries with an adjusted of zero have, of course, no effect. They
-#       exist to provide to make it easy to increase the tolerance used to
-#       identify values that may need correcting.
-_fixMap = {
-    # For output = work/ANN.dTs.GHCN.CL.1
-    (240,  9,  -17):   1,
-           
-    # For output = work/ANN.dTs.GHCN.CL.2
-    ( 292,   7,   55):    -1,   # 0x00000037,  frac=0.500000000000
-    ( 292,  12,  -70):    -1,   # 0xffffffba,  frac=0.500000000000
-    ( 292,  24,   60):    -1,   # 0x0000003c,  frac=0.500000000000
-    ( 292,  28,  -20):    -1,   # 0xffffffec,  frac=0.500000000000
-    ( 292,  32,  -60):    -1,   # 0xffffffc4,  frac=0.500000000000
-    ( 292,  35,  -15):    -1,   # 0xfffffff1,  frac=0.500000000000
-    ( 333,   0,    8):     1,   # 0x00000008,  frac=0.500000000000
-    ( 558, 104,   85):     0,   # 0x00000055,  frac=0.500012000765
-    ( 669,   2,   63):    -1,   # 0x0000003f,  frac=0.500000000000
-    ( 716,  11,  -38):     0,   # 0xffffffda,  frac=0.500000000000
-    ( 716,  14,   17):     1,   # 0x00000011,  frac=0.500000000000
-    ( 716,  22,   97):     1,   # 0x00000061,  frac=0.500000000000
-    ( 716,  23,   32):     1,   # 0x00000020,  frac=0.500000000000
-    ( 716,  25,  -93):     0,   # 0xffffffa3,  frac=0.500000000000
-    ( 716,  34, -198):     0,   # 0xffffff3a,  frac=0.500000000000
-    ( 716,  38,   67):     1,   # 0x00000043,  frac=0.500000000000
-    ( 716,  39,  132):     1,   # 0x00000084,  frac=0.500000000000
-    ( 716,  40,  218):     0,   # 0x000000da,  frac=0.500000000000
-    ( 716,  44,  -53):     1,   # 0xffffffcb,  frac=0.500000000000
-    ( 749,  12,  -75):    -1,   # 0xffffffb5,  frac=0.500000000000
-    ( 749,  16,  -95):    -1,   # 0xffffffa1,  frac=0.500000000000
-    (1295,  18,   64):     0,   # 0x00000040,  frac=0.500000000000
-    (1295,  22,  140):    -1,   # 0x0000008c,  frac=0.500000000000
-    (2578,   2,  -96):     0,   # 0xffffffa0,  frac=0.499981103553
-    (2663,  82,  289):     1,   # 0x00000121,  frac=0.499973992497
-    (2797, 110,  209):     0,   # 0x000000d1,  frac=0.500096974966
-    (3241,  35,   86):     1,   # 0x00000056,  frac=0.500000000000
-    (3263,   2,   76):     0,   # 0x0000004c,  frac=0.500000000000
-    (3263,   9,  -14):     0,   # 0xfffffff2,  frac=0.500000000000
-    (3263,  17,   -4):     0,   # 0xfffffffc,  frac=0.500000000000
-    (3263,  18,  -24):     0,   # 0xffffffe8,  frac=0.500000000000
-    (3263,  27,  -90):     1,   # 0xffffffa6,  frac=0.500000000000
-    (3263,  30,   26):     0,   # 0x0000001a,  frac=0.500000000000
-    (3298,   0,   95):    -1,   # 0x0000005f,  frac=0.500000000000
-    (3316,   0,  110):    -1,   # 0x0000006e,  frac=0.500000000000
-    (3502,  30,  127):     0,   # 0x0000007f,  frac=0.500000000000
-    (3602,   0,   28):    -1,   # 0x0000001c,  frac=0.500000000000
-    (3705,   0, -122):     0,   # 0xffffff86,  frac=0.500000000000
-    (3876,   5,  -43):     0,   # 0xffffffd5,  frac=0.500000000000
-    (3876,  10,   -8):     0,   # 0xfffffff8,  frac=0.500000000000
-    (3876,  12,  -53):     0,   # 0xffffffcb,  frac=0.500000000000
-
-    # For output = work/ANN.dTs.GHCN.CL.3
-    ( 323,   0,  -17):    -1,   # 0xffffffef,  frac=0.500000000000
-    ( 625,   0,   71):     0,   # 0x00000047,  frac=0.500000000000
-    ( 908,   3,  -33):     0,   # 0xffffffdf,  frac=0.500000000000
-    ( 908,   4,  -63):     0,   # 0xffffffc1,  frac=0.500000000000
-    ( 908,   9,    2):     0,   # 0x00000002,  frac=0.500000000000
-    ( 908,  11,  -63):     0,   # 0xffffffc1,  frac=0.500000000000
-    (1006,   0,  -19):     0,   # 0xffffffed,  frac=0.500000000000
-    (1007,   2,    8):     0,   # 0x00000008,  frac=0.500000000000
-    (1007,   7,   33):     0,   # 0x00000021,  frac=0.500000000000
-    (1007,  11,  -17):    -1,   # 0xffffffef,  frac=0.500000000000
-
-    # For output = work/ANN.dTs.GHCN.CL.5
-    (  96,  25,  -47):     0,   # 0xffffffd1,  frac=0.499925909420
-    ( 232,   1,  173):     0,   # 0x000000ad,  frac=0.500017127746
-    ( 339,   0,  107):     0,   # 0x0000006b,  frac=0.499802146304
-    ( 360,  66,  -58):     0,   # 0xffffffc6,  frac=0.500240385412
-    ( 408,   1,   91):    -1,   # 0x0000005b,  frac=0.500018695593
-    ( 408,   3,   31):    -1,   # 0x0000001f,  frac=0.500018695593
-    ( 408,  11,   21):    -1,   # 0x00000015,  frac=0.500018695593
-    ( 408,  15,   56):    -1,   # 0x00000038,  frac=0.500018695593
-    ( 408,  18,  -89):    -1,   # 0xffffffa7,  frac=0.499981304407
-    ( 408,  28,   16):    -1,   # 0x00000010,  frac=0.500018695593
-}
-
-
-def fixRoundingIssue(recordIdx, yIdx, v, frac):
-    key = recordIdx, yIdx, v
-    hv = v
-    if v < 0:
-        hv = 0x100000000 + v
-    adjust = _fixMap.get(key, 0)
-    if key not in _fixMap:
-        print "Potential round error:    (%4d, %3d, %4d): %5d,   # 0x%08x,  frac=%.12f" % (
-                recordIdx, yIdx, v, adjust, hv, frac)
-    return v + _fixMap.get(key, 0)
-
-
 def annav(mon, nyrs, iy1, ibad, m1, recordIdx, emuBug=False):
     # Work out the average for each month of the year (Jan, Feb, ..., Dec).
     # First group values for each month of the year.
@@ -168,18 +73,6 @@ def annav(mon, nyrs, iy1, ibad, m1, recordIdx, emuBug=False):
         if len(data) > 2:
             v = (10.0 * sum(data)) / len(data)
             iann[yIdx] = int(round(v))
-
-            # Fortran appears to use single precision floats, but python uses
-            # double precision. This can cause a fair number of differences
-            # following summing and rounding. The following maths is to identify
-            # potential value that suffer in this way, so they can (for now) be
-            # adjusted to match the fortran results.
-            absV = abs(v)
-            w, frac = divmod(absV, 1)
-            w = w + 0.5
-            a, b = w * 0.9999950, w * 1.0000050
-            if a < absV < b:
-                iann[yIdx] = fixRoundingIssue(recordIdx, yIdx, iann[yIdx], frac)
 
             iy2n = iy1 + yIdx
             if iy1n == ibad:
@@ -267,9 +160,5 @@ if __name__ == "__main__":
     usage = "usage: %prog [options]"
     parser = script_support.makeParser(usage)
     options, args = script_support.parseArgs(parser, __doc__, (0, 0))
-    # Psyco simply does not play nicely with this program.
-    # if not options.no_psyco:
-    #     script_support.enablePysco(__file__, main,
-    #            yearMonthEnumerate, fixRoundingIssue, annav, do_th_stuff)
     main(args)
 

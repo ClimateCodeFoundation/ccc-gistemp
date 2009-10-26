@@ -1,0 +1,38 @@
+Notes on the use of input, output, and intermediate files in Fortran
+STEP5.
+
+Nick Barnes, Ravenbrook Limited, 2009-06-23
+
+do_comb_step5.sh [<R>, default 100], which farms some script work out to
+zonav ho2.GHCN.CL.PA, does this:
+
+input_files/SBBX1880.Ts.GHCN.CL.PA.1200 [10]
+input_files/SBBX.HadR2 [11]
+
+-> SBBXotoBX.f <R> 0
+   "C *** This program combines 8000 subbox to 80 box data"
+   ->
+
+[12] BX.Ts.ho2.GHCN.CL.PA.1200 [11]
+
+-> zonav.f
+   "C**** This program combines the given gridded data (anomalies)
+    C**** to produce AVERAGES over various LATITUDE BELTS."
+    ->
+
+[stdout] zonav.Ts.ho2.GHCN.CL.PA.log
+[10] work_files/ZON.Ts.ho2.GHCN.CL.PA.1200.step1
+
+-> annzon.f
+   "C *** program reads ZONAL monthly means and recomputes REGIONAL means
+    C *** as well as annual means."
+   ->
+
+[stdout] annzon.Ts.ho2.GHCN.CL.PA.log
+[96] results/ZonAnn.Ts.ho2.GHCN.CL.PA.txt
+[97] results/GLB.Ts.ho2.GHCN.CL.PA.txt
+[98] results/NH.Ts.ho2.GHCN.CL.PA.txt
+[99] results/SH.Ts.ho2.GHCN.CL.PA.txt
+[12] work_files/ZON.Ts.ho2.GHCN.CL.PA.1200
+[11] work_files/ANNZON.Ts.ho2.GHCN.CL.PA.1200
+[10] deleted

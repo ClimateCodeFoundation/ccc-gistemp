@@ -56,8 +56,9 @@ def main(args):
     """The main for this module.
 
     """
-    f78 = open("work/fort.78")
-    f2 = open("work/fort.2", "w")
+    f78 = open("work/PApars.pre-flags")
+    f2 = open("work/PApars.list", "w")
+    f2.write('CCdStationID  slope-l  slope-r knee    Yknee    slope     Ymid      RMS     RMSl 3-rur+urb ext.range flag\n')
     nstat = sumch = nyrs = nstap = nyrsp = sumchp = 0
     nsl1 = nsl2 = ndsl = nswitch = nsw0 = nok = nokx = nsta = 0
     nshort = 0
@@ -123,8 +124,5 @@ if __name__ == "__main__":
     usage = "usage: %prog [options]"
     parser = script_support.makeParser(usage)
     options, args = script_support.parseArgs(parser, __doc__, (0, 0))
-    if not options.no_psyco:
-        script_support.enablePysco(__file__,
-                main, readRec)
     main(args)
 

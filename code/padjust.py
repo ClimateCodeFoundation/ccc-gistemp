@@ -19,9 +19,6 @@ import fort
 import ccc_binary
 import script_support
 
-import padjust_fixups
-
-
 def verbose(level, s):
     if level <= options.verbose:
         print >>sys.stderr, s
@@ -45,25 +42,18 @@ def readRec(f):
     return cc, IDc, sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag
 
 
-def fixup(iin, rec):
-    fixup = padjust_fixups.fixups[iin]
-    for i, v in enumerate(rec.idata):
-        key = (rec.name, i, v)
-        rec.idata[i] = fixup.get(key, v)
-
-
 def main(args):
     """The main for this module.
 
     """
-    f1 = open("work/fort.1")
+    f1 = open("work/PApars.list")
     header = f1.readline()
     # Read the first adjustment record.
     cc, IDc, sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag = readRec(f1)
 
-    for iin in range(12, 17 + 1):
-        inF = fort.open("work/fort.%d" % iin)
-        outF = fort.open("work/fort.%d" % (iin + 10), "wb")
+    for iin in range(1, 7):
+        inF = fort.open("work/Ts.GHCN.CL.%d" % iin)
+        outF = fort.open("work/Ts.GHCN.CL.PA.%d" % iin, "wb")
 
         h = ccc_binary.CCHeader(inF.readline())
         ibad = h.info[6]
@@ -105,7 +95,6 @@ def main(args):
                 rec_o.idata[:] = rec_o.idata[aa:aa + bb]
                 rec_o.count = bb
                 print rec_o.count, len(rec_o.idata)
-                fixup(iin, rec_o)
                 m1o, m2o = a, b
                 h.info[0] = m1o
                 h.info[8] = m2o
@@ -121,7 +110,7 @@ def main(args):
             if not s:
                 outF.writeline(rec_o.binary)
                 print " station   %9s  %s saved %11d" % (
-                        rec_o.ID, rec_o.name, iin - 11)
+                        rec_o.ID, rec_o.name, iin)
                 break
 
             rec = ccc_binary.CCRecord(rec_o.m2 - rec_o.m1 + 1, data=s)
@@ -129,7 +118,7 @@ def main(args):
                 if rec.name[30:32] == " R" or rec.name[30] == "1":
                     outF.writeline(rec_o.binary)
                     print " station   %9s  %s saved %11d" % (
-                            rec_o.ID, rec_o.name, iin - 11)
+                            rec_o.ID, rec_o.name, iin)
                 else:
                     rec_o.m1, rec_o.m2 = rec.m1, rec.m2
                     print " station   %9s  %s skipped" % (
@@ -148,10 +137,9 @@ def main(args):
                 rec.count = bb
                 print rec.count, len(rec.idata)
                 rec_o.m1, rec_o.m2 = a, b
-                fixup(iin, rec)
                 outF.writeline(rec_o.binary)
                 print " station   %9s  %s saved %11d" % (
-                        rec_o.ID, rec_o.name, iin - 11)
+                        rec_o.ID, rec_o.name, iin)
                 IDc = -9999
                 ddd = readRec(f1)
                 if ddd[0] is not None:
@@ -202,8 +190,5 @@ if __name__ == "__main__":
     usage = "usage: %prog [options]"
     parser = script_support.makeParser(usage)
     options, args = script_support.parseArgs(parser, __doc__, (0, 0))
-    if not options.no_psyco:
-        script_support.enablePysco(__file__,
-                main, adj)
     main(args)
 

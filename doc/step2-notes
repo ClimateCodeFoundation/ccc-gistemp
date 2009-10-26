@@ -1,0 +1,146 @@
+Notes on the use of input, output, and intermediate files in Fortran
+STEP2.
+
+Nick Barnes, Ravenbrook Limited, 2009-06-18
+
+1. OVERALL FUNCTION
+
+The overall function of STEP2 is as follows:
+
+input/v2.inv
+Ts.txt
+GHCN.last_year
+
+-> 
+
+Ts.GHCN.CL.[1-6]
+Ts.GHCN.CL.PA.[1-6]
+
+"PA" stands for peri-urban adjustment.  STEP3 as it stands uses the
+adjusted data in the .PA. files, but can be tweaked to run with the
+non-adjusted data.
+
+2. SUB-STEPS
+
+STEP2 has 8 executables, run in this order:
+
+text_to_binary, split_binary, trim_binary, invnt, toANNanom (*6), PApars, flags, padjust, invnt
+
+STEP2 can be considered as three separate parts:
+
+"Step 2.1" takes Ts.txt and turns it into 6 trimmed binary files Ts.GHCN.CL.[1-6]
+text_to_binary, split_binary, trim_binary
+
+"Step 2.2" analyses these binary files and makes a list of adjustments PApars.list
+toANNanim, PApars, flags
+
+"Step 2.3" applies the adjustments PApars,list to Ts.GHCN.CL.[1-6] to make Ts.GHCN.CL.PA.[1-6]
+padjust
+
+invnt runs after "Step 2.1" and after "Step 2.3", to produce station
+lists, which are not used by subsequent code.
+
+
+3. Detail
+
+Brackets denote Fortran unit numbers, both input and output.
+
+
+[3] input/v2.inv
+[1] Ts.txt
+[arg] GHCN.last_year
+
+-> text_to_binary
+
+[2]  -> Ts.bin
+[88] -> log/short.station.list
+[99] -> log/station.log
+
+--
+
+[1] Ts.bin
+
+-> split_binary
+
+[51-56] -> Ts.bin[1-6]
+
+--
+
+[2] Ts.bin[1-6]
+
+-> trim_binary
+
+[3] -> Ts.bin[1-6].trim
+
+Ts.bin[1-6].trim renamed as Ts.GHCN.CL.[1-6]
+
+--
+
+[15] Ts.GHCN.CL.[1-6]
+
+-> invnt
+
+[stdout] -> Ts.GHCN.CL.station.list
+
+--
+
+Ts.GHCN.CL.[1-6] ln as fort.2
+
+[2] fort.2
+
+-> toANNanom
+
+[3] -> fort.3
+
+fort.2 deleted
+fort.3 renamed as ANN.dTs.GHCN.CL.[1-6]
+
+--
+
+ANN.dTs.GHCN.CL.[1-6] copied to fort.3[1-6]
+
+[31-36] fort.3[1-6]
+
+-> PApars
+
+[66] -> fort.66
+[77] -> fort.77
+[78] -> fort.78
+[79] -> fort.79
+[stdout] -> log/PApars.GHCN.CL.1000.20.log
+
+--
+
+[78] fort.78
+
+-> flags 
+
+[2] -> fort.2
+[stdout] ->> log/PApars.GHCN.CL.1000.20.log
+
+fort.78 deleted
+fort.2 written to PApars.list, with a header
+fort.66 moved to log/PApars.statn.log.GHCN.CL.1000.20
+fort.77 moved to log/PApars.statn.use.GHCN.CL.1000.20
+fort.79 moved to log/PApars.noadj.stations.list
+
+--
+
+[1] PApars.list ln as fort.1
+[12-17] Ts.GHCN.CL.[1-6] ln as fort.[12-17]
+
+-> padjust
+
+[22-27] -> fort.[22-27]
+[stdout] -> log/padjust.log
+
+fort.[12-17] and fort.1 deleted
+fort.[22-27] moved to Ts.GHCN.CL.PA.[1-6]
+
+--
+
+[15] Ts.GHCN.CL.PA.[1-6]
+
+-> invnt
+
+[stdout] Ts.GHCN.CL.PA.station.list

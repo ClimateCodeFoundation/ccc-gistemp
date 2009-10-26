@@ -19,9 +19,6 @@ import fort
 import ccc_binary
 import script_support
 
-# This is used to 'fix' the rounding differences in the PApars list output.
-import fix_PApars
-
 # Input parameters (# of input files, time period)
 km0 = 1
 iyrm0 = km0 * (3000 - 1880 + 1)
@@ -96,13 +93,13 @@ def main(args):
     g.isuData = []
 
     # Open the 6 input files and single output file.
-    infiles = [fort.open("work/fort.%s" % i) for i in range(31, 37)]
-    f78 = open("work/fort.78", "w")
+    infiles = [fort.open("work/ANN.dTs.GHCN.CL.%d" % i) for i in range(1, 7)]
+    f78 = open("work/PApars.pre-flags", "w")
 
     # And for some extra logging
-    f66 = open("work/fort.66", "w")  # combination info
-    f77 = open("work/fort.77", "w")  # station usage stats
-    f79 = open("work/fort.79", "w")  # isolated urban stations
+    f66 = open("log/PApars.statn.log.GHCN.CL.1000.20", "w")  # combination info
+    f77 = open("log/PApars.statn.use.GHCN.CL.1000.20", "w")  # station usage stats
+    f79 = open("log/PApars.noadj.stations.list", "w")  # isolated urban stations
 
     # Read header of the first file.
     header = ccc_binary.CCHeader(data=infiles[0].readline())
@@ -256,7 +253,7 @@ def main(args):
                 needNewNeighbours = False
 
             if iy1 == 1:
-                f66.write("year dts-urban dts-rural stnid=%9d\n" % (
+                f66.write("year dTs-urban dTs-rural StnID=%9d\n" % (
                     us.idu))
             tmean, n3l, nxy, n3, n3f, nxy3, tm3 = func3(
                 iy1, iyrm, avg, urb, iwt, ts, f, iyoff, yr, x, w, f66)
@@ -264,7 +261,7 @@ def main(args):
             if n3 < ncrit:
                 if usingFullRadius:
                     # print " Drop station", us.cc, " ", us.idu
-                    f79.write("%3s%9d  good years: %4d   total years: %4d"
+                    f79.write("%3s%09d  good years: %4d   total years: %4d"
                               " too little rural-neighbors-overlap"
                               " - drop station 9999\n" % (
                         us.cc, us.idu, n3, n3l - n3f + 1))
@@ -285,9 +282,9 @@ def main(args):
             iy1 = int(n3l - (n3 - 1) / xcrit)
             if iy1 < n3f + 1:
                 iy1 = n3f + 1                  # avoid infinite loop
-            # print "%3s%8d drop early years %4d-%4d" % (
+            # print "%3s%08d drop early years %4d-%4d" % (
             #         us.cc, us.idu, 1 + iyoff, iy1 - 1 + iyoff)
-            f79.write("%3s%9d drop early years %4d-%4d\n" % (
+            f79.write("%3s%09d drop early years %4d-%4d\n" % (
                     us.cc, us.idu, 1 + iyoff, iy1 - 1 + iyoff))
 
         if dropStation:
@@ -321,7 +318,7 @@ def main(args):
                 us.cc, us.idu, fpar[0], fpar[1], int(fpar[2] + x0),
                 fpar[3], fpar[4], fpar[5],
                 rmsp[0], rmsp[1], n3f + iyoff, n3l + iyoff, n1x, n2x)
-        f78.write("%s\n" % fix_PApars.fixTabEntry(s))
+        f78.write("%s\n" % s)
 
     verbose(1, "Comb T=%s" % T.next())
     nuse = 0
@@ -582,8 +579,5 @@ if __name__ == "__main__":
     usage = "usage: %prog [options] RngbrF NLAP"
     parser = script_support.makeParser(usage)
     options, args = script_support.parseArgs(parser, __doc__, (2, 2))
-    if not options.no_psyco:
-        script_support.enablePysco(__file__,
-                main, getNeighbours, func2, func3, cmbine, getfit, trend2)
     main(args)
 

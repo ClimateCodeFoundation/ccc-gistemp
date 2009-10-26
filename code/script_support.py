@@ -45,8 +45,6 @@ def makeParser(usage):
         help="Print a simple man page.")
     parser.add_option("-v", action="count", dest="verbose",
         help="Increase verbose level")
-    parser.add_option("--no-psyco", action="store_true",
-        help="Do no use psyco")
     parser.add_option("--verbose", action="store", type="int",
         metavar="<N>", default=0,
         help="Set verbose level to <N>")
@@ -114,21 +112,3 @@ def countReport(interval, fmt="%d ", f=None):
             except NameError:
                 pass
         yield count
-
-
-def enablePysco(progFile, *functions):
-    def psycoFilt(co):
-        if not os.path.basename(co.co_filename) == os.path.basename(progFile):
-            return False
-        # print >>sys.stderr, "Psyco", co.co_name
-        return True
-
-    try:
-        import psyco
-        psyco.setfilter(psycoFilt)
-        for f in functions:
-            psyco.bind(f)
-    except ImportError:
-        pass
-
-

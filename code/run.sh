@@ -5,7 +5,7 @@
 #
 # Nick Barnes, Ravenbrook Limited, 2008-09-13.
 #
-# First draft: steps 0, 1, 3 are in Python; steps 2, 4, 5 still in
+# First draft: steps 0, 1, 2, 3 are in Python; steps 4, 5 still in
 # FORTRAN.  Very rough cut.
 
 fortran_compile=$FC
@@ -15,12 +15,8 @@ then echo "set an environment variable FC to the FORTRAN 90 compiler"
      exit
 fi
 
-# Compile all the FORTRAN
+# Compile the FORTRAN
 mkdir -p bin
-${fortran_compile} code/STEP2/PApars.f code/STEP2/tr2.f code/STEP2/t2fit.f -o bin/PApars.exe
-${fortran_compile} code/STEP2/flags.f -o  bin/flags.exe
-${fortran_compile} code/STEP2/padjust.f -o bin/padjust.exe
-${fortran_compile} code/STEP4_5/trimSBBX.f -o bin/trimSBBX.exe
 ${fortran_compile} code/STEP4_5/SBBXotoBX.f -o bin/SBBXotoBX.exe
 ${fortran_compile} code/STEP4_5/zonav.f -o bin/zonav.exe
 ${fortran_compile} code/STEP4_5/annzon.f -o bin/annzon.exe
@@ -44,45 +40,19 @@ python code/split_binary.py
 echo "trimming Ts.bin1-6"
 python code/trim_binary.py
 
-echo "preparations for urban adjustment"
-python code/invnt.py work/Ts.GHCN.CL > work/Ts.GHCN.CL.station.list
+echo "Making station list"
+python code/invnt.py work/Ts.GHCN.CL > log/Ts.GHCN.CL.station.list
 
 echo "Creating annual anomalies"
 python code/toANNanom.py
+python code/PApars.py 1000 20 > log/PApars.GHCN.CL.1000.20.log
+python code/flags.py >> log/PApars.GHCN.CL.1000.20.log
 
-for n in 1 2 3 4 5 6
-do
-   cp work/ANN.dTs.GHCN.CL.$n  work/fort.3$n
-done
+echo "Applying peri-urban adjustment"
+python code/padjust.py > log/padjust.log
 
-bin/PApars.exe 1000 20 > log/PApars.GHCN.CL.1000.20.log
-bin/flags.exe >> log/PApars.GHCN.CL.1000.20.log
-rm -f work/fort.78
-
-echo 'CCdStationID  slope-l  slope-r knee    Yknee    slope     Ymid      RMS     RMSl 3-rur+urb ext.range flag' > work/PApars.list
-cat work/fort.2 >> work/PApars.list
-rm work/fort.2
-
-mv work/fort.66   log/PApars.statn.log.GHCN.CL.1000.20
-mv work/fort.77   log/PApars.statn.use.GHCN.CL.1000.20
-mv work/fort.79   log/PApars.noadj.stations.list
-
-ln work/PApars.list work/fort.1
-for n in 1 2 3 4 5 6
-do
-   unit=`expr 11 + $n`
-   ln work/Ts.GHCN.CL.$n work/fort.$unit
-done
-bin/padjust.exe > log/padjust.log
-rm work/fort.1[2-7] work/fort.1
-
-for n in 1 2 3 4 5 6
-do
-   unit=`expr 21 + $n`
-   mv  work/fort.$unit work/Ts.GHCN.CL.PA.$n
-done
-
-bin/invnt.exe work/Ts.GHCN.CL.PA > work/Ts.GHCN.CL.PA.station.list
+echo "Making station list"
+python code/invnt.py work/Ts.GHCN.CL.PA > log/Ts.GHCN.CL.PA.station.list
 
 echo "====> STEP 3 ===="
 python code/step3.py

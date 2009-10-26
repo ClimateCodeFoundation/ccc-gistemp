@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-# $Id$
+# $URL$
+# $Rev$
 # David Jones.
 # Copyright 2008 Ravenbrook Limited.
 

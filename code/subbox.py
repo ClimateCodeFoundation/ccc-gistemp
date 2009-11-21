@@ -58,7 +58,16 @@ class File:
         keys = '''mo1 kq mavg monm monm4 iyrbeg
                   missing_flag precipitation_flag title'''.split()
         # See SBBXotoBX.f line 79, 77, 113
-        self.__dict__.update(zip(keys, struct.unpack('>8i80s', headerline)))
+        header = struct.unpack('>8i80s', headerline)
+        self._info = header[:8]
+        self.title = header[8]
+        self.__dict__.update(zip(keys, header))
+
+    def info(self):
+        """Return the 8 words from the INFO header of the binary file.
+        Returned as a list of ints."""
+
+        return list(self._info)
 
     def __repr__(self):
         return '<subbox.File %r' % self.__dict__

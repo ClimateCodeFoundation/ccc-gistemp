@@ -182,20 +182,21 @@ which it does).
 
 Note: the AREA array (filled in by GRIDEA, then later multiplied
 cell-wise by the area of one subbox) is accessed a few times.  The
-access on line 198 (just before the FORTRAN label 205) looks
-suspect.  The array is indexed using the variable NC; sadly this
-variable can be in the range 1 to 200, whereas the array index should
-range from 1 to 100.  Because of the way FORTRAN arrays are laid out in
-memory, and the fact that the array element values are constant, this is
-harmless for all but the highest numbered box (when NR is 80).  For this
-box, any NC values > 100 (in other words, ocean values) will result in
-reading off the end of the array.  Which seems bad to me [drj].  Box 80,
-by the way, is bounded by -64.2 on the north, -90 on the south, +90 on
-the west, and +180 on the east.  Eyeballing the HadSST2 grid and the
-GISTEMP grid, it looks like that box has very little ocean data, and
-lots of (presumably interpolated) land data.  Therefore, bogus weights
-assigned to the ocean data may have little influence on the box average
-(here's hoping).
+access on line 198 (just before the FORTRAN label 205) looks suspect.
+The array is indexed using the variable NC; sadly this variable can
+be in the range 1 to 200, whereas the array index should range from
+1 to 100.  Because of the way FORTRAN arrays are laid out in memory,
+and the fact that the array element values are constant, this is
+harmless for all but the highest numbered box (when NR is 80).  For
+this box, if NC > 100 (in other words, an ocean value) we will read
+off the end of the array.  Which seems bad to me [drj].  This only
+affects the first subbox considered for the box.  They are sorted
+essentially by record length, so this bug only comes up if the
+longest subbox record in region 80 is an ocean cell.  Box 80, by
+the way, is bounded by -64.2 on the north, -90 on the south, +90
+on the west, and +180 on the east.  Eyeballing the HadSST2 grid and
+the GISTEMP grid, it looks like that box has very little ocean data,
+and lots of (presumably interpolated) land data.
 
 Note: setting wocn to zero when fewer than 12 * NOVRLP ocean values is
 premature optimization because these ocean records won't be combined

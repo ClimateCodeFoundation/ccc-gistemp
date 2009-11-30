@@ -24,6 +24,9 @@ input_files/SBBX.HadR2 [11]
 
 [12] BX.Ts.ho2.GHCN.CL.PA.1200 [11]
 
+(SBBXotoBX.f also simultaneously combines the ocean data from the
+SBBX.HadR2 file)
+
 -> zonav.f
    "C**** This program combines the given gridded data (anomalies)
     C**** to produce AVERAGES over various LATITUDE BELTS."
@@ -170,15 +173,30 @@ files and zonav: certainly it produces the same set of boxes and
 sub-boxes.  The results are only used for the coordinates of the boxes
 (not the sub-boxes), and for setting the AREA() array to 1.
 
-Note: The ocean weight is calculated in three separate places, with a
-subtle difference which may be a bug.  In the first place (lines
-173-176) it is calculated for each sub-box.  In the second and third
-places (191-194, 210-213) it is calculated for a data record (either
-land or ocean).  For an ocean record, when the number of valid data
-items is less than 12 * NOVRLP, (i.e. 240), and dist >= Rland
-(i.e. 100), the first calculation will produce wocn = 0 but the latter
-two calculations will produce wocn > 0 (wocn = 1 when Rintrp == 0,
-which it does).
+Note: The ocean weight (wocn) is calculated in three separate places,
+with a subtle difference which may be a bug.  In the first place
+(lines 173-176) it is calculated for each sub-box.  In the second
+and third places (191-194, 210-213) it is calculated for a data
+record (either land or ocean).  For an ocean record, when the number
+of valid data items is less than 12 * NOVRLP, (i.e. 240), and dist
+>= Rland (i.e. 100), the first calculation will produce wocn = 0
+but the latter two calculations will produce wocn > 0 (wocn = 1
+when Rintrp == 0, which it does).
+
+In fact, it is slightly worse than we (originally) thought.  In the
+second and third places where the ocean weight is calculated, the WGTC
+array is abused.  Line 193 (and the identical line 212) accesses
+WGTC(nc+ncm) when nc indexes a land cell.  The intention seems to be to
+consider the record length of the ocean cell corresponding to this land
+cell.  However, WGTC has been sorted ("CALL SORT", line 187), so
+WGTC(nc+ncm) does not access the WGTC element for the corresponding
+ocean cell, but merely *a* cell (land or ocean) in the region (one
+that appears in the "bottom 100 cells by record length").
+
+The overall effect of this is to (more or less) randomly "promote" some
+land cells where DIST > Rland and give them positive weight, even when
+there is ocean data for that location.  It may be the case that for some
+particular cell both land and ocean data end up being combined.
 
 Note: the AREA array (filled in by GRIDEA, then later multiplied
 cell-wise by the area of one subbox) is accessed a few times.  The

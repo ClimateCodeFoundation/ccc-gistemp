@@ -50,7 +50,7 @@ def fetch(files, prefix='input/', output=sys.stdout):
     # *name* is a dictionary that maps from short name to the URL.
     name = dict((url.split('/')[-1], url) for url in all)
     for n in files:
-        if n not in name:
+        if n not in name and n+'.Z' not in name:
             raise Error("Don't know how to fetch %s" % n)
 
     # Attempt to create the directories required for *prefix*.
@@ -62,6 +62,9 @@ def fetch(files, prefix='input/', output=sys.stdout):
         pass
 
     for file in files:
+        if file+'.Z' in name:
+            file += '.Z'
+        assert file in name
         def hook(n, bs, ts):
             output.write("\r%s %d" % (url, n*bs))
             output.flush()

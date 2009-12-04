@@ -58,23 +58,22 @@ def checkit(log):
             rc = max(rc, 2)
 
     step0big = 'v2.mean hcn_doe_mean_data'.split()
-    assert step0big
-    missing = missing_big_files(step0big)
-    if len(missing) == len(step0big):
+    step5big = 'SBBX.HadR2'.split()
+    big = step0big + step5big
+    assert big
+    missing = missing_big_files(big)
+    if missing:
         log.write('Attempting to fetch missing files: %s\n' %
             ' '.join(missing))
-        os.system('code/fetch.py')
-        missing = missing_big_files(step0big)
+        # Call fetch.py as if it were a program.
+        import fetch
+        fetch.main(argv=['fetch'] + missing)
+        missing = missing_big_files(big)
         if missing:
             log.write("PROBLEM: Tried fetching missing files but it didn't work.\n")
             rc = max(rc, 2)
         else:
             log.write('OK: Fetching missing files looks like it worked\n')
-    elif missing:
-        log.write('PROBLEM: Some, but not all, of [%s] are missing.\n'
-                  '         Please sort it out by hand.\n' %
-                ' '.join(step0big))
-        rc = max(rc, 2)
 
     step1 = """
         mcdw.tbl
@@ -87,10 +86,7 @@ def checkit(log):
         Ts.strange.RSU.list.IN
         Ts.discont.RS.alter.IN
         """.split()
-    step5 = """
-        SBBX.HadR2
-        """.split()
-    for name in step1 + step5:
+    for name in step1:
         if not input_ok(name):
             missing_input(name)
             rc = max(rc, 2)

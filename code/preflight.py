@@ -112,10 +112,14 @@ def config_ok(name):
     return file_readable('config/' + name)
 
 def file_readable(n):
-    """Return True if file name n exists, and can be opened for reading."""
+    """Return True if file name n exists, can be opened for reading, and
+    1 byte can be read (this avoids problems with 0 length files).
+    """
 
     try:
-        f = open(n)
+        f = open(n, 'rb')
+        if f.read(1) == '':
+            return False
     except IOError:
         return False
     f.close()

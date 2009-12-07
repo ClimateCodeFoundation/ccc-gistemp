@@ -438,9 +438,15 @@ def step5():
     box = open('result/BX.Ts.ho2.GHCN.CL.PA.1200', 'wb')
     log = open('log/SBBXotoBX.log', 'w')
     SBBXtoBX(land, ocean, box, log, rland=100, intrp=0)
-    # 
-    # zonav
-    # annzon
+    # necessary, because box is an input to the next stage, so the file
+    # needs to be fully written.
+    box.close()
+
+    # :todo: replace with Python:
+    import os
+    os.system('GFORTRAN_CONVERT_UNIT="big_endian:10,11" bin/zonav.exe > log/zonav.Ts.ho2.GHCN.CL.PA.log')
+    os.system('GFORTRAN_CONVERT_UNIT="big_endian:10,11,12" bin/annzon.exe  > log/annzon.Ts.ho2.GHCN.CL.PA.log')
+
 
 def main(argv=None):
     import sys

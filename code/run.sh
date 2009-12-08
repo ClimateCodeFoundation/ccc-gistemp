@@ -70,5 +70,5 @@ GFORTRAN_CONVERT_UNIT="big_endian:10,11,12" bin/SBBXotoBX.exe 100 0 > log/SBBXot
 GFORTRAN_CONVERT_UNIT="big_endian:10,11" bin/zonav.exe > log/zonav.Ts.ho2.GHCN.CL.PA.log
 GFORTRAN_CONVERT_UNIT="big_endian:10,11,12" bin/annzon.exe  > log/annzon.Ts.ho2.GHCN.CL.PA.log
 
-python code/step5res.py result/GLB.Ts.ho2.GHCN.CL.PA.txt > result/google-chart.url
+python code/vischeck.py result/GLB.Ts.ho2.GHCN.CL.PA.txt > result/google-chart.url
 echo "See result/google-chart.url"

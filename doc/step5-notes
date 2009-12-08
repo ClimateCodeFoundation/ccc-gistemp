@@ -125,8 +125,6 @@ Reads
 
 Writes:
   unit 96: result/ZonAnn.Ts.ho2.GHCN.CL.PA.txt
-  unit 97: result/GLB.Ts.ho2.GHCN.CL.PA.txt
-           global monthly, seasonal, and annual anomalies.
   unit 98: result/NH.Ts.ho2.GHCN.CL.PA.txt
   unit 99: result/SH.Ts.ho2.GHCN.CL.PA.txt
   unit 12: work/ZON.Ts.ho2.GHCN.CL.PA.1200
@@ -235,6 +233,61 @@ applied to sub-boxes) ?
 4. zonav.f details
 
 STEP4_5/zonav.f is identical to STEP3/zonav.f
+
+[the zonav notes are somewhat under construction, ask drj if you need to]
+
+The Fortran code variously refers to belt and bands and zones.  Here I
+try to use "belt" for the 8 basic latitude belts (4 in each hemisphere,
+the same belts used to form the equal area 80 boxes).  And "zone" for
+the combined zones that are made from combinations of belts:
+
+There are 6 large zones are defined as various combinations of the
+8 belts.  The KZONE array maintains the characteristic function:
+KZONE(b,c) is 1 when belt b is part of combined zone c.  b ranges
+from 1 to 8, c from 1 to 6.  Let xxxx-yyyy be the 8 basic zones (from
+North on the left to South on the right).  The combined zones are as
+follows:
+
+1110-0000 northern (N-T)
+0001-1000 tropical T
+0000-0111 southern (S-T)
+1111-0000 northern hemisphere N
+0000-1111 southern hemisphere S
+1111-1111 global N+S
+
+We can define T, N, and S as "primitives" and then compose the other
+combined zones using set operations. (I don't know whether this is
+useful, but it's cute).
+
+Useful to note:
+
+JBM=8 (number of belts)
+NZS=3 (number of "special" zones.  which is 3 less than the number of
+  zones. *sigh*)
+
+In detail:
+
+line 97 to 106: gather metadata from input file.
+
+line 129 to 177: for each belt:
+  Combine the records the the regions in that belt (by reading them from
+  the BX file into AR and WTR), sorting them to combine longer regions
+  first.
+  line 160 to 176: the record for the belt is biased to make it zero on
+    average for the reference period, and it is written to the output
+    file (unit 10)
+
+line 181: The 8 belts are then sorted by record length. (so that when
+they are combined into zones, below, the longest record is used first)
+
+line 182 to 217: for each zone (6 of them)
+  combine the belts that comprise that zone into a single record, rebias
+  it and write it out to disk.  Details follow:
+  line 188 to 190: find the longest belt that is in the zone.
+  line 191 to 194: and initialise WTG and AVGG with that belt's record
+  line 196 to 201: and the loop over the rest of the belts, calling
+  CMBINE to add in the belts that are included in the zone.
+  line 203 and following: rebias and write to disk.
 
 5. annzon.f
 

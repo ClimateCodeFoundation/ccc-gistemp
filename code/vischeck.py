@@ -8,14 +8,12 @@
 #
 # Script to produce a visual check of the results (of STEP 5).
 
-import sys
-
 def asann(f):
-    """Convert the text file f into a sequence of global anomalies.  An
+    """Convert the text file *f* into a sequence of global anomalies.  An
     input file is expected to be one of the NH.*, SH.*, or GLB.* files
     that are the results of GISTEMP step 5.  The return value is an
     iterable over a sequence of pairs (year, datum); when present the
-    dataum is an integer, when not present it appears as None.  Normally
+    datum is an integer, when not present it appears as None.  Normally
     the data can be interpreted as centi-Kelvin.
     """
 
@@ -36,7 +34,7 @@ def asann(f):
                 yield((year, None))
 
 def asgooglechartURL(i):
-    """Convert an iterable (assumed to be output from asann()) into
+    """Convert an iterable (assumed to be output from :meth:`asann`) into
     a URL suitable for passing to the Google Chart API.
     """
 
@@ -72,8 +70,8 @@ def asgooglechartURL(i):
     chco='chco=ff0000'
     return prefix + '?' + '&'.join(['cht=lc',chd,chxt,chxl,chco,chs])
 
-def doit(f):
-    """Convert the file object f to a Google Chart API url and print it
+def chartit(f):
+    """Convert the file object *f* to a Google Chart API url and print it
     on standard output, and *ahem* write the PNG received from the same
     URL to a file 'foo.png' where its name is derived from the input
     file.
@@ -95,10 +93,17 @@ def doit(f):
         o.write(x)
     o.close()
 
-if __name__ == '__main__':
-    if len(sys.argv[1:]):
-        fs = map(open, sys.argv[1:])
+def main(argv=None):
+    import sys
+
+    if argv is None:
+        argv = sys.argv
+    if len(argv[1:]):
+        fs = map(open, argv[1:])
     else:
         fs = [sys.stdin]
     for f in fs:
-        doit(f)
+        chartit(f)
+
+if __name__ == '__main__':
+    main()

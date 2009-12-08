@@ -1,7 +1,12 @@
 #!/usr/bin/env python
-# $Id: //info.ravenbrook.com/project/ccc/master/code/step5res.py#5 $
-# step5res.py
-# Script to process the results of STEP5
+# $URL$
+# $Rev$
+#
+# vischeck.py - Visual Check
+#
+# David Jones, Ravenbrook Limited
+#
+# Script to produce a visual check of the results (of STEP 5).
 
 import sys
 

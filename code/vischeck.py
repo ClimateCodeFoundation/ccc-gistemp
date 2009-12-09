@@ -70,9 +70,10 @@ def asgooglechartURL(seq):
     chxt = 'chxt=x,y,r'
     chd='chd=t:' + '|'.join(ds)
     chs='chs=600x500'
+    chds = 'chds=-100,100'
     colours = ['ff0000','000000']
     chco = 'chco=' + ','.join(colours)
-    return prefix + '?' + '&'.join(['cht=lc',chd,chxt,chxl,chco,chs])
+    return prefix + '?' + '&'.join(['cht=lc',chds,chd,chxt,chxl,chco,chs])
 
 def chartsingle(l):
     """Take a list and return a URL fragment for its Google
@@ -80,16 +81,12 @@ def chartsingle(l):
 
     d = map(lambda x:x[1], l)
 
-    # Google Chart API says you can specify an out-of-range value for
-    # a missing datum, but this doesn't work for line charts if data
-    # scaling is being used.  So we drop the data scaling, scaling it
-    # ourselves to a range of 0 to 100, and use -1 for the missing value.
+    # Google Chart API says "Values less than the specified minimum are
+    # considered missing values".  So we don't actually do any scaling
+    # (we used to, but now it's all in the chds parameter).
     def scale(x):
         if x is None:
-            return -1
-        x = (x + 100.0) / 2.0
-        if not (0 <= x <= 100):
-            x = -1
+            return -999
         return x
 
     d = map(scale, d)

@@ -8,6 +8,31 @@
 #
 # Script to produce a visual check of the results (of STEP 5).
 
+"""
+vischeck.py [-o offset] GLB.txt [...]
+
+Visually check a file of global anomalies, by converting it to a Google
+Chart.  A URL is output (on stdout), visit/display that URL to see the
+graph.
+
+The file arguments should be in the GISTEMP tabular format, which is the
+format used for this GISTEMP file
+http://data.giss.nasa.gov/gistemp/tabledata/GLB.Ts.txt
+and others.
+
+Multiple series (one per file) can be displayed on the same chart,
+simply specify all the files on the command line (although more than 2
+may run into problems with long URLs and the Google Chart API).
+Currently the same beginning and end years have to be used for all the
+series.
+
+If series are very close, they will be displayed on top of each other.
+An offset can be introduced between each series to shift it up the
+chart.  -o offset will shift each series up (for a positive offset) or
+down (negative offset); its units are the same as in the data files
+(centikelvin usually).
+"""
+
 class Error(Exception):
     """Some sort of problem."""
 
@@ -36,13 +61,15 @@ def asann(f):
             except ValueError:
                 yield((year, None))
 
-def asgooglechartURL(seq):
+def asgooglechartURL(seq, offset):
     """*seq* is a sequence of iterables (each one assumed to be the
     output from :meth:`asann`) into a URL suitable for passing to the
     Google Chart API.
 
     Each element of the sequence corresponds to a different data series,
     all the series are plotted on the same chart.
+
+    *offset* corresponds to the -o option
     """
 
     prefix = 'http://chart.apis.google.com/chart'
@@ -70,7 +97,14 @@ def asgooglechartURL(seq):
     chxt = 'chxt=x,y,r'
     chd='chd=t:' + '|'.join(ds)
     chs='chs=600x500'
-    chds = 'chds=-100,100'
+    # Choose scale, and deal with offset if we have to.
+    scale = [-100,100]
+    if offset and len(seq) > 1:
+        scale *= len(seq)
+        for i in range(len(seq)):
+            scale[2*i] -= i*offset
+            scale[2*i+1] -= i*offset
+    chds = 'chds=' + ','.join(map(str, scale))
     colours = ['ff0000','000000']
     chco = 'chco=' + ','.join(colours)
     return prefix + '?' + '&'.join(['cht=lc',chds,chd,chxt,chxl,chco,chs])
@@ -92,19 +126,22 @@ def chartsingle(l):
     d = map(scale, d)
     return ','.join(map(str, d))
 
-def chartit(fs):
+def chartit(fs, offset):
     """Convert the list of files *fs* to a Google Chart API url and print it
     on standard output.
     
     If the list is exactly one element long then a PNG file received
     from the URL is written to a file 'foo.png' where its name is
     derived from the input file.
+
+    *offset* specifies the inter-chart offset, as per the -o option (see
+    module docstring).
     """
 
     import re
     import urllib
 
-    url = asgooglechartURL(map(asann, fs))
+    url = asgooglechartURL(map(asann, fs), offset=offset)
     print url
     uf = urllib.urlopen(url)
     if len(fs) != 1:
@@ -121,15 +158,23 @@ def chartit(fs):
     o.close()
 
 def main(argv=None):
+    import getopt
     import sys
 
     if argv is None:
         argv = sys.argv
-    if len(argv[1:]):
-        fs = map(open, argv[1:])
+
+    # offset between each series (-o option)
+    offset = 0
+    opt,arg = getopt.getopt(argv[1:], 'o:', ['offset='])
+    for o,v in opt:
+        if o in ('-o', '--offset'):
+            offset = float(v)
+    if len(arg):
+        fs = map(open, arg)
     else:
         fs = [sys.stdin]
-    chartit(fs)
+    chartit(fs, offset=offset)
 
 if __name__ == '__main__':
     main()

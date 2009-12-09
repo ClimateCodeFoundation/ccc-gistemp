@@ -157,24 +157,33 @@ def chartit(fs, offset):
         o.write(x)
     o.close()
 
+import sys
+
 def main(argv=None):
     import getopt
-    import sys
 
     if argv is None:
         argv = sys.argv
 
     # offset between each series (-o option)
     offset = 0
-    opt,arg = getopt.getopt(argv[1:], 'o:', ['offset='])
+
+    try:
+        opt,arg = getopt.getopt(argv[1:], 'o:', ['offset='])
+    except getopt.GetoptError, e:
+        print >> sys.stderr, e.msg
+        print >> sys.stderr, __doc__
+        return 2
     for o,v in opt:
         if o in ('-o', '--offset'):
             offset = float(v)
+        print o,v
     if len(arg):
         fs = map(open, arg)
     else:
         fs = [sys.stdin]
     chartit(fs, offset=offset)
+    return 0
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

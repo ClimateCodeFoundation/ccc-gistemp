@@ -148,9 +148,19 @@ def chartit(fs, offset):
     if len(fs) != 1:
         return
     f = fs[0]
+
+    def name(f):
+        """Return the "name" of a file object.  Works with genuine
+        objects and objects return from urllib.urlopen.
+        """
+
+        try:
+            return f.name
+        except:
+            return f.geturl()
     # Open a PNG output file with a name based on the input.
     # 'foo.txt' -> 'foo.png' ; '<stdin>' -> '<stdin>.png'
-    o = open(re.sub('(\.[^.]*|)$', '.png', f.name), 'wb')
+    o = open(re.sub('(\.[^.]*|)$', '.png', name(f)), 'wb')
     while True:
         x = uf.read(1000)
         if x == '':

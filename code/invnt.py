@@ -21,6 +21,7 @@ import fort
 import ccc_binary
 import script_support
 
+options = None
 
 iyrbeg = 1880
 iyrend = 3001
@@ -29,8 +30,8 @@ nrecpy = 12
 ndpryr = nrecpy
 monm = ndpryr * (iyrend - iyrbeg + 1)
 
-def invntSingleFile(fileNumber):
-    fname = "%s.%d" % (args[0], fileNumber)
+def invntSingleFile(fileName, fileNumber):
+    fname = "%s.%d" % (fileName, fileNumber)
     progress = script_support.countReport(
             50, fmt="File %s: %%d records processed\n" % fname)
     f15 = fort.open(fname, "rb")
@@ -62,7 +63,7 @@ def invntSingleFile(fileNumber):
             n1 = rec.m1
             n2 = rec.m2
 
-            if options.verbose:
+            if options and options.verbose:
                 progress.next()
 
     return True
@@ -74,7 +75,7 @@ def main(args):
     This simply invokes invntSingleFile for n = 1, 2, ... 6.
     """
     for n in range(1, 7):
-        if not invntSingleFile(n):
+        if not invntSingleFile(args[0], n):
             # No data?
             break
 

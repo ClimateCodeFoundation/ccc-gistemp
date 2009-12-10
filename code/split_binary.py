@@ -12,6 +12,7 @@ import fort
 import ccc_binary
 import script_support
 
+options = None
 
 def main(args):
     """The main for this module.
@@ -25,7 +26,7 @@ def main(args):
     except IOError, exc:
         sys.exit("Open failed for %s\n%s" % (inPath, exc))
     header = ccc_binary.CCHeader(data=inF.readline())
-    if options.verbose >= 1:
+    if options and options.verbose >= 1:
         print "Input file header details:"
         print "    %s" % header.title.rstrip()
         for i, v in enumerate(header.info):
@@ -49,10 +50,10 @@ def main(args):
         mu = 56 - mu // 300
         outF[mu].writeline(rec.binary)
 
-        if options.verbose >= 2:
+        if options and options.verbose >= 2:
             print "Write record %d to %d" % (recordCount, mu - 50)
 
-    if options.verbose >= 1:
+    if options and options.verbose >= 1:
         print "Processed records =", recordCount
 
 

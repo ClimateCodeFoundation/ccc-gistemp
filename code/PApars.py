@@ -19,6 +19,8 @@ import fort
 import ccc_binary
 import script_support
 
+options = None
+
 # Input parameters (# of input files, time period)
 km0 = 1
 iyrm0 = km0 * (3000 - 1880 + 1)
@@ -61,7 +63,7 @@ def timer():
 
 
 def verbose(level, s):
-    if level <= options.verbose:
+    if options and level <= options.verbose:
         print >>sys.stderr, s
 
 
@@ -69,6 +71,7 @@ def main(args):
     """The main for this module.
 
     """
+    T = timer()
     verbose(1, "main T=%s" % T.next())
 
     # The Python version of this program currently requires the two command
@@ -183,7 +186,7 @@ def main(args):
 
             i1snow = i1snow + length
 
-            if options.verbose >= 2:
+            if options and options.verbose >= 2:
                 progress.next()
 
             # Short-circuit
@@ -574,7 +577,6 @@ def trend2(xc, a, dataLen, xmid, bad, min1, min2):
 
 
 if __name__ == "__main__":
-    T = timer()
     import optparse
     usage = "usage: %prog [options] RngbrF NLAP"
     parser = script_support.makeParser(usage)

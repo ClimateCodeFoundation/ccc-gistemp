@@ -14,6 +14,7 @@ import fort
 import ccc_binary
 import script_support
 
+options = None
 
 def trimSingleFile(fileNumber):
     """The main for this module.
@@ -31,7 +32,7 @@ def trimSingleFile(fileNumber):
 
     header = ccc_binary.CCHeader(f2.readline())
     f3.writeRecord(header)
-    if options.verbose >= 3:
+    if options and options.verbose >= 3:
         print "Input file %r header details:" % filei
         print "    %s" % header.title.rstrip()
         for i, v in enumerate(header.info):
@@ -81,7 +82,7 @@ def trimSingleFile(fileNumber):
         outRec.m2 = marker
         f3.writeRecord(outRec)
 
-        if options.verbose:
+        if options and options.verbose:
             progress.next()
 
 

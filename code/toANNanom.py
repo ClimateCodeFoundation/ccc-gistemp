@@ -12,6 +12,8 @@ import fort
 import ccc_binary
 import script_support
 
+options = None
+
 iylast = 3000
 i4o = (iylast - 1701 + 1)
 i4 = i4o * 12
@@ -130,7 +132,7 @@ def toANNanom(i):
             rec.m1 = i1
             rec.m2 = i2
 
-        if options.verbose:
+        if options and options.verbose:
             progress.next()
 
         nYears = i2 - i1 + 1

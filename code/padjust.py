@@ -19,8 +19,10 @@ import fort
 import ccc_binary
 import script_support
 
+options = None
+
 def verbose(level, s):
-    if level <= options.verbose:
+    if options and level <= options.verbose:
         print >>sys.stderr, s
 
 

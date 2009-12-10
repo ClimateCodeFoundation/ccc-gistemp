@@ -411,9 +411,12 @@ def step0(input_file):
     return itertools.chain(read_Hohenpeissenberg(),
                            remove_Hohenpeissenberg(including_US))
 
-if __name__ == '__main__':
+def main():
     write_data(step0("v2.mean"),
                "work/v2.mean_comb.unsorted")
+
+if __name__ == '__main__':
+    main()
 
 # This file is copyright (C) 2008 Ravenbrook Limited.
 #

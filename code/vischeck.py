@@ -180,7 +180,6 @@ def main(argv=None):
     for o,v in opt:
         if o in ('-o', '--offset'):
             offset = float(v)
-        print o,v
     if len(arg):
         fs = map(urllib.urlopen, arg)
     else:

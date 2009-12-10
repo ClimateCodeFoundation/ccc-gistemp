@@ -18,7 +18,8 @@ graph.
 The file arguments should be in the GISTEMP tabular format, which is the
 format used for this GISTEMP file
 http://data.giss.nasa.gov/gistemp/tabledata/GLB.Ts.txt
-and others.
+and others.  The arguments can either be files on the local disk, or
+URLs (in which case the data will be downloaded and used).
 
 Multiple series (one per file) can be displayed on the same chart,
 simply specify all the files on the command line (although more than 2
@@ -161,6 +162,8 @@ import sys
 
 def main(argv=None):
     import getopt
+    # http://www.python.org/doc/2.4.4/lib/module-urllib.html
+    import urllib
 
     if argv is None:
         argv = sys.argv
@@ -179,7 +182,7 @@ def main(argv=None):
             offset = float(v)
         print o,v
     if len(arg):
-        fs = map(open, arg)
+        fs = map(urllib.urlopen, arg)
     else:
         fs = [sys.stdin]
     chartit(fs, offset=offset)

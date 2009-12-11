@@ -443,8 +443,9 @@ def step5():
     box.close()
 
     # :todo: replace with Python:
+    import zonav
+    zonav.main()
     import os
-    os.system('GFORTRAN_CONVERT_UNIT="big_endian:10,11" bin/zonav.exe > log/zonav.Ts.ho2.GHCN.CL.PA.log')
     os.system('GFORTRAN_CONVERT_UNIT="big_endian:10,11,12" bin/annzon.exe  > log/annzon.Ts.ho2.GHCN.CL.PA.log')
 
 

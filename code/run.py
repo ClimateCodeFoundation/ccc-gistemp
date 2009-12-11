@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# $URL$
 # $Id$
 # 
 # run.py -- run steps of the GISTEMP algorithm
@@ -120,6 +121,9 @@ def run_step5():
     log("====> STEP 5 ====")
     fortran = os.environ['FC']
 
+    # Save standard output so we can restore it when we're done with this step.
+    old_stdout = sys.stdout
+
     # Each entry in this list is a tuple specifying a Fortran program that we
     # need to compile, run with some command-line arguments (and an endianness
     # setting; see below for an explanation), and capture the standard output
@@ -168,6 +172,8 @@ def run_step5():
 
     log("See result/google-chart.url")
 
+    # Restore standard output.
+    sys.stdout = old_stdout
 
 def main(argv = None):
     if argv is None:
@@ -214,9 +220,6 @@ def main(argv = None):
         # Create all the temporary directories we're going to use.
         for d in ['bin', 'log', 'result', 'work']:
             mkdir(d)
-
-        # So that we can "import step0" and other Python modules.
-        sys.path.append('code')
 
         step_fn = {
             0: run_step0,

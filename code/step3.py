@@ -88,7 +88,7 @@ class Stations:
             # First record contains various INFO items.
             # When referring to comments in to.SBBXgrid.f recall that Fortran
             # arrays are typically indexed from 1 onwards; Python from 0
-            # onwards.  Therefore INFO(2) corresponds to a[0]
+            # onwards.  Therefore INFO(1) corresponds to a[0]
             a = struct.unpack('9i', r[:9*w])
             mfirst = a[0]
             mlast = a[8]

@@ -1,0 +1,41 @@
+Notes on GISTEMP changes between 2008-09-11 and 2009-12-03.
+Nick Barnes, Ravenbrook Limited, 2009-12-17
+
+For STEP0 see step0-update-notes
+
+STEP1:
+
+Ts.strange.RSU.list.IN and ushcn.tbl both come from STEP0 now.
+
+There is a typo correction in v2.inv:  40371964000 is called WHITEHORSE, Y, not WITHEHORSE, Y.
+
+The driver script has changed to use more consistent directories for
+input, output, and temporary files.
+
+STEP2:
+
+A typo correction in v2.inv, matching the one in STEP1:  40371964000 is called WHITEHORSE, Y, not WITHEHORSE, Y.
+
+Directory renames for intermediate files.
+
+text_to_binary.f has a check for Antartica:
+
+      if(sid(1:2)=='90') then
+        name(31:36)=' RC700' ! Antarctica
+      else
+        // existing code
+      end if
+
+STEP3:
+
+Directory renames for intermediate files.
+
+to.SBBXgrid.f:
+  236c236
+  <          DO 110 N=1,NCM
+  ---
+  >          DO 110 NC=1,NCM
+
+STEP4_5:
+
+Fixed the ocean-weighting bug we found in SBBXotoBX.f

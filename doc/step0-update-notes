@@ -1,0 +1,139 @@
+Notes on STEP0 changes in GISTEMP between 2008-09-11 and 2009-12-03.
+Nick Barnes, Ravenbrook Limited, 2009-12-17
+
+Summary:
+
+- reads USHCNv2 data if present.
+
+- A "skip_US" parameter, which defaults to zero and which I propose
+  not to implement at present.
+
+- has updated Antarctica data and station tables.
+
+do_comb_step0.sh:
+  New command-line arguments:
+  if $2 is 7, "skip austr.source"
+  if $3 is non-zero, skip USHCN
+
+  There has been a small amount of rearrangement of the shell script.
+
+  The get_USHCN script has changed a lot (see below).
+
+  There is manipulation of the file input_files/Ts.strange.RSU.list.IN_full
+  to produce the file temp_files/Ts.strange.RSU.list.IN
+  which is later used in STEP1.  This is partly in the get_USHCN
+  scripts, but note that if skip_US is zero (default behaviour) then
+  we get the original file (which has the same contents as in the
+  previous version of GISTEMP).
+
+  antarc_to_v2.sh is passed $2 as an argument, although it appears not
+  to use it.
+
+  cmb2.ushcn.v2.exe is passed the skip_US parameter as first argument
+
+Looking in order through the various other source files used:
+
+antarc_to_v2.sh is identical
+
+antarc1.txt, antarc2.txt, antarc3.txt, antarc3.list all differ: new data, updated data, corrected station metadata
+
+There is a small difference in antarc_comb.f, fixing a potential bug
+which doesn't actually occur in practice (one line of data would be
+discarded if Antarctic data comes later than all v2.mean data).
+
+dump_old.f is identical
+
+ushcn.tbl is now called ushcn1.tbl (identical contents).
+
+get_USHCN:
+  If hcn_doe_mean_data is missing, or 9641C_200907_F52.avg is present,
+  run get_USHCN_v2 instead (see below)
+
+  Otherwise, we're still using USHCNv1 data:
+    USHCN2v2.f has been renamed USHCN_to_v2.f
+    move ushcn1.tbl to ushcn.tbl
+    move the IN_full file to IN
+
+get_USHCN_v2 is all new.  It runs unify_us_ids to translate new
+station IDs in the USHCNv2 data to old station IDs.  Then it runs
+USHCNv2_to_v2.f.  Finally it runs the reduce_strange.sh script to
+remove USHCNv2 stations from the Ts.strange file:
+    #!/bin/ksh
+
+    fortran_compile=${FC}
+
+    echo "replacing USHCN station data in $1 by USHCN_V2 data (all adjustments, but ignoring fill-ins)"
+    cd input_files
+    echo "unifying station-ids"
+    ./unify_us_ids 9641C_200907_F52.avg
+    cd ..
+
+    mkdir temp_files 2> /dev/null
+    sort -n input_files/ushcn2.tbl > ID_US_G
+    ${fortran_compile} USHCNv2_to_v2.f -o USHCNv2_to_v2.exe
+    USHCNv2_to_v2.exe  ; rm -f USHCNv2_to_v2.exe
+    sort -n USHCN.v2.mean_noFIL > USHCN.v2.mean_noFIL.sort
+    mv -f USHCN.v2.mean_noFIL.sort USHCN.v2.mean_noFIL
+
+    cd input_files
+    reduce_strange.sh
+    mv Ts.strange.RSU.list.IN ../temp_files/.
+    cp ushcn2.tbl ../temp_files/ushcn.tbl
+
+unify_us_ids is all new, and changes 9641C_200907_F52.avg by replacing
+the new station IDs with old station IDs (columns 1 and 3 in
+ushcnV2_cmb.tbl):
+    #! /bin/ksh
+    while read a b c d
+    do sed "s/^$a/$c/g" < $1 > $1.1
+       mv -f $1.1 $1
+    done < ushcnV2_cmb.tbl
+    sort -n $1 > $1.1
+    mv -f $1.1 $1
+
+USHCNv2_to_v2.f is based on USHCN_to_v2.f, with some changes for the
+new data format.
+
+reduce_strange is all new, and removes some lines from
+Ts.strange.RSU.list.IN_full to make Ts.strange.RSU.list.IN.
+Specifically, ones which have country code 425 and which don't have
+any matching lines in USHCN.v2.mean_noFIL (the output from USHCNv2_to_v2):
+    #! /bin/ksh
+
+    while read a b
+    do if [[ $a != '425'* ]]
+       then echo "$a $b"
+       else c=$( grep $a ../USHCN.v2.mean_noFIL | head -1 ) 2> /dev/null
+          if [[ $c != '' ]]
+          then echo "$a $b"
+          fi
+       fi
+    done < Ts.strange.RSU.list.IN_full > Ts.strange.RSU.list.IN
+
+USHCN2v2.f has become USHCN_to_v2.f, and is identical apart from
+correcting a trivial bug (which we have already fixed in step0.py).
+
+dif.ushcn.ghcn.f identical
+
+cmb2.ushcn.v2.f has changed:
+    It now takes the $skip_US argument.
+    Internally, that becomes only_USHCN.
+    In a normal run only_USHCN will be false,
+    but if do_comb_step0.sh is given a non-zero second argument
+    then only_USHCN will be true.
+
+    When reading a line from GHCN, if icc is 425 and
+    the id is in [710000000, 900000000), cont_US is set to true,
+    otherwise false.
+
+    If we're about to write a GHCN line, and if (cont_US and
+    only_USHCN), skip the line.
+
+    So if $skip_US is zero, the semantics are identical.  If $skip_US
+    is 1, it omits any GHCN lines from this range of station
+    IDs (which, based on the variable name, is the continental US) -
+    but still copies the USHCN lines.
+
+hohp_to_v2.f identical 
+
+cmb.hohenp.v2.f identical

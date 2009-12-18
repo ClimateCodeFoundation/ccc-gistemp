@@ -10,10 +10,22 @@ Summary:
 
 - has updated Antarctica data and station tables.
 
+Plan:
+
+- import updated Antarctica data and station tables.
+
+- import ushcnV2_cmb.tbl
+
+- Change preflight to get USHCN v2 file 9641C_200907_F52.avg
+
+- Change step0.py to use USHCN v2 file.
+
+- Disregard skip_US parameter.
+
 do_comb_step0.sh:
   New command-line arguments:
   if $2 is 7, "skip austr.source"
-  if $3 is non-zero, skip USHCN
+  if $3 is non-zero, skip GHCN data for [some of] the US, and just use USHCN data.
 
   There has been a small amount of rearrangement of the shell script.
 
@@ -25,6 +37,11 @@ do_comb_step0.sh:
   scripts, but note that if skip_US is zero (default behaviour) then
   we get the original file (which has the same contents as in the
   previous version of GISTEMP).
+
+  What's going on there is that this file identifies station records
+  or partial records in GHCN which should be skipped.  If the skip_US
+  switch is on, the GHCN records relating to the US are omitted and
+  should be dropped from this file.
 
   antarc_to_v2.sh is passed $2 as an argument, although it appears not
   to use it.
@@ -115,7 +132,7 @@ correcting a trivial bug (which we have already fixed in step0.py).
 
 dif.ushcn.ghcn.f identical
 
-cmb2.ushcn.v2.f has changed:
+cmb2.ushcn.v2.f has changed to support the skip_US behaviour.
     It now takes the $skip_US argument.
     Internally, that becomes only_USHCN.
     In a normal run only_USHCN will be false,

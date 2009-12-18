@@ -1,6 +1,12 @@
 Notes on GISTEMP changes between 2008-09-11 and 2009-12-03.
 Nick Barnes, Ravenbrook Limited, 2009-12-17
 
+The only things we need to do for this are:
+
+- step1.py needs to get the appropriate ushcn.tbl file, now we are using USHCNv2.
+
+- correct typo in our v2.inv file.
+
 For STEP0 see step0-update-notes
 
 STEP1:
@@ -14,17 +20,25 @@ input, output, and temporary files.
 
 STEP2:
 
-A typo correction in v2.inv, matching the one in STEP1:  40371964000 is called WHITEHORSE, Y, not WITHEHORSE, Y.
+A typo correction in v2.inv, matching the one in STEP1:  40371964000 is called WHITEHORSE, Y, not WITHEHORSE, Y.  Note: the v2.inv files are identical.
 
 Directory renames for intermediate files.
 
-text_to_binary.f has a check for Antartica:
+text_to_binary.f has a check for special station IDs in Antartica,
+which Reto explains thusly:
 
-      if(sid(1:2)=='90') then
-        name(31:36)=' RC700' ! Antarctica
-      else
-        // existing code
-      end if
+    The modification of text_to_binary.f has nothing to do with the
+    current input files and has no effect whatsoever (no IDs start with
+    90); it should never have been in the public version and it is not
+    there anymore.  What happened is that somebody wanted us to use some
+    gridded Antarctica data that he somehow obtained. To minimize the
+    changes in our code, I treated each grid box as a station whose ID
+    started with 90 and which contained lat and lon of that grid
+    box. Since I did not want to add many new lines to the inventory file
+    v2.inv, I had to slightly modify the various programs to add the
+    missing information.
+
+So we don't need to do anything with that change.
 
 STEP3:
 
@@ -35,6 +49,13 @@ to.SBBXgrid.f:
   <          DO 110 N=1,NCM
   ---
   >          DO 110 NC=1,NCM
+
+This corrects a bug in the handling of boxes which contain no
+stations: in that case sub-box records are written out for all the
+sub-boxes containing only BAD values.  The previous code incorrectly
+put identical lat/long coordinates in each written sub-box record.  In
+the Python we don't currently bother with an "early bath" in this
+case, so the original bug didn't affect us.
 
 STEP4_5:
 

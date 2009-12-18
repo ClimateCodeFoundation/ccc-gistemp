@@ -20,7 +20,7 @@
 70089262000 Larsen_Ice_Shelf               -66.90  -60.90   17 antarc3
 70089264000 Uranus_Glacier                 -71.40  -68.90  780 antarc3
 70089266000 Butler_Island                  -72.20  -60.20   91 antarc3
-70089269000 Bonapart_Point                 -64.80  -64.10    8 antarc3
+70089269000 Bonaparte_Point                -64.80  -64.10    8 antarc3
 70089284000 Siple                          -75.90  -84.00 1054 antarc3
 70089324000 Byrd                           -80.00 -119.40 1530 antarc3
 70089327000 Mount_Siple                    -73.20 -127.10   30 antarc3
@@ -34,6 +34,7 @@
 70089612000 Casey_New_Airstrip             -66.30  110.80  390 antarc3
 70089643000 Port_Martin                    -66.80  141.40   39 antarc3
 70089662000 Terra_Nova_Bay                 -74.70  164.10   81 antarc3
+70089665001 Scott_Base                     -77.90  166.70   16 antarc3
 70089666000 Cape_Ross                      -76.70  163.00  201 antarc3
 70089667000 Pegasus_North                  -77.90  166.50   20 antarc3
 70089744000 Relay_Station                  -74.00   43.10 3353 antarc3

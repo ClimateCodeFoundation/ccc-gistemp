@@ -20,6 +20,9 @@ jbm = 8 # bands 90-64-44-24-0-24-44-64-90
 nzs = 3 # zones 90-24-24-90
 jzm = jbm + nzs + 3 # NH, SH, global
 
+class Error(Exception):
+    """Some problem."""
+
 def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False, bos='>'):
     """Convert zonal monthly averages to text format.
     
@@ -56,6 +59,8 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False, bos='>'):
 
     for i in range(jzm):
         r = f.readline()
+        if r is None:
+            raise Error('Unexpected end of file.')
         data = struct.unpack(descriptor, r)
         output.write('%s\n' % data[-1])
         if metaonly:

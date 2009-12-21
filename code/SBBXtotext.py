@@ -1,16 +1,20 @@
 #!/usr/bin/env python
 # $URL$
 # $Rev$
+
 # SBBXtotext.py
-#
-# Convert GISTEMP subbox file to text.
 #
 # David Jones, Ravenbrook Limited
 #
-# Similar job to subboxtotext.py, but this file uses the subbox module.
-# subboxtotext.py is more complete (it automagically handles
-# trimmed/untrimmed for example) but does not use the subbox module.
-# The plan is for this tool (SBBXtotext) to evolve into the preferred tool.
+
+"""
+Convert GISTEMP subbox file to text.
+
+Similar job to subboxtotext.py, but this file uses the subbox module.
+subboxtotext.py is more complete (it automagically handles
+trimmed/untrimmed for example) but does not use the subbox module.
+The plan is for this tool (SBBXtotext) to evolve into the preferred tool.
+"""
 
 # Ravenbrook
 import subbox

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-# $Id: //info.ravenbrook.com/project/ccc/master/code/subboxtotext.py#7 $
+# $URL$
+# $Rev$
 #
 # zontotext.py
 #

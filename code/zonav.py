@@ -329,9 +329,8 @@ def grid():
     for zone *z* for `z in range(14)`.
     """
 
-    ibm = [1,2,3,4,4,3,2,1]
-    # multiply by 4 to get the number of boxes in each band.
-    ibm = map(lambda x: x*x, ibm)
+    # Number of boxes (regions) in each band.
+    ibm = [4,8,12,16,16,12,8,4]
 
     # This is not the same way the zones are defined in Fortran, but it
     # should produce the same result.

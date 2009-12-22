@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # $URL$
-# $Id$
+# $Rev$
 #
 # zonav.py
 #
@@ -14,7 +14,9 @@ Perform Zonal Averaging.
 
 The input is a box file, usually work/BX.Ts.GHCN.CL.PA.1200 .  The data
 in the boxes are combined to produce averages over various latitudinal
-zones.
+zones.  The output is a zone file,
+usually work/ZON.Ts.ho2.GHCN.CL.PA.1200.step1 (the output can be
+converted to text with code/zontotext.py).
 
 14 belts are produced.  The first 8 are the basic belts that are used
 for the equal area grid, the remaining 6 are combinations:
@@ -39,7 +41,7 @@ for the equal area grid, the remaining 6 are combinations:
 
 def zonav(inp, out, log):
     """Take an open file *inp* of boxed data and produce zonal means on
-    *out*.
+    *out*.  *log* is used for logging (mostly textual descriptions).
     """
 
     # local module
@@ -261,8 +263,9 @@ def zoneout(out, log, average, weight, title):
 
     import struct
 
-    def nint10x(x):
-        return int((10*x) + 0.5)
+    def f(x):
+        """Format a monthly anomaly as a string, for logging."""
+        return "%4d" % int((10*x) + 0.5)
 
     def filerepr(a):
         """Take an array (list,sequence,tuple) of floats and return
@@ -283,13 +286,14 @@ def zoneout(out, log, average, weight, title):
         return struct.pack('<%dI' % l, *struct.unpack('>%dI' % l, s))
 
     print >> log, 'zonal mean', title
-    for l in [(map(nint10x, average[i:i+12]),map(nint10x, average[i+12:i+24]))
+    spaces = [' '*5]
+    for l in [map(f, average[i:i+12])+spaces+map(f, average[i+12:i+24])
                 for i in range(0, len(average), 24)]:
-        print >> log, l
+        print >> log, ''.join(l)
     print >> log, 'weights'
-    for l in [(map(nint10x, weight[i:i+12]),map(nint10x, weight[i+12:i+24]))
+    for l in [map(f, weight[i:i+12])+spaces+map(f, weight[i+12:i+24])
                 for i in range(0, len(weight), 24)]:
-        print >> log, l
+        print >> log, ''.join(l)
 
     # zonav.f line 175 and line 215
     out.writeline(filerepr(average) + filerepr(weight) + swaw(title))

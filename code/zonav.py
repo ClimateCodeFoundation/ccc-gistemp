@@ -261,11 +261,14 @@ def zoneout(out, log, average, weight, title):
     """Output, onto the files *out* and *log*, the zone record in
     the arrays *average* and *weight*, labelled *title*."""
 
+    # http://www.python.org/doc/2.4.4/lib/module-math.html
+    import math
+    # http://www.python.org/doc/2.4.4/lib/module-struct.html
     import struct
 
     def f(x):
         """Format a monthly anomaly as a string, for logging."""
-        return "%4d" % int((10*x) + 0.5)
+        return "%4d" % math.floor((10*x) + 0.5)
 
     def filerepr(a):
         """Take an array (list,sequence,tuple) of floats and return

@@ -30,6 +30,9 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False, bos='>'):
     time series are not.
     """
 
+    # :todo: move into common module
+    from zonav import swaw
+
     # The width of a standard word according to Python's struct module...
     w = len(struct.pack('=I', 0))
 
@@ -62,7 +65,7 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False, bos='>'):
         if r is None:
             raise Error('Unexpected end of file.')
         data = struct.unpack(descriptor, r)
-        output.write('%s\n' % data[-1])
+        output.write(swaw(data[-1]))
         if metaonly:
             continue
         for set in range(2):

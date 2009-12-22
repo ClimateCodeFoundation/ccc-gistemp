@@ -257,6 +257,19 @@ def zonav(inp, out, log):
         zoneout(out, log, avgg, wtg, titlez[JBM+jz])
     out.flush()
 
+def swaw(s):
+    """Swap the words of a string, so that every 4 bytes are
+    reversed.  This emulates the way that Fortran strings get
+    written out using the SWRITE subroutine in zonav.f and
+    friends.
+    """
+
+    # http://www.python.org/doc/2.4.4/lib/module-struct.html
+    import struct
+
+    l = len(s)//4
+    return struct.pack('<%dI' % l, *struct.unpack('>%dI' % l, s))
+
 def zoneout(out, log, average, weight, title):
     """Output, onto the files *out* and *log*, the zone record in
     the arrays *average* and *weight*, labelled *title*."""
@@ -277,16 +290,6 @@ def zoneout(out, log, average, weight, title):
         """
 
         return struct.pack('>%df' % len(a), *a)
-
-    def swaw(s):
-        """Swap the words of a string, so that every 4 bytes are
-        reversed.  This emulates the way that Fortran strings get
-        written out using the SWRITE subroutine in zonav.f and
-        friends.
-        """
-
-        l = len(s)//4
-        return struct.pack('<%dI' % l, *struct.unpack('>%dI' % l, s))
 
     print >> log, 'zonal mean', title
     spaces = [' '*5]

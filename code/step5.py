@@ -245,7 +245,7 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991)):
             nsm = combine(avgr, bias, wtr, avg[nc], 0, combined_n_months/km,
               wt1, wtm, km, nc)
         if nfb > 0:
-            bias = tavg(avgr, km, NYRSIN, nfb, nlb, nr, 0)
+            bias = tavg(avgr, km, NYRSIN, nfb, nlb, True, "Region %d" % nr)
         ngood = 0
         m = 0
         for iy in range(combined_n_months/km):
@@ -320,6 +320,29 @@ def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, km, id,
     assert nf1 < nl1
     assert wt1 >= 0
 
+    # This is somewhat experimental.  *wt1* the weight of the incoming
+    # data, *dnew*, can either be a scalar (applies to the entire *dnew*
+    # series) or a list (in which case each element is the weight of the
+    # corresponding element of *dnew*).  (zonav uses the list form).
+    # In the body of this function we treat *wt1* as an indexable
+    # object.  Here we convert scalars to an object that always returns
+    # a constant.
+    try:
+        wt1[0]
+        def update_bias():
+            pass
+    except TypeError:
+        wt1_constant = wt1
+        def update_bias():
+            """Find mean bias."""
+            wtmnew = wtm[k]+wt1_constant
+            bias[k] = float(wtm[k]*bias[k]+wt1_constant*biask)/wtmnew
+            wtm[k]=wtmnew
+            return
+        class constant_list:
+            def __getitem__(self, i):
+                return wt1_constant
+        wt1 = constant_list()
 
     # See to.SBBXgrid.f lines 519 and following
 
@@ -346,26 +369,17 @@ def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, km, id,
             sumn += dnew[kn]
         if ncom < NOVRLP:
             continue
+
         biask = float(sum-sumn)/ncom
-        # Find mean bias
-        wtmnew = wtm[k]+wt1
-        # :todo: remove after debugging.
-        if wtmnew == 0:
-            print wtm, wt1, k, wtmnew
-            l = dict(locals())
-            del l['dnew']
-            del l['wt']
-            del l['avg']
-            print l
-        bias[k] = float(wtm[k]*bias[k]+wt1*biask)/wtmnew
-        wtm[k]=wtmnew
+        update_bias()
+
         # Update period of valid data, averages and weights
         for n in range(nf1, nl1):
             kn = k+km*n     # CSE for array index
             if dnew[kn] >= XBAD:
                 continue
-            wtnew = wt[kn] + wt1
-            avg[kn] = float(wt[kn]*avg[kn] + wt1*(dnew[kn]+biask))/wtnew
+            wtnew = wt[kn] + wt1[kn]
+            avg[kn] = float(wt[kn]*avg[kn] + wt1[kn]*(dnew[kn]+biask))/wtnew
             wt[kn] = wtnew
             nsm += 1
         missed -= 1
@@ -378,14 +392,19 @@ def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, km, id,
 # Equivalent to Fortran subroutine TAVG.  Except the bias array
 # (typically 12 elements) is returned.
 # See to.SBBXgrid.f lines 563 and following.
-def tavg(data, km, nyrs, base, limit, nr, nc, deflt=0.0, XBAD=9999):
+def tavg(data, km, nyrs, base, limit, nr, id, deflt=0.0, XBAD=9999):
     """:meth:`tavg` computes the time averages (separately for each calendar
     month if *km*=12) over the base period (year *base* to *limit*) and
-    saves them in *bias*. In case of no data, the average is set to
+    saves them in *bias* (a fresh array that is returned).
+    
+    In case of no data, the average is set to
     *deflt* if nr=0 or computed over the whole period if nr>0.
 
     Similarly to :meth:`combine` *data* is treated as a linear array divided
     into years by considering contiguous chunks of *km* elements.
+
+    *id* is an arbitrary printable value used for identification in
+    diagnostic output (for example, the cell number).
 
     Note: the Python convention for *base* and *limit* is used, the base
     period consists of the years starting at *base* and running up to,
@@ -417,7 +436,7 @@ def tavg(data, km, nyrs, base, limit, nr, nc, deflt=0.0, XBAD=9999):
     for k in range(km):
         if len[k] > 0:
             continue
-        print "No data in base period - MONTH,NR,NC", k, nr, nc
+        print "No data in base period - MONTH,NR,ID", k, nr, id
         sum = 0.0
         m = 0
         for n in range(nyrs):

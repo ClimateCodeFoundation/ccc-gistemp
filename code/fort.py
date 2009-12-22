@@ -84,6 +84,11 @@ class File :
       """
       return self.fd.close()
 
+  def flush(self):
+      """Flush the underlying file descriptor."""
+
+      return self.fd.flush()
+
   def readline(self) :
     """For Fortran binary files this will return a binary record, as an
     arbitrary length binary string.  This is extremely unlikely to be

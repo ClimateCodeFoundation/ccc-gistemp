@@ -65,7 +65,7 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False, bos='>'):
         if r is None:
             raise Error('Unexpected end of file.')
         data = struct.unpack(descriptor, r)
-        output.write(swaw(data[-1]))
+        output.write(swaw(data[-1]) + '\n')
         if metaonly:
             continue
         for set in range(2):

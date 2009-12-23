@@ -152,10 +152,7 @@ def zonav(inp, out, log):
         if lntot == 0:
             log.write('**** NO DATA FOR ZONE %d %s' % (jb, titlez[jb]))
             continue
-        z = zip(lenr, range(ibm[jb]))
-        from step3 import sort
-        sort(z, lambda x,y: y[0]-x[0])
-        lenr,IORD = zip(*z)
+        lenr,IORD = sort_perm(lenr)
         nr = IORD[0]
         # Copy the longest region's record into *wt* and *avg*.
         # Using list both performs a copy and converts into a mutable
@@ -311,8 +308,8 @@ def sort_perm(a):
 
     The *iord* array is such that `a[iord[x]] == sorted[x]`.
     """
-    z = zip(a, range(len(a)))
     from step3 import sort
+    z = zip(a, range(len(a)))
     sort(z, lambda x,y: y[0]-x[0])
     sorted,iord = zip(*z)
     return sorted,iord

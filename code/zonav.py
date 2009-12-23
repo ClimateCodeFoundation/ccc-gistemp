@@ -175,7 +175,7 @@ def zonav(inp, out, log):
             # :todo: could the id parameter (the last one) be something
             # more useful, like "Zone 4"? Is it only used for
             # diagnostics?
-            combine(avg[jb], bias, wt[jb], ar[nr], 1,nyrsin,
+            combine(avg[jb], bias, wt[jb], ar[nr], 0,nyrsin,
               wtr[nr], wtm, km, jb)
         # zonav.f line 161
         bias = tavg(avg[jb], km, nyrsin, reference[0], reference[1], True,
@@ -232,7 +232,7 @@ def zonav(inp, out, log):
                 # Not convinced this behavious is either correct or
                 # worth preserving from the zonav.f code.
                 break
-            combine(avgg, bias, wtg, avg[jb], 1,nyrsin,
+            combine(avgg, bias, wtg, avg[jb], 0,nyrsin,
               wt[jb], wtm, km, "Zone %d" % (JBM+jz))
         else:
             # zonav.f line 202

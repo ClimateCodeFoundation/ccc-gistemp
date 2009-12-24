@@ -10,11 +10,12 @@
 annzon.py computes annual anomalies from monthly anomalies (and also
 recomputes global and hemispheric averages).
 
-As input it takes the output of zonav.py (a ZON file).
+As input it takes the output of zonav.py (a ZON file).  Several files
+are written to result/*: (ZonAnn|GLB|NH|SH).Ts.ho2.GHCN.CL.PA.txt ;
+and work/ZON.Ts.ho2.GHCN.CL.PA.1200 and work/ANNZON.Ts.ho2.GHCN.CL.PA.1200
+are written.
 
 This is part of GISTEMP STEP5.
-
-This is a work in progress (output of ZonAnn.* file is correct).
 """
 
 def annzon(inp, log, out, zono, annzono,
@@ -233,9 +234,10 @@ def annzon(inp, log, out, zono, annzono,
             return '*****'
         return x
 
+    from zonav import swaw
     # annzon.f line 166
     for jz in range(jzp):
-        print >> log, jz, titlez[iord[jz]]
+        print >> log, jz, swaw(titlez[iord[jz]])
     iyrsp = iyrs
     # Check (and skip) incomplete year.
     if data[-1][-1][-1] > 8000:
@@ -332,6 +334,29 @@ Year  Glob  NHem  SHem    -90N  -24N  -24S    -90N  -64N  -44N  -24N  -EQU  -24S
               '%4d ' + '%s'*12 + '  %s%s  ' + '%s'*4 + '%6d') % tuple(
               [iyr] + sout + [iyr])
         print >> outf, banner
+
+    # annzon.f line 229
+    # Save annual means on disk.
+    annzono.writeline(struct.pack(bos+'8i', *infoo) +
+                      titleo +
+                      title[28:80] +
+                      ' '*28)
+    for jz in range(jzm):
+        fmt = bos + '%df' % (monm//12)
+        annzono.writeline(struct.pack(fmt, *ann[jz]) +
+                          struct.pack(fmt, *annw[jz]) +
+                          titlez[jz])
+    # annzon.f line 236
+    # Save monthly means on disk
+    zono.writeline(struct.pack(bos + '8i', *info) +
+                   title + titl2)
+
+    import itertools
+    for jz in range(jzm):
+        fmt = bos + '%df' % monm
+        zono.writeline(struct.pack(fmt, *itertools.chain(*data[jz])) +
+                       struct.pack(fmt, *itertools.chain(*wt[jz])) +
+                       titlez[jz])
 
 
 def nint(x):

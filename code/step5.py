@@ -453,7 +453,6 @@ def step5():
     # needs to be fully written.
     box.close()
 
-    # :todo: replace with Python:
     import zonav
     zonav.main()
     import annzon

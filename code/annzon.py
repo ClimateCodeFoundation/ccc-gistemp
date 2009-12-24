@@ -261,9 +261,87 @@ Year  Glob  NHem  SHem    -90N  -24N  -24S    -90N  -64N  -44N  -24N  -EQU  -24S
     banner[0] = banner[1][:24] + banner[0][24:] + ' Year'
     banner[1] = ' '*24 + banner[1][24:-5]
     banner = '\n'.join(banner)
-
     print >> out[0], banner
     print >> out[0]
+
+    # annzon.f line 44
+    tit = ['    GLOBAL','N.HEMISPH.','S.HEMISPH.']
+    # Shift the remaining 3 output files so that the indexing works out.
+    out = out[1:]
+    banner = 'Year   Jan  Feb  Mar  Apr  May  Jun  Jul  Aug' + \
+      '  Sep  Oct  Nov  Dec    J-D D-N    DJF  MAM  JJA  SON  Year'
+    # All the "WRITE(96+J" stuff in the Fortran is replaced with this
+    # enumeration into the *out* array (an array of file descriptors).
+    # annzon.f line 191
+    for j,outf in enumerate(out):
+        print >> outf, (tit[j] + ' Temperature Anomalies' + 
+          ' in .01 C     base period: 1951-1980')
+        for iy in range(iy1tab-iyrbeg, iyrs):
+            iout = [100*XBAD]*18
+            if (iy+iyrbeg >= iy1tab+5 and ((iy+iyrbeg) % 20 == 1) or
+              iy == iy1tab - iyrbeg):
+                print >> outf
+                print >> outf, banner
+            # *data* for this zone, avoids some duplication of code.
+            zdata = data[iord[j]]
+            # :todo: Would probably be better to have a little 4-long
+            # seasonal array to do the computation in.
+            awin = 9999
+            if iy > 0:
+                awin = zdata[iy-1][11] + zdata[iy][0] + zdata[iy][1]
+            aspr = sum(zdata[iy][2:5])
+            asmr = sum(zdata[iy][5:8])
+            afl  = sum(zdata[iy][8:11])
+            if awin < 8000:
+                iout[14] = nint(100.0*awin/3)
+            if aspr < 8000:
+                iout[15] = nint(100.0*aspr/3)
+            if asmr < 8000:
+                iout[16] = nint(100.0*asmr/3)
+            if afl < 8000:
+                iout[17] = nint(100.0*afl/3)
+            # annzon.f line 216
+            ann2=awin+aspr+asmr+afl
+            if ann2 < 8000:
+                iout[13] = nint(100.0*ann2/12)
+            ann1=ann[iord[j]][iy]
+            if iy == iyrs-1 and zdata[iy][-1] > 8000:
+                ann1 = 9999
+            if ann1 < 8000:
+                iout[12] = nint(100.0*ann[iord[j]][iy])
+            for m in range(12):
+                iout[m] = nint(100.0*zdata[iy][m])
+            iyr = iyrbeg+iy
+            # Convert each of *iout* to a string, storing the results in
+            # *sout*.
+            sout = [None]*len(iout)
+            for i,x in enumerate(iout):
+                # All the elements of iout are formatted to width 5,
+                # except for element 13 (14 in the Fortran code), which
+                # is length 4.
+                if i == 13:
+                    x = '%4d' % x
+                    if len(x) > 4:
+                        x = '****'
+                else:
+                    x = '%5d' % x
+                    if len(x) > 5:
+                        x = '*****'
+                sout[i] = x
+            print >> outf, (
+              '%4d ' + '%s'*12 + '  %s%s  ' + '%s'*4 + '%6d') % tuple(
+              [iyr] + sout + [iyr])
+        print >> outf, banner
+
+
+def nint(x):
+    """Nearest integer.  Reasonable approximation to Fortran's NINT
+    routine."""
+
+    # http://www.python.org/doc/2.4.4/lib/module-math.html
+    import math
+
+    return int(math.floor(x+0.5))
 
 
 def main():

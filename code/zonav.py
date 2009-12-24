@@ -23,17 +23,15 @@ for the equal area grid, the remaining 6 are combinations:
 
 (The Fortran uses 1 to 14, but here in Python we use 0 to 13)
 
-  0 64N - 90N
-  1 44N - 64N (asin 0.9)
-  2 24N - 44N (asin 0.7)
-  3 Equ - 24N (asin 0.4)
-  4 24S - Equ
-  5 44S - 24S
-  6 64S - 44S
-  7 90S - 64S
-  8 24N - 90N (0 + 1 + 2)
-  9 24S - 24N (3 + 4)
- 10 90S - 24S (5 + 6 + 7)
+  0 64N - 90N               \
+  1 44N - 64N (asin 0.9)    |-  8 24N - 90 N  (0 + 1 + 2)
+  2 24N - 44N (asin 0.7)    /
+  3 Equ - 24N (asin 0.4)    \_  9 24S - 24 N  (3 + 4)
+  4 24S - Equ               /
+  5 44S - 24S               \
+  6 64S - 44S               |- 10 90S - 24 S  (5 + 6 + 7)
+  7 90S - 64S               /
+
  11 northern hemisphere (0 + 1 + 2 + 3)
  12 southern hemisphere (3 + 4 + 5 + 6)
  13 global (all belts 0 to 7)

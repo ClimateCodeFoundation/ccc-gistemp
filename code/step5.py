@@ -3,31 +3,23 @@
 # $Rev$
 # 
 # step5.py
-# 
-# Python code reproducing the STEP5 part of the GISTEMP algorithm.
 #
 # David Jones, Ravenbrook Limited, 2009-10-27
-#
-# Work in progress.  Currently it replaces SBBXtoBX (but not yet 
-#
-# The code is derived from the Fortran GISTEMP code.
-#
-# Python notes:
-#
-# Much of the binary IO uses the struct module.  A quick review will
-# help.
-#
-# I feel obliged to tell you that the Python expression N * list gives a
-# new list that conists of list repeated N times.  This is used every
-# now and then.
-#
-# We also make use of list slice assignment: a[2:4] = range(2)
 
-# Ravenbrook
+"""
+STEP5 of the GISTEMP algorithm.
+
+In STEP5: 8000 subboxes are combined into 80 boxes, and ocean data is
+combined with land data; boxes are combined into latitudinal zones
+(including hemispheric and global zones); annual and seasonal anomalies
+are computed from monthly anomalies.
+"""
+
+# Clear Climate Code
 import eqarea
-# Ravenbrook
+# Clear Climate Code
 import fort
-# Ravenbrook
+# Clear Climate Code
 import subbox
 
 # http://www.python.org/doc/2.3.5/lib/itertools-functions.html

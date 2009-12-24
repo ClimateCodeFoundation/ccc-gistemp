@@ -456,9 +456,8 @@ def step5():
     # :todo: replace with Python:
     import zonav
     zonav.main()
-    import os
-    os.system('GFORTRAN_CONVERT_UNIT="big_endian:10,11,12" bin/annzon.exe  > log/annzon.Ts.ho2.GHCN.CL.PA.log')
-
+    import annzon
+    annzon.main()
 
 def main(argv=None):
     import sys

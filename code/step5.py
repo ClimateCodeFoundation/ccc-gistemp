@@ -444,10 +444,13 @@ def tavg(data, km, nyrs, base, limit, nr, id, deflt=0.0, XBAD=9999):
 
 
 def step5():
-    land = open('work/SBBX1880.Ts.GHCN.CL.PA.1200', 'rb')
-    ocean = open('input/SBBX.HadR2', 'rb')
-    box = open('result/BX.Ts.ho2.GHCN.CL.PA.1200', 'wb')
-    log = open('log/SBBXotoBX.log', 'w')
+    # http://www.python.org/doc/2.4.4/lib/module-os.html
+    import os
+
+    land = open(os.path.join('work', 'SBBX1880.Ts.GHCN.CL.PA.1200'), 'rb')
+    ocean = open(os.path.join('input', 'SBBX.HadR2'), 'rb')
+    box = open(os.path.join('result', 'BX.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
+    log = open(os.path.join('log', 'SBBXotoBX.log'), 'w')
     SBBXtoBX(land, ocean, box, log, rland=100, intrp=0)
     # necessary, because box is an input to the next stage, so the file
     # needs to be fully written.

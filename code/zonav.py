@@ -383,15 +383,17 @@ def grid():
 
 
 def main(argv=None):
+    # http://www.python.org/doc/2.4.4/lib/module-os.html
+    import os
     import sys
 
     if argv is None:
         argv = sys.argv
     # getopt here, if you need it.
 
-    out = open('work/ZON.Ts.ho2.GHCN.CL.PA.1200.step1', 'wb')
-    inp = open('result/BX.Ts.ho2.GHCN.CL.PA.1200', 'rb')
-    log = open('log/zonav.Ts.ho2.GHCN.CL.PA.log', 'w')
+    out = open(os.path.join('work', 'ZON.Ts.ho2.GHCN.CL.PA.1200.step1'), 'wb')
+    inp = open(os.path.join('result', 'BX.Ts.ho2.GHCN.CL.PA.1200'), 'rb')
+    log = open(os.path.join('log', 'zonav.Ts.ho2.GHCN.CL.PA.log'), 'w')
     return zonav(inp, out, log)
 
 if __name__ == '__main__':

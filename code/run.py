@@ -164,10 +164,6 @@ def main(argv = None):
             raise Fatal("--steps must be a comma-separated list of numbers, "
                         "not '%s'." % steps)
 
-        if 5 in step_list and not os.environ.get('FC'):
-            raise Fatal("Set the environment variable FC to the FORTRAN 90 "
-                        "compiler command,\ne.g. FC=gfortran42")
-
         rootdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         if os.getcwd() != rootdir:
             raise Fatal("The GISTEMP procedure must be run from the root "

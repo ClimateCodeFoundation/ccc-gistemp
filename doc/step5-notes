@@ -291,11 +291,28 @@ line 182 to 217: for each zone (6 of them)
 
 5. annzon.f
 
-[not written yet]
+[not written yet, see drj]
+
+JZM=14 (the number of zones)
+MONMIN=6 (the minimum number of months to compute an annual anomaly)
+IAVGGH=2 (alternate global and hemispheric means)
+
+JZG records which zones comprise the alternate global mean computation
+(alternate 2 is in fact used by default, see IAVGGH).  They are:
+Alternate 1: 9,10,10,11; Alternate 2: 9,4,5,11 (see array literal at
+annzon.f line 50).  These 4 zones are combined with weights 3,2,2,3
+respectively (see WTSP array, line 51).  These weights are proportional
+to the area of the zone (for these particlar zones).
+
+line 53 to 83: open file, read header, allocate arrays.
+line 84 to 97: write header.
+line 98 to 103: read data.
+line 104 to 122: Compute annual means.
 
 Note: the output files say "base period 1951-1980".  But the
 de-biasing we've just been looking at in SBBXotoBX.f uses a base
 period of IYBASE-LYBASE, i.e. 1961-1990 (these are parameters in
 SBBXotoBX.f).  Of course, this data has already been de-biased in
 STEP3, with a base period of 1951-1980.  Is this all sensible and
-legitimate?
+legitimate?  They are (yet again) rebiased to have a base period of
+1951-1980 by zonav.f (which is run immediately before zonav.f)

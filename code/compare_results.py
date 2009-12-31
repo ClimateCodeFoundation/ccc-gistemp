@@ -43,6 +43,20 @@ class Fatal(Exception):
     def __init__(self, msg):
         self.msg = msg
 
+def asann_values_only(f):
+    """Wrapper for `vischeck.asann` which yields only values.
+
+    Any tuple that contains ``None`` is simply discarded.
+
+    :Param f:
+        Input file as required by `vischeck.asann`.
+
+    """
+    for el in vischeck.asann(f):
+        if None not in el:
+            yield el
+
+
 def box_series(f):
     """Convert the Fortran data file *f* into sequence of monthly
     anomalies for the geographical boxes. The file must be a BX.* file
@@ -81,7 +95,7 @@ def box_series(f):
         box += 1
 
 # This is derived from the similar function vischeck.asann.
-def asmon(f):
+def asmon(f, values_only=False):
     """Convert the text file *f* into a sequence of monthly anomalies.
     An input file is expected to be one of the NH.*, SH.*, or GLB.*
     files that are the results of GISTEMP step 5.  The return value is
@@ -104,7 +118,8 @@ def asmon(f):
                 try:
                     yield(((year, month), int(l[(month + 1) * 5:(month + 2) * 5])))
                 except ValueError:
-                    yield(((year, month), None))
+                    if not values_only:
+                        yield(((year, month), None))
 
 def stats(seq):
     """Return the mean and standard deviation of the numbers in the
@@ -238,6 +253,9 @@ def compare(dirs, labels, o):
     escape = xml.sax.saxutils.escape
     labels = map(escape, labels)
 
+    # Version of ``asmon`` that avoids yielding ``None``.
+    asmon_values_only = lambda f: asmon(f, values_only=True)
+
     title = "Comparison of %s and %s" % tuple(dirs)
     print >>o, """<!doctype HTML>
 <html>
@@ -257,7 +275,7 @@ def compare(dirs, labels, o):
     ]:
         # Annual series
         fs = map(lambda d: open(os.path.join(d, anomaly_file % code), 'r'), dirs)
-        anns = map(list, map(vischeck.asann, fs))
+        anns = map(list, map(asann_values_only, fs))
         url = vischeck.asgooglechartURL(anns, offset=0)
         print >>o, '<h2>%s annual temperature anomaly</h2>' % region.capitalize()
         print >>o, '<p>%s in red, %s in black.</p>' % tuple(labels) 
@@ -280,7 +298,7 @@ def compare(dirs, labels, o):
 
         # Monthly series
         fs = map(lambda d: open(os.path.join(d, anomaly_file % code), 'r'), dirs)
-        mons = map(asmon, fs)
+        mons = map(asmon_values_only, fs)
         diffs = list(difference(mons, 0.01))
         d = map(lambda a: a[1], diffs)
         print >>o, '<h3>%s monthly residue distribution</h3>' % region.capitalize()

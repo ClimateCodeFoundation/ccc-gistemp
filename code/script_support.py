@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 """Some useful support for Python scripts.
 
-TODO: Describle more.
+This module contains some useful functions for script writing. Since the CCC
+project involves quite a few scripts (at least in the medium term) it makes sense
+abstract out some common script support code. Hopefully this helps provide more
+consistent usage and behaviour.
+
 """
 __docformat__ = "restructuredtext"
 
@@ -11,8 +15,14 @@ import os
 def parseIntArg(idx, args):
     """Parse ``args[idx]`` as an integer.
 
-    If the argument is not a valid integer then the program exits with
-    code == 1.
+    If the argument is not a valid integer then the program exits with code ==
+    1.
+
+    :Param idx:
+        Which argument to check in the ``args`` parameter.
+    :Param args:
+        The command line arguments, excluding options.
+
     """
     try:
         return int(args[idx])
@@ -34,7 +44,8 @@ def makeParser(usage):
         Used to display a short usage message. This is standard in the
         ``optparse.OptionParser``.
     --man
-        Used to display detailed help, including the usage message.
+        Used to display detailed help, including the usage message. This uses
+        the script's docstring to provide the detail.
     --verbose=level, -v
         Allow the ``verbose`` to be set.
     """
@@ -72,6 +83,7 @@ def parseArgs(parser, doc, argRange=(0, 0)):
         The tuple ``(options, args)``, as returned by ``parser.parse_args()``.
         This function may not return, for example if the ``--help`` option is
         used on the command line.
+
     """
     options, args = parser.parse_args()
     a, b = argRange
@@ -89,8 +101,8 @@ def parseArgs(parser, doc, argRange=(0, 0)):
 def countReport(interval, fmt="%d ", f=None):
     """Generator:
 
-    A count generator with he side effect of writing the count every ``interal``
-    iterations:
+    A count generator with the side effect of writing the count every
+    ``interval`` iterations:
 
     :Param interval:
         The reporting interval.
@@ -100,6 +112,7 @@ def countReport(interval, fmt="%d ", f=None):
     :Param fmt:
         Format string for the report. The report will be ``fmt % count``. No
         newline is automatically added.
+
     """
     count = 0
     while True:

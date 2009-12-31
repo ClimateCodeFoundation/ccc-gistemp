@@ -99,10 +99,15 @@ def main(args):
     infiles = [fort.open("work/ANN.dTs.GHCN.CL.%d" % i) for i in range(1, 7)]
     f78 = open("work/PApars.pre-flags", "w")
 
-    # And for some extra logging
-    f66 = open("log/PApars.statn.log.GHCN.CL.1000.20", "w")  # combination info
-    f77 = open("log/PApars.statn.use.GHCN.CL.1000.20", "w")  # station usage stats
-    f79 = open("log/PApars.noadj.stations.list", "w")  # isolated urban stations
+    #
+    # Open output files for some extra logging
+    #
+    # Combination info
+    f66 = open("log/PApars.statn.log.GHCN.CL.1000.20", "w")
+    # Station usage stats
+    f77 = open("log/PApars.statn.use.GHCN.CL.1000.20", "w")
+    # Isolated urban stations
+    f79 = open("log/PApars.noadj.stations.list", "w")
 
     # Read header of the first file.
     header = ccc_binary.CCHeader(data=infiles[0].readline())

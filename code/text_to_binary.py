@@ -57,13 +57,12 @@ def main(args):
     lat, lon, id, ht, hto, mmax = 0, 0, [0]*(multm + 1), 0, 0, [0]*(multm + 1)
     name, nameo, line, li, sid, sidi = "", "", "", "", "", ""
 
-
     lastyr = script_support.parseIntArg(0, args)
     MTOT = 12 * (lastyr - iyear1 + 1)
     idata = [array.array("i", [0] * MTOT) for i in range(multm + 1)]
 
     header = ccc_binary.CCHeader()
-    header.title = 'GHCN V2 Temperatures (.1 C)'.ljust(80)
+    header.title = 'GHCN V2 Temperatures (.1 C)'
     header.info[0] = 1
     header.info[1] = 1
     header.info[2] = 6

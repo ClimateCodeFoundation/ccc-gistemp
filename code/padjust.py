@@ -1,10 +1,6 @@
 #!/usr/bin/env python
 """Python replacement for code/STEP2/padjust.f
 
-Input files:
-
-    work/fort.1
-
 """
 __docformat__ = "restructuredtext"
 
@@ -193,4 +189,3 @@ if __name__ == "__main__":
     parser = script_support.makeParser(usage)
     options, args = script_support.parseArgs(parser, __doc__, (0, 0))
     main(args)
-

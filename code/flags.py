@@ -32,8 +32,33 @@ def readRec(f):
 
     The input file is text, line oriented, one record per line.
 
+    :Return:
+        A tuple of 15 values, as follows:
+
+        cc
+            **TBD**
+        IDc
+            **TBD**
+        sl1, sl2
+            **TBD**
+        knee
+            **TBD**
+        Yknee
+            **TBD**
+        sl0, Ymid
+            **TBD**
+        RMS,RMSl
+            **TBD**
+        iy1, iy2,
+            **TBD**
+        iy1e, iy2e
+            **TBD**
+        l
+            **TBD**
+
     :Param f:
         The open file to read from.
+
     """
     l = f.readline()
     l = l.rstrip()
@@ -49,7 +74,8 @@ def readRec(f):
     sl0 = float(slope)
     iy1, iy2 = [int(v) for v in rur_urb.split("-")]
     iy1e, iy2e = [int(v) for v in ext_range.split("-")]
-    return cc, IDc, sl1, sl2, knee, Yknee, sl0, Ymid,RMS,RMSl, iy1, iy2, iy1e, iy2e, l
+    return (cc, IDc, sl1, sl2, knee, Yknee, sl0, Ymid,RMS,RMSl, iy1, iy2,
+            iy1e, iy2e, l)
 
 
 def main(args):
@@ -77,9 +103,9 @@ def main(args):
 
         # classify : iflag: +1 for short legs etc
         iflag = 0
-        if knee < iy1+lshort or knee > iy2 - lshort:
+        if knee < iy1 + lshort or knee > iy2 - lshort:
             iflag += 1
-        if knee < iy1+lshort or knee > iy2 - lshort:
+        if knee < iy1 + lshort or knee > iy2 - lshort:
             nshort += 1
         if abs(sl1) > slplim:
             iflag += 20
@@ -93,6 +119,7 @@ def main(args):
             iflag += 100
         if abs(sl2 - sl1) > slplim:
             ndsl += 1
+
         # TODO: The small offset fixes a Fortran/Python rounding issue, but I
         #       am not happy with it. PAO, Mon Feb 23 2009.
         if abs(sl2 - sl1) + 0.00000001 > slpx:
@@ -112,8 +139,10 @@ def main(args):
         line += " %4d" % iflag
         f2.write("%s\n" % line)
 
-    print " %-10s %4d %10.7f     %10.7f" % ("all", nsta,-sumch/nsta,-10.*sumch/nyrs)
-    print " %-11s %8d  %10.7f    %10.7f" % ("urb warm", nstap,-sumchp/nstap,-10.*sumchp/nyrsp)
+    print " %-10s %4d %10.7f     %10.7f" % (
+            "all", nsta,-sumch/nsta,-10.*sumch/nyrs)
+    print " %-11s %8d  %10.7f    %10.7f" % (
+            "urb warm", nstap,-sumchp/nstap,-10.*sumchp/nyrsp)
     print " %-11s %11d %11d %11d %11d %11d %11d" % (
         "# short,sl1,sl2,dsl,ok", nshort,nsl1,nsl2,ndsl,nok,nokx)
     print " %-11s  %11d %11d" % ("switches: all , else ok", nswitch,nsw0)
@@ -125,4 +154,3 @@ if __name__ == "__main__":
     parser = script_support.makeParser(usage)
     options, args = script_support.parseArgs(parser, __doc__, (0, 0))
     main(args)
-

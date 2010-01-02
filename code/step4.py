@@ -23,6 +23,7 @@ __docformat__ = "restructuredtext"
 
 import os
 import sys
+import shutil
 import struct
 import re
 from glob import glob
@@ -128,7 +129,7 @@ def load_sst_data(iyr1, n_years, dates):
     trace(0, " Reading input_files/oiv2mon... files.")
     for iyr, mon in dates:
         path = "input_files/oiv2mon.%04d%02d" % (iyr, mon)
-        trace(1, " trying to read %-70s" % path)
+        trace(1, " trying to read %s" % path)
         f11 = fort.open(path)
         f11.bos = ">"
         data = f11.readline()
@@ -433,7 +434,8 @@ def main(args=(), use_all_oiv2mon=False, verbose=None):
         # Trimming was successful. So rename the working file to become
         # the input/SBBX.HadR2
         trace(0, " Replacing input/SBBX.HadR2 with new file")
-        os.rename(tmp_out, "input/SBBX.HadR2")
+        shutil.copyfile(tmp_out, "input/SBBX.HadR2")
+        os.unlink(tmp_out)
 
 
 if __name__ == "__main__":

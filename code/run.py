@@ -115,7 +115,9 @@ def run_step3():
     step3.main()
 
 def run_step4():
-    log("====> skipping STEP 4; see code/STEP4_5/do_comb_step4.sh ====")
+    log("====> STEP 4 ====")
+    import step4
+    return step4.main(verbose=1)
 
 def run_step5():
     log("====> STEP 5 ====")
@@ -189,7 +191,9 @@ def main(argv = None):
         for s in step_list:
             if not step_fn.has_key(s):
                 raise Fatal("Can't run step %d" % s)
-            step_fn[s]()
+            ret = step_fn[s]()
+            if ret not in (0, None):
+                raise Fatal("Step %d failed" % s)
 
         return 0
     except Fatal, err:

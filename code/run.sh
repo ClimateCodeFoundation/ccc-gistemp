@@ -58,6 +58,7 @@ echo "====> STEP 3 ===="
 python code/step3.py
 
 echo "====> skipping STEP 4; see code/STEP4_5/do_comb_step4.sh ===="
+python code/step4.py --verbose=1
 
 echo "====> STEP 5 ===="
 # GISS binary data files are big-endian, so ours are too, including

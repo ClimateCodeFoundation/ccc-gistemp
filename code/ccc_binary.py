@@ -154,6 +154,16 @@ class CCBin(object):
         """
         raise NotImplementedError("Needs implementing in %s"
                 % self.__class__.__name__)
+
+    def set_bos(self, bos):
+        """Set the byte-order indicator.
+        
+        :Param bos:
+            The bytpe order indicator. This should be a single character string
+            of '>', '<' or '@', as used by the standard ``struct`` module.
+        """
+        self._bos = bos
+
     #}
 
 
@@ -181,7 +191,7 @@ class CCHeader(CCBin):
     The header itself has the following structure::
 
         +-----------+ - - - - - - - - +-------------------+
-        | info[9]   |              0  |  m1               |
+        | info[9]   |              0  |  ml               |
         +-----------+ -               +-------------------+
         | title[80] |   \          1  |  kq               |
         +-----------+    .            +-------------------+
@@ -237,7 +247,7 @@ class CCHeader(CCBin):
         wih spaces.""")
 
     @property
-    def m1(self):
+    def ml(self):
         """The month (or year) number of the first idata element in the
         following record."""
         return self.info[0]
@@ -294,7 +304,7 @@ class SBBX_Header(CCBin):
     details)::
 
         +-------------------+
-      0 |  m1               | [Note 1]
+      0 |  ml               | [Note 1]
         +-------------------+
       1 |  kq               | quantity flag [Note 2]
         +-------------------+
@@ -353,7 +363,7 @@ class SBBX_Header(CCBin):
         wih spaces.""")
 
     @mprop("info[0]")
-    def m1(self):
+    def ml(self):
         """Provisional: The month (or year) number of the first idata element
         in the following record."""
         return self.info[0]

@@ -12,6 +12,38 @@ __docformat__ = "restructuredtext"
 import sys
 import os
 
+
+class _Struct(object):
+    pass
+options = _Struct()
+options.verbose = 0
+
+
+def trace(level, fmt, *args):
+    """Simple tracing ouput function.
+
+    :Param level:
+        The level of verbosity at which to trace.
+    :Param fmt:
+        A format string, using the normal Python formatting sequences.
+    :Param args:
+        The arguments to be converted with the format string.
+
+    """
+    # Only log if the vebose level is set sufficiently high.
+    if options is not None and level > options.verbose:
+        return
+
+    # Format the output string.
+    try:
+        s = fmt % args
+    except TypeError:
+        # Fall back to simpy printing the format string and arguments. This is
+        # generally better than making the program fail.
+        s = "%s %s" % (fmt, args)
+    sys.stdout.write("%s\n" % s)
+
+
 def parseIntArg(idx, args):
     """Parse ``args[idx]`` as an integer.
 
@@ -85,6 +117,8 @@ def parseArgs(parser, doc, argRange=(0, 0)):
         used on the command line.
 
     """
+    global options
+
     options, args = parser.parse_args()
     a, b = argRange
     if not a <= len(args) <= b:

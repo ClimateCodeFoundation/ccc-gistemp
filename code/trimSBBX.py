@@ -85,19 +85,15 @@ def findl6(avg, ml, xbad):
     return len([el for el in avg[:ml] if el != xbad])
 
 
-def main(args):
+def main(in_path, out_path):
     """The main for this module.
 
     """
-    if len(args) < 1:
-        f10 = fort.open("work/fort.10")
-    else:
-        f10 = fort.open(args[0])
-    if len(args) < 2:
-        f11 = fort.open("work/fort.11", "wb")
-    else:
-        f11 = fort.open(args[1], "wb")
-    h = ccc_binary.CCHeader2(f10.readline())
+    f10 = fort.open(in_path)
+    f10.bos = ">"
+    f11 = fort.open(out_path, "wb")
+    f11.bos = ">"
+    h = ccc_binary.SBBX_Header(f10.readline(), bos=">")
 
     km = 1
     if h.mavg == 6:
@@ -107,23 +103,26 @@ def main(args):
     # Here Fortran code verifies that the input file gives km=12, but that will
     # always be true for the CCC code.
     if km != km0:
-        sys.exit("ERROR: CHANGE KM0")
+        sys.stderr.write("ERROR: CHANGE KM0\n")
+        return 1
 
     ml = h.nm
     if monm0 < ml:
-        sys.exif("Set monm0 at least to %s" % ml)
+        sys.stderr.write("Set monm0 at least to %s\n" % ml)
+        return 1
 
     mbad = last = h.bad
     xbad = float(mbad)
     newHdr = h.copy()
+    newHdr.set_bos(">")
     newHdr.recsize = h.nm + 8
     nLat = h.recsize - h.nm
 
-    rec = Rec(ml, nLat)
-    reco = TrimmedRec(ml, nLat)
+    rec = Rec(ml, nLat, bos=">")
+    reco = TrimmedRec(ml, nLat, bos=">")
     rec.lat[4:6] = [0, 1, 0]
     reco.lat[4:6] = [0, 1, 0]
-    temp_rec = Rec(ml, nLat)
+    temp_rec = Rec(ml, nLat, bos=">")
     temp_rec.setFromBinary(data=f10.readline())
     reco.set_from_rec(temp_rec)
     newHdr.ml = 1
@@ -137,7 +136,7 @@ def main(args):
     f11.writeline(newHdr.binary)
 
     for n in range(2, nsbbx + 1):
-        rec = Rec(ml, nLat, data=f10.readline())
+        rec = Rec(ml, nLat, data=f10.readline(), bos=">")
         reco.mln = 1
         reco.nAvg = ml
         if nLat == 4:
@@ -146,7 +145,7 @@ def main(args):
             reco.mln = ml
         if reco.lat[5] == 0:
             data = tuple([reco.mln] + reco.lat + [xbad])
-            bin = struct.pack("i7if", *data)
+            bin = struct.pack(">i7if", *data)
             f11.writeline(bin)
         else:
             f11.writeline(reco.binary)
@@ -156,10 +155,11 @@ def main(args):
     reco.mln = 0
     if reco.lat[5] == 0:
         data = tuple([reco.mln] + reco.lat + [xbad])
-        bin = struct.pack("i7if", *data)
+        bin = struct.pack(">i7if", *data)
         f11.writeline(bin)
     else:
         f11.writeline(reco.binary)
+    return 0
 
 
 if __name__ == "__main__":
@@ -168,4 +168,4 @@ if __name__ == "__main__":
     usage += "\n\nThe infile, outfile default to work/fort.10, work/fort.11"
     parser = script_support.makeParser(usage)
     options, args = script_support.parseArgs(parser, __doc__, (0, 2))
-    main(args)
+    sys.exit(main(*args))

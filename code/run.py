@@ -177,7 +177,7 @@ def main(argv = None):
         preflight.checkit(sys.stderr)
 
         # Create all the temporary directories we're going to use.
-        for d in ['bin', 'log', 'result', 'work']:
+        for d in ['log', 'result', 'work']:
             mkdir(d)
 
         step_fn = {

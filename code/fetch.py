@@ -79,14 +79,29 @@ def fetch(files, prefix='input/', output=sys.stdout):
             file += '.Z'
         assert file in name
         def hook(n, bs, ts):
-            output.write("\r%s %d" % (url, n*bs))
+            """Hook function for urllib.urlretrieve.  Implements a
+            progress indicator.
+            """
+
+            got = n*bs
+            if ts < 0:
+                outof = ''
+            else:
+                # On the last block n*bs can exceed ts, so we clamp it
+                # to avoid awkward questions.
+                got = min(got, ts)
+                outof = '/%d [%d%%]' % (ts, 100*got//ts)
+            output.write("\r  %d%s" % (got, outof))
             output.flush()
+
         # Make a local filename,
         local = prefix + file
         # and get the relevant URL.
         url = name[file]
+        output.write(url + '\n')
         urllib.urlretrieve(url, local, hook)
         output.write('\n')
+        output.flush()
 
 class Error(Exception):
     """Some sort of problem with fetch."""

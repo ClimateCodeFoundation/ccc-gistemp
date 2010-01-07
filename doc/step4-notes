@@ -3,7 +3,9 @@ STEP4.
 
 Nick Barnes, Ravenbrook Limited, 2009-06-23
 
-input_files/SBBX.HadR2         (originally from ????)
+input_files/SBBX.HadR2         (originally from
+  ftp://data.giss.nasa.gov/pub/gistemp/SBBX.HadR2 - fetch.py knows how to
+  download this)
 input_files/oiv2mon<yyyy><mm>  (optionally for several consecutive values of <mm> at once,
                                 from <ftp://ftp.emc.ncep.noaa.gov/cmb/sst/oimonth_v2/> and gunzipped).
 input_files/SBBX_LtSN.LnWE.dat (distributed as .gz with GISTEMP)

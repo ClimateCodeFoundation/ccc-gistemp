@@ -1,14 +1,21 @@
 #!/usr/bin/env python
 # $URL$
 # $Rev$
-# David Jones.
-# Copyright 2008,2009 Ravenbrook Limited.
+#
+# fetch.py
+#
+# David Jones, Ravenbrook Limited, 2010-01-07
+# Copyright (C) 2008-2010 Ravenbrook Limited.
 
-"""Script to fetch the inputs required for the GISTEMP program.  The
-inputs on are documented in the gistemp.txt file:
-http://clearclimatecode.org/master/test/GISTEMP/gistemp.txt
+"""
+fetch.py [--help] [input-files] ...
 
-Invoke without arguments.
+Script to fetch (download from the internet) the inputs required for
+the GISTEMP program.
+
+Any input files passed as arguments will be fetched from their locations
+on the internet.  If no arguments are supplied, then *all* the input
+files that this program knows about will be fetched.
 """
 
 # http://www.python.org/doc/2.4.4/lib/module-getopt.html

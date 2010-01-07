@@ -34,6 +34,12 @@ def fetch(files, prefix='input/', output=sys.stdout):
     # http://groups.google.com/group/ccc-gistemp-discuss/web/compiling-gistemp-source?hl=en
     # (But station_inventory.Z corrected to station.inventory.Z)
 
+    # There appears to be an HTTP server for the NOAA data:
+    # http://www1.ncdc.noaa.gov/pub/data/ghcn/v2/
+    # drj can't find any documentation that says this is the right place to
+    # use.  HTTP would be better because we can find out the length of
+    # the file so we can show progress better (and possibly diagnose /
+    # restart interrupted downloads).
     noaa = """
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.mean.Z
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.temperature.inv

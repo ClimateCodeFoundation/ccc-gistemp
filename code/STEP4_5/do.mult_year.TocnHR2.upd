@@ -1,8 +1,0 @@
-if [[ $# -lt 2 ]]; then echo "Usage: $0 year1 year2"; exit; fi
-y1=$1 ; y2=$2 ; y2m=$(( y1+14 ))
-if [[ y2 -lt y1 ]] ; then echo need yr1=$y1 '<' yr2=$y1 ; exit ; fi
-if [[ y2 -gt y2m ]] ; then echo need yr2=$y2 '<' ${y2m} ; exit ; fi
-
-# f90 convert.HadR2_mod4.upto15full_yrs.f -o convert.HadR2_mod4.upto15full_yrs.exe
-convert.HadR2_mod4.upto15full_yrs.exe  $y1 $y2
-trimSBBX SBBX.HadR2.upd

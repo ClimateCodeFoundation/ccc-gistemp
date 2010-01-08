@@ -27,7 +27,7 @@
 # NOAA file has been treated for GISTEMP's use by, for example, adding
 # records corresponding to Antarctic stations that are not used in GHCN
 # but are used in the GISTEMP analysis.  Step 1 (this step) expects to
-# find a record in v2.inv for every station is has a time series for.
+# find a record in v2.inv for every station it has a time series for.
 #
 # Requires the following files in the config/ directory,
 # from GISTEMP STEP1/input_files/:

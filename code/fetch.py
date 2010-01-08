@@ -14,8 +14,7 @@ Script to fetch (download from the internet) the inputs required for
 the GISTEMP program.
 
 Any input files passed as arguments will be fetched from their locations
-on the internet.  If no arguments are supplied, then *all* the input
-files that this program knows about will be fetched.
+on the internet.  If no arguments are supplied, nothing will be fetched.
 """
 
 # http://www.python.org/doc/2.4.4/lib/module-getopt.html
@@ -28,13 +27,11 @@ import urllib
 def fetch(files, prefix='input/', output=sys.stdout):
     """Download a bunch of files.  *files* is a list of the files to
     download (just the basename part, the bit after the last directory
-    separator).  *prefix* (not normally changed from the default) is
-    the location on the local file system where
-    the files will be downloaded.  *output* (not normally changed from
-    the default) is where progress messages appear.
-
-    If *files* is the empty list then it will download all the files it
-    knows about.
+    separator, with or without the compression suffix).  *prefix* (not
+    normally changed from the default) is the location on the local
+    file system where the files will be downloaded.  *output* (not
+    normally changed from the default) is where progress messages
+    appear.
     """
 
     # See
@@ -47,8 +44,13 @@ def fetch(files, prefix='input/', output=sys.stdout):
     # use.  HTTP would be better because we can find out the length of
     # the file so we can show progress better (and possibly diagnose /
     # restart interrupted downloads).
+
+    # We are moving from USHCNv1 (v2.mean.Z) to USHCNv2
+    # (9641C_200907_F52.avg.gz).  It does no harm to remember how to
+    # fetch the older file.
     noaa = """
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.mean.Z
+    ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_200907_F52.avg.gz
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.temperature.inv
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/hcn_doe_mean_data.Z
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/station.inventory.Z
@@ -60,10 +62,18 @@ def fetch(files, prefix='input/', output=sys.stdout):
 
     all = noaa + giss
 
-    # *name* is a dictionary that maps from short name to the URL.
-    name = dict((url.split('/')[-1], url) for url in all)
+    # *name* is a dictionary that maps from short name, with and
+    # without compression suffix, to the URL.
+    name = {}
+    for url in all:
+        file = url.split('/')[-1]
+        split = file.split('.')
+        if split[-1].lower() in ['z','gz']:
+            name['.'.join(split[:-1])] = (file, url)
+        name[file] = (file, url)
+
     for n in files:
-        if n not in name and n+'.Z' not in name:
+        if n not in name:
             raise Error("Don't know how to fetch %s" % n)
 
     # Attempt to create the directories required for *prefix*.
@@ -75,8 +85,6 @@ def fetch(files, prefix='input/', output=sys.stdout):
         pass
 
     for file in files:
-        if file+'.Z' in name:
-            file += '.Z'
         assert file in name
         def hook(n, bs, ts):
             """Hook function for urllib.urlretrieve.  Implements a
@@ -94,10 +102,9 @@ def fetch(files, prefix='input/', output=sys.stdout):
             output.write("\r  %d%s" % (got, outof))
             output.flush()
 
-        # Make a local filename,
-        local = prefix + file
-        # and get the relevant URL.
-        url = name[file]
+        # Make a local filename
+        (filename, url) = name[file]
+        local = prefix + filename
         output.write(url + '\n')
         urllib.urlretrieve(url, local, hook)
         output.write('\n')

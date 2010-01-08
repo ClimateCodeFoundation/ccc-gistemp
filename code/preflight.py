@@ -35,7 +35,7 @@ def checkit(log):
 
         missing = []
         for name in list:
-            if not (input_ok(name) or input_ok(name + '.Z')):
+            if not any(input_ok(name+suffix) for suffix in ['','.Z','.gz']):
                 missing_input(name)
                 missing.append(name)
         return missing
@@ -57,7 +57,7 @@ def checkit(log):
             missing_input(name)
             rc = max(rc, 2)
 
-    step0big = 'v2.mean hcn_doe_mean_data'.split()
+    step0big = '9641C_200907_F52.avg hcn_doe_mean_data'.split()
     step5big = 'SBBX.HadR2'.split()
     big = step0big + step5big
     assert big

@@ -26,15 +26,16 @@
 #   t_hohenpeissenberg_200306.txt_as_received_July17_2003
 #
 # From GISTEMP/STEP0/input_files, USHCN/GHCN station table:
-#   ushcn.tbl
+#   ushcn2.tbl
+#   ushcnV2_cmb.tbl
 #
 # From import/2008-07-14/ghcn, GHCN data:
-# (originally from ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.mean.Z)
-#   v2.mean
+# (from ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.mean.Z)
+#   v2.mean.Z
 #
 # From import/2007-10-11/ushcn, USHCN data:
-# (originally from ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/hcn_doe_mean_data.Z)
-#   hcn_doe_mean_data
+# (from ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_200907_F52.avg.gz)
+#   9641C_200907_F52.avg.gz
 
 import itertools
 import math
@@ -44,18 +45,19 @@ import re
 def open_or_uncompress(filename):
     """Opens the text file `filename` for reading.  If this fails then
     it attempts to find a compressed version of the file by appending
-    '.Z' to the name and opening that (uncompressing it on the fly).
+    '.Z' or '.gz' to the name and opening that (uncompressing it on
+    the fly).
     """
 
     try:
         return open(filename)
     except IOError:
-        # When neither filename nor filename.Z exists we want to pretend
-        # that the exception comes from the original call to open,
-        # above.  Otherwise the user can be confused by claims that
-        # "foo.Z" does not exist when they tried to open "foo".  In
-        # order to maintain this pretence, we have to get the exception
-        # info and save it. See
+        # When none of filename, filename.Z, nor filename.gz exists we
+        # want to pretend that the exception comes from the original
+        # call to open, above.  Otherwise the user can be confused by
+        # claims that "foo.Z" does not exist when they tried to open
+        # "foo".  In order to maintain this pretence, we have to get
+        # the exception info and save it. See
         # http://blog.ianbicking.org/2007/09/12/re-raising-exceptions/
         import sys
         exception = sys.exc_info()
@@ -63,7 +65,11 @@ def open_or_uncompress(filename):
             import uncompress
             return uncompress.Zfile(filename + '.Z')
         except IOError:
-            pass
+            try:
+                import gzip
+                return gzip.open(filename + '.gz')
+            except IOError:
+                pass
         raise exception[0], exception[1], exception[2]
 
 def read_antarc_station_ids(filename):
@@ -222,18 +228,21 @@ def read_USHCN_stations():
     """
 
     stations = {}
-    for line in open('input/ushcn.tbl'):
-        # USHCN2v2.f: read(1,'(5x,i6,1x,a11,1x,i1)') idus,idg,iz
-        USHCN_id = int(line[5:11])
-        country_code = int(line[12:15])
-        WMO_station = int(line[15:20])
-        modifier = int(line[20:23])
-        duplicate = int(line[25])
+    for line in open('input/ushcn2.tbl'):
+        (USHCN_id, WMO_id, duplicate) = line.split()
+        country_code = int(WMO_id[0:3])
+        WMO_station = int(WMO_id[3:8])
+        modifier = int(WMO_id[8:11])
+        USHCN_id = int(USHCN_id)
         if country_code != 425:
             raise ValueError, "non-425 station found in ushcn.tbl: '%s'" % line
-        if duplicate != 0:
+        if duplicate != '0':
             raise ValueError, "station in ushcn.tbl with non-zero duplicate: '%s'" % line
         stations[USHCN_id] = (WMO_station, modifier)
+    # some USHCNv2 station IDs convert to USHCNv1 station IDs:
+    for line in open('input/ushcnV2_cmb.tbl'):
+        (v2_station,_,v1_station,_) = line.split()
+        stations[int(v2_station)] = stations[int(v1_station)]
     return stations
 
 def read_USHCN():
@@ -247,9 +256,8 @@ def read_USHCN():
     # initialize hash from WMO station ID to results
     for (USHCN_id, (WMO_station, modifier)) in stations.items():
         hash[(WMO_station, modifier)] = {}
-    for line in open_or_uncompress('input/hcn_doe_mean_data'):
-        # " 3A" indicates mean Filnet temperatures.
-        if line[11:14] != ' 3A':
+    for line in open_or_uncompress('input/9641C_200907_F52.avg'):
+        if line[6] != '3': # 3 indicates mean temperatures
             continue
         USHCN_station = int(line[0:6])
         (WMO_station, modifier) = stations[USHCN_station]
@@ -260,14 +268,14 @@ def read_USHCN():
         temps = []
         valid = False
         for m in range(0,12):
-            temp_fahrenheit = read_float(line[m*10+14:m*10+20])
-            flags = line[m*10+20:m*10+24]
-            if ((flags[3] == 'M') or           # interpolated data
-                (temp_fahrenheit < -99)) :     # absent data
+            temp_fahrenheit = int(line[m*7+11:m*7+17])
+            flag = line[m*7+17]
+            if ((flag in 'EQ') or              # interpolated data
+                (temp_fahrenheit == -9999)) :  # absent data
                 temp = None
             else:
                 # tenths of degree centigrade
-                temp = round_to_nearest((temp_fahrenheit - 32) * 50/9.0)
+                temp = round_to_nearest((temp_fahrenheit - 320) * 5/9.0)
                 valid = True
             temps.append(temp)
         if valid: # some valid data found

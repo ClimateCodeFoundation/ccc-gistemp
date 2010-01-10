@@ -50,14 +50,15 @@ def checkit(log):
         antarc3.list
         antarc3.txt
         t_hohenpeissenberg_200306.txt_as_received_July17_2003
-        ushcn.tbl
+        ushcn2.tbl
+        ushcnV2_cmb.tbl
         """.split()
     for name in step0:
         if not input_ok(name):
             missing_input(name)
             rc = max(rc, 2)
 
-    step0big = '9641C_200907_F52.avg hcn_doe_mean_data'.split()
+    step0big = '9641C_200907_F52.avg v2.mean'.split()
     step5big = 'SBBX.HadR2'.split()
     big = step0big + step5big
     assert big
@@ -77,7 +78,7 @@ def checkit(log):
 
     step1 = """
         mcdw.tbl
-        ushcn.tbl
+        ushcn2.tbl
         sumofday.tbl
         v2.inv
         """.split()

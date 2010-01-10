@@ -45,14 +45,14 @@ def fetch(files, prefix='input/', output=sys.stdout):
     # the file so we can show progress better (and possibly diagnose /
     # restart interrupted downloads).
 
-    # We are moving from USHCNv1 (v2.mean.Z) to USHCNv2
+    # We are moving from USHCNv1 (hcn_doe_mean_data.Z) to USHCNv2
     # (9641C_200907_F52.avg.gz).  It does no harm to remember how to
     # fetch the older file.
     noaa = """
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.mean.Z
-    ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_200907_F52.avg.gz
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.temperature.inv
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/hcn_doe_mean_data.Z
+    ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_200907_F52.avg.gz
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/station.inventory.Z
     """.split()
 

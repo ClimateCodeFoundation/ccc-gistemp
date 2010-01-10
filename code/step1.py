@@ -17,7 +17,7 @@
 # from GISTEMP STEP1/input_files/:
 # 
 # mcdw.tbl
-# ushcn.tbl
+# ushcn2.tbl
 # sumofday.tbl
 # v2.inv
 #
@@ -297,7 +297,7 @@ def v2_fill_dbm(f, dbm, info, sources):
 
 def v2_get_sources():
     sources = {}
-    for source in ['MCDW', 'USHCN', 'SUMOFDAY']:
+    for source in ['MCDW', 'USHCN2', 'SUMOFDAY']:
         for line in open('input/%s.tbl' % source.lower()):
             _, id, rec_no = line.split()
             sources[id + rec_no] = source
@@ -437,7 +437,7 @@ def combine(*args):
     return 1
 
 def get_best(records):
-    ranks = {'MCDW': 4, 'USHCN': 3, 'SUMOFDAY': 2, 'UNKNOWN': 1}
+    ranks = {'MCDW': 4, 'USHCN2': 3, 'SUMOFDAY': 2, 'UNKNOWN': 1}
     best = 1
     longest = 0
     rids = records.keys()

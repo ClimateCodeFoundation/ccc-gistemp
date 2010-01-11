@@ -28,9 +28,9 @@ def checkit(log):
 
         log.write('MISSING: config/%s\n' % name)
 
-    def missing_big_files(list):
-        """Check list (of names) and return mising ones.  .Z extension
-        is also tried if supplied name is not found.
+    def missing_files(list):
+        """Check list (of names) and return mising ones.  Compression
+        extensions (.Z and .gz) are also tried if supplied name is not found.
         """
 
         missing = []
@@ -53,44 +53,37 @@ def checkit(log):
         ushcn2.tbl
         ushcnV2_cmb.tbl
         """.split()
-    for name in step0:
-        if not input_ok(name):
-            missing_input(name)
-            rc = max(rc, 2)
-
-    step0big = '9641C_200907_F52.avg v2.mean'.split()
-    step5big = 'SBBX.HadR2'.split()
-    big = step0big + step5big
-    assert big
-    missing = missing_big_files(big)
-    if missing:
-        log.write('Attempting to fetch missing files: %s\n' %
-            ' '.join(missing))
-        # Call fetch.py as if it were a program.
-        import fetch
-        fetch.main(argv=['fetch'] + missing)
-        missing = missing_big_files(big)
-        if missing:
-            log.write("PROBLEM: Tried fetching missing files but it didn't work.\n")
-            rc = max(rc, 2)
-        else:
-            log.write('OK: Fetching missing files looks like it worked\n')
-
     step1 = """
         mcdw.tbl
         ushcn2.tbl
         sumofday.tbl
         v2.inv
         """.split()
+
+    step0big = '9641C_200907_F52.avg v2.mean'.split()
+    step5big = 'SBBX.HadR2'.split()
+    big = step0big + step5big
+    assert big
+    all = step0 + step1 + big
+    missing = missing_files(all)
+    if missing:
+        log.write('Attempting to fetch missing files: %s\n' %
+            ' '.join(missing))
+        # Call fetch.py as if it were a program.
+        import fetch
+        fetch.main(argv=['fetch'] + missing)
+        missing = missing_files(all)
+        if missing:
+            log.write("PROBLEM: Tried fetching missing files but it didn't work.\n")
+            rc = max(rc, 2)
+        else:
+            log.write('OK: Fetching missing files looks like it worked\n')
+
     step1_config = """
         combine_pieces_helena.in
         Ts.strange.RSU.list.IN
         Ts.discont.RS.alter.IN
         """.split()
-    for name in step1:
-        if not input_ok(name):
-            missing_input(name)
-            rc = max(rc, 2)
     for name in step1_config:
         if not config_ok(name):
             missing_config(name)

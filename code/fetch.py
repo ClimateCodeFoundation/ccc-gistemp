@@ -83,6 +83,7 @@ def fetch(files, prefix='input/', output=sys.stdout):
     antarc3.list
     antarc3.txt
     t_hohenpeissenberg_200306.txt_as_received_July17_2003
+    ushcn2.tbl
     ushcnV2_cmb.tbl
     """.split()
 

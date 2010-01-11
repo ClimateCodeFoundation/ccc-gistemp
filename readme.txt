@@ -94,9 +94,11 @@ We use this directory structure:
 
 ccc-gistemp-x.x.x/code/     Source code only
                  /config/   Configuration files
+                 /doc/      Internal developer documentation
                  /input/    Input data files
-                 /work/     Intermediate data files
                  /log/      Log files
+                 /tool/     Tools - sources other than ccc-gistemp
+                 /work/     Intermediate data files
                  /result/   Final result files
 
 Running the code should write to the input/ directory when fetching

@@ -12,15 +12,15 @@ Summary:
 
 Plan:
 
-- import updated Antarctica data and station tables.
+- import updated Antarctica data and station tables. [DONE]
 
-- import ushcnV2_cmb.tbl
+- import ushcnV2_cmb.tbl [DONE]
 
-- Change preflight to get USHCN v2 file 9641C_200907_F52.avg
+- Change preflight to get USHCN v2 file 9641C_200907_F52.avg [DONE]
 
-- Change step0.py to use USHCN v2 file.
+- Change step0.py to use USHCN v2 file. [DONE]
 
-- Disregard skip_US parameter.
+- Disregard skip_US parameter. [DONE]
 
 do_comb_step0.sh:
   New command-line arguments:

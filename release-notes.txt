@@ -1,4 +1,4 @@
-CLEAR CLIMATE CODE RELEASE NOTES FOR RELEASE x.x.x
+CLEAR CLIMATE CODE RELEASE NOTES FOR RELEASE 0.2.0
 
 Nick Barnes, Ravenbrook Limited
 
@@ -11,7 +11,7 @@ CONTENTS
   2. Supported configurations
   3. Getting help
   4. What's fixed
-     4.1.   What's fixed since release 0.1.0
+     4.1.   What's fixed in release 0.2.0
      4.2.   What was fixed in release 0.1.0
      4.3.   What was fixed in release 0.0.3
      4.4.   What was fixed in release 0.0.2
@@ -24,7 +24,7 @@ CONTENTS
 
 1. INTRODUCTION
 
-These are the release notes for release x.x.x of the Clear Climate
+These are the release notes for release 0.2.0 of the Clear Climate
 Code GISTEMP project (CCC-GISTEMP).
 
 Clear Climate Code is reimplementing GISTEMP (the GISS surface
@@ -34,7 +34,7 @@ For instructions on installing and running the CCC GISTEMP, see the
 product readme (readme.txt).
 
 For up-to-date information about releases of CCC GISTEMP see the
-project home page <http://www.clearclimatecode.org/>.  From there you
+project home page <http://clearclimatecode.org/>.  From there you
 will find links to the latest releases, including reports of defects
 found.
 
@@ -54,12 +54,51 @@ support@clearclimatecode.org.
 
 This section lists defects that have been fixed.
 
-4.1. WHAT'S FIXED SINCE RELEASE 0.1.0
+4.1. WHAT'S FIXED IN RELEASE 0.2.0
 
 Since moving CCC-GISTEMP from Ravenbrook's own internal servers to
 GoogleCode, we haven't yet written the necessary scripts to generate
 lists of fixed defects from GoogleCode, so this section is incomplete.
+Here are the major defects we have fixed.
 
+Issue 19: STEP2 is in Fortran
+
+Paul Ollis rewrote the STEP2 code in Python.
+
+Issue 10: STEP5 is in Fortran
+
+David Jones rewrote the STEP5 code in Python.
+
+Issue 9: STEP4 is in Fortran
+
+Paul Ollis rewrote the STEP4 code in Python, removing the last Fortran
+from CCC-GISTEMP.
+
+Issue 1: Does not work on Windows
+
+Gareth Rees rewrote the driver script in Python, so we no longer have
+a dependency on any shell, and can run on Windows with or without
+cygwin.  John Keyes and Richard Hendricks were very helpful in
+diagnosing and testing this on various Windows platforms.
+
+Issue 7: Out-of-date with respect to GISTEMP
+
+Various changes have been made to GISTEMP since we started this
+project.  Nick Barnes ported those changes over to our code.  The most
+significant change was the use of version 2 of the USHCN dataset.
+
+Issue 20: Source data has to be fetched and uncompressed by hand
+
+David Jones wrote a fetch module and a preflight checking module, to
+fetch all the input data from the originating organisations.
+
+Issue 21: No way to compare results
+
+David Jones wrote vischeck.py, which will generate a graph comparing
+the annual global temperature anomalies from two sets of result data
+(e.g. comparing CCC-GISTEMP with GISTEMP).  Gareth Rees wrote
+compare_results.py, which generates a more detailed report comparing
+two sets of results.
 
 4.2. WHAT WAS FIXED IN RELEASE 0.1.0
 
@@ -200,6 +239,7 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
+2010-01-11 NB  Updated for 0.2.0.
 2009-12-03 NB  Updated for GoogleCode project.
 2008-09-14 NB  Updated for 0.1.0
 2008-09-12 NB  Updated for 0.0.3
@@ -210,8 +250,8 @@ Most recent changes first:
 
 C. COPYRIGHT AND LICENSE
 
-This document is copyright (C) 2009 Ravenbrook Limited.  All rights
-reserved.
+This document is copyright (C) 2009, 2010 Ravenbrook Limited.  All
+rights reserved.
 
 Redistribution and use of this document in any form, with or without
 modification, is permitted provided that redistributions of this
@@ -230,4 +270,6 @@ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 DOCUMENT, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-$Id: //info.ravenbrook.com/project/ccc/master/release-notes.txt#4 $
+$URL$
+$Rev$
+

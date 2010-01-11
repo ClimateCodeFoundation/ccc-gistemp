@@ -1,8 +1,8 @@
-CLEAR CLIMATE CODE GISTEMP README FOR RELEASE x.x.x
+CLEAR CLIMATE CODE GISTEMP README FOR RELEASE 0.2.0
 
 Nick Barnes, Clear Climate Code
 
-$Date: 2008/09/19 $
+$Date$
 
 
 CONTENTS
@@ -15,15 +15,14 @@ CONTENTS
 
 1. INTRODUCTION
 
-This is release x.x.x of the Clear Climate Code GISTEMP project
+This is release 0.2.0 of the Clear Climate Code GISTEMP project
 (ccc-gistemp).
 
 Clear Climate Code is reimplementing GISTEMP (the GISS surface
 temperature analysis system) in Python, to make it clearer.
 
-CCC GISTEMP release x.x.x is a release of CCC GISTEMP version x.x.
-The purpose of version x.x is: to publish our early progress towards
-the project goals.
+CCC GISTEMP release 0.2.0 is a release of CCC GISTEMP version 0.2.
+The purpose of version 0.2 is: a first all-Python version.
 
 Large amounts of the original GISS code was written in Fortran, some in
 C, and some in ksh (and some in Python).  This code has all been
@@ -65,33 +64,33 @@ not work).
 
 3. INSTALLATION
 
-Unpack ccc-gistemp-x.x.x.tar.gz.
+Unpack ccc-gistemp-0.2.0.tar.gz.
 
 
 4. INPUT DATA
 
-ccc-gistemp-x.x.x uses input data in the subdirectory input/ .  The
-smaller and less variable inputs are already packaged in the tar file in
-this directory.  The larger input files (the land temperature records from
-GHCN, USHCN, and sea surface data) can be obtained from the originating
-organisations over the internet by running the Python script
-code/preflight.py (or you can obtain them yourself).  preflight.py will
-not download a file if it is already present in the input/ directory, so
-if you wish to run ccc-gistemp with updated input data, you can delete
-the files and run preflight.py again.
+ccc-gistemp-0.2.0 uses input data in the subdirectory input/.  This
+input data includes large files of temperature records from GHCN,
+USHCN, and sea surface data, and small files of additional temperature
+records and records and station tables from GISS.  ccc-gistemp-0.2.0
+includes code (preflight.py) to fetch this data from the originating
+organisations over the internet.  It will not download a file if it is
+already present in the input/ directory, so if you wish to run
+ccc-gistemp with updated input data, you can delete the input
+directory before you start.
 
 
 5. RUNNING
 
-To run steps 0, 1, 2, 3, and 5:
+To run CCC-GISTEMP:
 
 python code/run.py
 
-code/STEP4_5/do_comb_step4.sh runs step 4, which updates the
-sea-surface temperature file input/SSBX.HadR2.  This is optional. [and
-this documentation is wrong]
+To run only one step (0-5), give a -s <step> argument.  For instance:
 
-Both these scripts use this directory structure:
+python code/run.py -s 1
+
+We use this directory structure:
 
 ccc-gistemp-x.x.x/code/     Source code only
                  /config/   Configuration files
@@ -100,7 +99,8 @@ ccc-gistemp-x.x.x/code/     Source code only
                  /log/      Log files
                  /result/   Final result files
 
-Running the code should only write to the bin/ work/ log/ and result/
+Running the code should write to the input/ directory when fetching
+input data, but subsequently only write to the work/ log/ and result/
 directories.  Before running code/run.py, these directories can all be
 deleted (if you wish, for example, to have a clean run).
 
@@ -131,6 +131,7 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
+2010-01-11 NB  Updated to describe preflight better.
 2010-01-06 DRJ Updated for our all-Python status.
 2009-12-03 NB  Updated for transfer to GoogleCode project.
 2008-09-19 DRJ Added PNG result.

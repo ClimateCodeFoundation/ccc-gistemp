@@ -48,7 +48,7 @@ http://ccc-gistemp.googlecode.com/ ccc-gistemp code repository.
 
 2. DEPENDENCIES
 
-The only dependency is Python 2.4 (or a more recent Python version).
+The only dependency is Python 2.5.2 (or a more recent Python version).
 The code should run on OS X, FreeBSD, Windows, and probably a variety of
 other Unix-like operating systems.  A network connection is required to
 download the input files (which need only be done once), and to produce

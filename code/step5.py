@@ -448,7 +448,7 @@ def step5():
     import os
 
     land = open(os.path.join('work', 'SBBX1880.Ts.GHCN.CL.PA.1200'), 'rb')
-    ocean = open(os.path.join('input', 'SBBX.HadR2'), 'rb')
+    ocean = open(os.path.join('work', 'SBBX.HadR2'), 'rb')
     box = open(os.path.join('result', 'BX.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
     log = open(os.path.join('log', 'SBBXotoBX.log'), 'w')
     SBBXtoBX(land, ocean, box, log, rland=100, intrp=0)

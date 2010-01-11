@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 """Python version of convert1.HadR2_mod4.py.
 
-Without arguments this will look for all the ``oiv2mon.*`` files in the
-``input_files`` directory and use them to buid a new ``input/SBBX.HadR2`` file.
-Alternatively, you can provide 2 or 3 arguments to select the set of input
-files. The arguments can be in one of two forms::
+Without arguments this will look for ``input/SBBX.HadR2`` and all the
+``oiv2mon.*`` files in the ``input`` directory and use them to buid a
+new ``work/SBBX.HadR2`` file.  Alternatively, you can provide 2 or 3
+arguments to select the set of input files. The arguments can be in
+one of two forms::
 
     year month1 month2
     year1 year2 [month2]
@@ -92,8 +93,8 @@ def sread(f, na):
 
 
 def load_oisstv2_mod4_clim():
-    src = "input_files/oisstv2_mod4.clim"
-    if not os.path.exists("input_files/oisstv2_mod4.clim"):
+    src = "input/oisstv2_mod4.clim"
+    if not os.path.exists("input/oisstv2_mod4.clim"):
         sys.stderr.write("File %r is missing\n" % src)
         return None
 
@@ -126,9 +127,9 @@ def load_sst_data(iyr1, n_years, dates):
     # Read in the SST data for recent years (unit 11)
     sst = make_3d_array(IM, JM, 12 * n_years)
 
-    trace(0, " Reading input_files/oiv2mon... files.")
+    trace(0, " Reading input/oiv2mon... files.")
     for iyr, mon in dates:
-        path = "input_files/oiv2mon.%04d%02d" % (iyr, mon)
+        path = "input/oiv2mon.%04d%02d" % (iyr, mon)
         trace(1, " trying to read %s" % path)
         f11 = fort.open(path)
         f11.bos = ">"
@@ -238,14 +239,13 @@ def select_input_files(args, curr_moe=None, curr_yre=None,
         use_all_oiv2mon=False):
     dates = []
 
-    if not os.path.isdir("input_files"):
-        sys.stderr.write(" There is no input_files directory\n")
-        sys.stderr.write(" The optional step 4 requires this directory\n")
+    if not os.path.isdir("input"):
+        sys.stderr.write(" There is no input directory\n")
         return 0, None, None, None
 
     # Try to ensure the input files are decompressed.
     gzipped_paths = glob(
-            "input_files/oiv2mon.[0-9][0-9][0-9][0-9][0-9][0-9].gz")
+            "input/oiv2mon.[0-9][0-9][0-9][0-9][0-9][0-9].gz")
     for i, p in enumerate(gzipped_paths):
         ret = decompress_gz(p)
         if ret == 1:
@@ -258,7 +258,7 @@ def select_input_files(args, curr_moe=None, curr_yre=None,
 
     if not args and use_all_oiv2mon:
         potential_paths = glob(
-                "input_files/oiv2mon.[0-9][0-9][0-9][0-9][0-9][0-9]")
+                "input/oiv2mon.[0-9][0-9][0-9][0-9][0-9][0-9]")
         for p in sorted(potential_paths):
             y, m = [int(s) for s in (p[-6:-2], p[-2:])]
             if not 1981 <= y <= IYREO or not 1 <= m <= 12:
@@ -272,7 +272,7 @@ def select_input_files(args, curr_moe=None, curr_yre=None,
         if curr_moe == 12:
             start_year += 1
         potential_paths = glob(
-                "input_files/oiv2mon.[0-9][0-9][0-9][0-9][0-9][0-9]")
+                "input/oiv2mon.[0-9][0-9][0-9][0-9][0-9][0-9]")
         for p in sorted(potential_paths):
             y, m = [int(s) for s in (p[-6:-2], p[-2:])]
             if y < start_year:
@@ -290,7 +290,7 @@ def select_input_files(args, curr_moe=None, curr_yre=None,
         iyr1, mo1, iyr2, mo2 = parse_args(args)
         y, m = iyr1, mo1
         while (y, m) <= (iyr2, mo2):
-            p = "input_files/oiv2mon.%04d%02d" % (y, m)
+            p = "input/oiv2mon.%04d%02d" % (y, m)
             if not os.path.exists(p):
                 sys.stderr.write(
                         "Input file %r does not exist - ignoring\n" % p)
@@ -341,8 +341,9 @@ def main(args=(), use_all_oiv2mon=False, verbose=None):
     iyr1, iyr2, n_years, dates = select_input_files(args, curr_moe, curr_yre,
             use_all_oiv2mon=use_all_oiv2mon)
     if iyr1 is None:
-        sys.stdout.write(" The SBBX.HadR2 appears to be up to date,"
-                         " leaving it unchanged\n")
+        sys.stdout.write(" The input SBBX.HadR2 appears to be up to date,"
+                         " using it unchanged\n")
+        shutil.copyfile("input/SBBX.HadR2", "work/SBBX.HadR2")
         return 0
     elif iyr1 == 0:
         sys.stderr.write(" Unable to update SBBX.HadR2\n")
@@ -350,7 +351,7 @@ def main(args=(), use_all_oiv2mon=False, verbose=None):
 
     if 0:
         for y, m in dates:
-            path = "input_files/oiv2mon.%04d%02d" % (y, m)
+            path = "input/oiv2mon.%04d%02d" % (y, m)
             print path
 
     sst, moe, iyre = load_sst_data(iyr1, n_years, dates)
@@ -369,7 +370,7 @@ def main(args=(), use_all_oiv2mon=False, verbose=None):
     outH.title = inH.title[:40] + " Had: 1880-11/1981, oi2: 12/1981-%2d/%04d" % (
             moe, iyre)
 
-    f2 = fort.open("work/SBBX.HadR2", "wb")
+    f2 = fort.open("work/SBBX.HadR2.untrimmed", "wb")
     f2.bos = ">"
     f2.writeline(outH.binary)
 
@@ -428,15 +429,7 @@ def main(args=(), use_all_oiv2mon=False, verbose=None):
     # Close the updated file and trim.
     f2.close()
     trace(0, " Trimming the updated SBBX file")
-    tmp_out = "work/SBBX.HadR2.trim"
-    ret = trimSBBX.main("work/SBBX.HadR2", tmp_out)
-    if ret == 0:
-        # Trimming was successful. So rename the working file to become
-        # the input/SBBX.HadR2
-        trace(0, " Replacing input/SBBX.HadR2 with new file")
-        shutil.copyfile(tmp_out, "input/SBBX.HadR2")
-        os.unlink(tmp_out)
-
+    ret = trimSBBX.main("work/SBBX.HadR2.untrimmed", "work/SBBX.HadR2")
 
 if __name__ == "__main__":
     import optparse
@@ -444,7 +437,7 @@ if __name__ == "__main__":
     usage += "\n       %prog [options] [year1 year2 [month2]]"
     parser = script_support.makeParser(usage)
     parser.add_option("--use-all-oiv2mon", action="store_true",
-        help="Use all the oiv2mon files in input_files")
+        help="Use all the oiv2mon files in input")
     options, args = script_support.parseArgs(parser, __doc__, (0, 3))
     if len(args) not in (0, 2, 3):
         parser.error("Expected either zero, 2 or 3 arguments")

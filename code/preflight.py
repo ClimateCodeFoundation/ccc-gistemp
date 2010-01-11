@@ -35,7 +35,13 @@ def checkit(log):
 
         missing = []
         for name in list:
-            if not any(input_ok(name+suffix) for suffix in ['','.Z','.gz']):
+            gotit = False
+            for suffix in ['','.Z','.gz']:
+                if input_ok(name+suffix):
+                    gotit = True
+                    break
+            if not gotit:
+                # Didn't find file, even trying compressed suffixes.
                 missing_input(name)
                 missing.append(name)
         return missing

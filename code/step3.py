@@ -657,7 +657,7 @@ def subbox_grid(infile,
             latlon = map(lambda x:int(round(100*x)), subbox)
             # Select and weight stations
             centre = eqarea.centre(subbox)
-            print 'subbox centre', centre
+            print 'subbox centre %+05.1f%+06.1f' % centre
             # Of possible stations in this region, filter for those with
             # radius of subbox centre.  Note that it is important that
             # the ordering within the regionstations list is retained.

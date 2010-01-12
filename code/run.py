@@ -112,7 +112,7 @@ def run_step2():
 def run_step3():
     log("====> STEP 3 ====")
     import step3
-    step3.main()
+    step3.main([])
 
 def run_step4():
     log("====> STEP 4 ====")

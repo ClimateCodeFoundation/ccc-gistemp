@@ -401,6 +401,8 @@ def subbox_grid(infile,
         (when combining stations it expected to be the station ID).
         """
 
+        from itertools import izip
+
         # See to.SBBXgrid.f lines 519 and following
 
         # The Fortran code handles the arrays by just assuming them to
@@ -415,14 +417,13 @@ def subbox_grid(infile,
             sumn = 0    # Sum of data in dnew
             sum = 0     # Sum of data in avg
             ncom = 0    # Number of years where both dnew and avg are valid
-            for kn in range(nf1*km+k, nl1*km, km):
-                # Could specify that arguments are array.array and use
-                # array.count(BAD) and sum, instead of this loop.
-                if avg[kn] >= XBAD or dnew[kn] >= XBAD:
+            for a,n in izip(avg[nf1*km+k: nl1*km: km],
+                           dnew[nf1*km+k: nl1*km: km]):
+                if a >= XBAD or n >= XBAD:
                     continue
                 ncom += 1
-                sum += avg[kn]
-                sumn += dnew[kn]
+                sum += a
+                sumn += n
             if ncom < NOVRLP:
                 continue
             biask = float(sum-sumn)/ncom

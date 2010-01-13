@@ -233,12 +233,14 @@ def differences_url(anns):
     return 'http://chart.apis.google.com/chart?' + '&'.join(chart)
 
 def top(diffs, n, o, fmt = str):
-    """Output a list of the top *n* largest differences (in magnitude)
-    from the list *diffs* to the stream *o*, using *fmt* to format the
-    results."""
+    """Output a list of the top at-most-*n* largest differences (in
+    magnitude) from the list *diffs* to the stream *o*, using *fmt* to
+    format the results.  Does not output any zeroes."""
     topn = sorted(diffs, key = lambda a: abs(a[1]), reverse = True)[:n]
     print >>o, "<ol>"
     for k, v in topn:
+        if v == 0:
+            break
         print >>o, "<li>" + fmt(k, v)
     print >>o, "</ol>"
 

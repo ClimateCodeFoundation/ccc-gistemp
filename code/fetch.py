@@ -215,7 +215,10 @@ def fetch_from_tar(inp, want, prefix='input', log=sys.stdout):
 
     # http://www.python.org/doc/2.4.4/lib/module-tarfile.html
     import tarfile
-    tar = tarfile.open(mode='r|*', fileobj=inp)
+    # The first argument, an empty string, is a dummy which works around
+    # a bug in Python 2.5.1.  See
+    # http://code.google.com/p/ccc-gistemp/issues/detail?id=26
+    tar = tarfile.open('', mode='r|*', fileobj=inp)
     for info in tar:
         if info.name in want:
             short = info.name.split('/')[-1]

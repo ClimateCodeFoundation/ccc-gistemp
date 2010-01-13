@@ -352,7 +352,7 @@ def sort(l, cmp):
 def subbox_grid(infile,
         subbox_out, box_out, station_use_out, radius=1200,
         year_begin=1880, base_year=(1951,1980), audit=None,
-        subbox=()):
+        just_subbox=()):
     """(This is the equivalent of to.SBBXgrid.f) Convert the input file,
     infile, into gridded datasets which are output on the file (-like)
     object subbox_out and box_out.
@@ -624,11 +624,11 @@ def subbox_grid(infile,
 
     regions = list(eqarea.gridsub())
     if audit:
-        subbox = [audit]
-    if subbox:
+        just_subbox = [audit]
+    if just_subbox:
         # Restrict processing to region containing single gridbox of
         # interest.
-        n = list(set(map(lambda x: x//100, subbox)))
+        n = list(set(map(lambda x: x//100, just_subbox)))
         if len(n) > 1:
             raise Exception('Sorry, only works within one region currently.')
         regions = map(lambda x: regions[x], n)
@@ -670,9 +670,9 @@ def subbox_grid(infile,
                 print station.id
 
         subboxes = list(region[1])
-        if subbox:
+        if just_subbox:
             # Select subboxes for processing.
-            l = map(lambda x: x % 100, subbox)
+            l = map(lambda x: x % 100, just_subbox)
             subboxes = map(lambda x: subboxes[x], l)
 
         # Used to generate the "subbox at" rows in the log.
@@ -785,7 +785,7 @@ def step3(label='GHCN.CL.PA', radius=1200, audit=None, subbox=()):
 
     subbox_grid(infile,
         subbox_grid_output, box_grid_output, station_use_output,
-        radius=radius, audit=audit, subbox=subbox)
+        radius=radius, audit=audit, just_subbox=subbox)
 
     # if [[ $rad -eq 1200 ]] ; then ./zonav $label ; fi
     # ./trimSBBX SBBX1880.Ts.${label}.$rad

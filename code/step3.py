@@ -353,6 +353,8 @@ def subbox_grid(infile,
     period.
     """
 
+    log = sys.stdout
+
     # Helper functions (rather big ones).  These are separate in the
     # Fortran.
 
@@ -652,15 +654,22 @@ def subbox_grid(infile,
             # Select single subbox for audit
             subboxes = [subboxes[audit % 100]]
 
+        # Used to generate the "subbox at" rows in the log.
+        lastcentre = (None, None)
         for subbox in subboxes:
             # Convert latitude longitude to integer 100ths for swrite.
             latlon = map(lambda x:int(round(100*x)), subbox)
             # Select and weight stations
             centre = eqarea.centre(subbox)
-            print 'subbox centre %+05.1f%+06.1f' % centre
+            if centre[0] != lastcentre[0]:
+                log.write("\nsubbox at %+05.1f" % centre[0])
+            log.write('%+06.1f' % centre[1])
+            log.flush()
+            lastcentre = centre
             # Of possible stations in this region, filter for those with
             # radius of subbox centre.  Note that it is important that
-            # the ordering within the regionstations list is retained.
+            # the ordering within the regionstations list is retained
+            # (in order to match the GISS code).
             # station is a list (wt, station) pairs:
             station = list(incircle(regionstations, arc, *centre))
             # Split list of pairs into pair of lists
@@ -675,7 +684,8 @@ def subbox_grid(infile,
             avg = [XBAD]*stations.monm
             if len(station) == 0:
                 swrite(subboxf, dmin=XBAD)
-                print 'No stations for center %s' % str(centre)
+                log.write('\nNo stations for center %+05.1f%+06.1f\n' %
+                  (centre))
                 continue
             # Initialise data with first station
             # See to.SBBXgrid.f lines 315 to 330

@@ -176,6 +176,11 @@ def distribution_url(d, w):
     while 100 * w < d_range:
         w *= 10
 
+    # Increase the number of bins by decreasing the bin width, so that the
+    # chart still looks interesting even if the range is tiny.
+    while d > 0 and w > d_range:
+        w /= 10
+
     # Map from integer multiple of w to number of values in that bin.
     bins = {}
     for v in d:

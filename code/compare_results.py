@@ -165,21 +165,30 @@ def difference(seqs, scale):
             newa = True
             newb = True
 
-def distribution_url(d, w):
+def distribution_url(d):
     """Return the URL of a Google chart showing the distribution of the
-    values in the sequence *d*, collected into bins of width *w* (if
-    possible, otherwise a power of 10 times *w*)."""
+    values in the sequence *d*, collected into bins."""
+
+    d_range = max(d) - min(d)
+    w = 0.01
 
     # Reduce the number of bins by increasing the bin width, so that the
-    # Google chart can be drawn even if the range is very large.
-    d_range = max(d) - min(d)
-    while 100 * w < d_range:
+    # chart can be drawn even if the range is very large.
+    while 100*w < d_range:
         w *= 10
 
     # Increase the number of bins by decreasing the bin width, so that the
     # chart still looks interesting even if the range is tiny.
-    while len(d) > 0 and d_range > 0 and w > d_range:
+    while len(d) > 0 and d_range > 0 and 10*w > d_range:
         w /= 10
+
+    # Now we have between 10 and 100 bins.  100 bins is too many.
+    if d_range > 25*w:
+        w *= 5
+
+    # Now either 10w < d_range < 25w, and w = 10^k,
+    # Or 5w < d_range < 20w, and w = 5*10^k
+    # Or d_range = 0 and w = 0.01.
 
     # Map from integer multiple of w to number of values in that bin.
     bins = {}
@@ -194,7 +203,9 @@ def distribution_url(d, w):
     dmax = max(d)
 
     # Google chart documentation at http://code.google.com/apis/chart/
-    rx = '%f,%f,%f' % (bin_min * w, bin_max * w, w)
+    rx = '|'.join(map(lambda x: '%d' % x, range(bin_min, bin_max + 1)))
+    bin_count = bin_max - bin_min + 1
+    notex = '|'*(bin_count/2) + '(bin size %f)' % w
     ry = '0,%d,%d' % (dmax, 10 ** math.floor(math.log10(dmax)))
     chart = [
         'chs=600x300', # Chart size (pixels).
@@ -202,8 +213,10 @@ def distribution_url(d, w):
         'chbh=a',        # Automatically resize bars to fit.
         'chd=t:' + ','.join(map(str, d)),     # Data.
         'chds=0,%d' % dmax,                   # Data scaling. 
-        'chxt=x,y,r',                         # Axes to label.
-        'chxr=0,%s|1,%s|2,%s' % (rx, ry, ry), # Axes ranges.
+        'chxt=x,y,r,x',                       # Axes to label.
+        'chxl=0:|%s|3:|%s' % (rx, notex),     # Text labels on x axis
+        'chxr=1,%s|2,%s' % (ry, ry),          # Axis ranges.
+        'chm=N,000000,0,-1,11'                # Data labels
         ]
 
     return 'http://chart.apis.google.com/chart?' + '&'.join(chart)
@@ -296,7 +309,7 @@ def compare(dirs, labels, o):
         diffs = list(difference(anns, 0.01))
         d = map(lambda a: a[1], diffs)
         print >>o, '<h3>%s annual residue distribution</h3>' % region.capitalize()
-        print >>o, '<img src="%s">' % escape(distribution_url(d, 0.01))
+        print >>o, '<img src="%s">' % escape(distribution_url(d))
         print >>o, '<h3>%s annual residue summary</h3>' % region.capitalize()
         print >>o, '<ul>'
         print >>o, '<li>Zeroes: %d/%d<li>Mean = %f<li>Standard deviation = %f' % stats(d)
@@ -311,7 +324,7 @@ def compare(dirs, labels, o):
         diffs = list(difference(mons, 0.01))
         d = map(lambda a: a[1], diffs)
         print >>o, '<h3>%s monthly residue distribution</h3>' % region.capitalize()
-        print >>o, '<img src="%s">' % escape(distribution_url(d, 0.01))
+        print >>o, '<img src="%s">' % escape(distribution_url(d))
         print >>o, '<h3>%s monthly residue summary</h3>' % region.capitalize()
         print >>o, '<ul>'
         print >>o, '<li>Min = %f<li>Max = %f' % (min(d), max(d))
@@ -326,7 +339,7 @@ def compare(dirs, labels, o):
     diffs = list(difference(boxes, 0.01))
     d = map(lambda a: a[1], diffs)
     print >>o, '<h3>Per-box monthly residue distribution</h3>'
-    print >>o, '<img src="%s">' % escape(distribution_url(d, 0.01))
+    print >>o, '<img src="%s">' % escape(distribution_url(d))
     print >>o, '<h3>Per-box monthly residue summary</h3>'
     print >>o, '<ul>'
     print >>o, '<li>Min = %f<li>Max = %f' % (min(d), max(d))

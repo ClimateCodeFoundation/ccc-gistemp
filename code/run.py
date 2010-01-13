@@ -76,6 +76,11 @@ def run_step2():
     # all the stations between +30.1 and +60.0 come next, and so on.
     # Thus reflecting how they get re-ordered when they are split into 6
     # files.
+    # Not doing the reordering makes a tiny amount of difference, see
+    # http://code.google.com/p/ccc-gistemp/issues/detail?id=25
+    # But if you feel like doing, you'll need to look at the, now
+    # deleted, split_binary.py program to see exactly how the split
+    # happens.
 
     log("... trimming Ts.bin")
     import trim_binary

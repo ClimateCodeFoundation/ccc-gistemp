@@ -121,13 +121,13 @@ def asmon(f, values_only=False):
                         yield(((year, month), None))
 
 def stats(seq):
-    """Return the mean and standard deviation of the numbers in the
-    non-empty sequence *seq*."""
+    """Return the zero count, length, mean, and standard deviation of
+    the numbers in the non-empty sequence *seq*."""
     assert seq
     n = float(len(seq))
     mean = sum(seq) / n
     variance = sum(map(lambda x: (x - mean) ** 2, seq)) / n
-    return mean, math.sqrt(variance)
+    return seq.count(0), n, mean, math.sqrt(variance)
 
 def difference(seqs, scale):
     """Return a sequence of differences between the second (data) items
@@ -290,8 +290,8 @@ def compare(dirs, labels, o):
         print >>o, '<img src="%s">' % escape(distribution_url(d, 0.01))
         print >>o, '<h3>%s annual residue summary</h3>' % region.capitalize()
         print >>o, '<ul>'
+        print >>o, '<li>Zeroes: %d/%d<li>Mean = %f<li>Standard deviation = %f' % stats(d)
         print >>o, '<li>Min = %f<li>Max = %f' % (min(d), max(d))
-        print >>o, '<li>Mean = %f<li>Standard deviation = %f' % stats(d)
         print >>o, '</ul>'
         print >>o, '<h3>Largest %s annual residues</h3>' % region
         top(diffs, 10, o, lambda k, v: "%04d: %f" % (k, v))
@@ -306,7 +306,7 @@ def compare(dirs, labels, o):
         print >>o, '<h3>%s monthly residue summary</h3>' % region.capitalize()
         print >>o, '<ul>'
         print >>o, '<li>Min = %f<li>Max = %f' % (min(d), max(d))
-        print >>o, '<li>Mean = %f<li>Standard deviation = %f' % stats(d)
+        print >>o, '<li>Zeroes: %d/%d<li>Mean = %f<li>Standard deviation = %f' % stats(d)
         print >>o, '</ul>'
         print >>o, '<h3>Largest %s monthly residues</h3>' % region
         top(diffs, 10, o, lambda k, v: "%04d-%02d: %f" % (k[0], k[1] + 1, v))
@@ -321,7 +321,7 @@ def compare(dirs, labels, o):
     print >>o, '<h3>Per-box monthly residue summary</h3>'
     print >>o, '<ul>'
     print >>o, '<li>Min = %f<li>Max = %f' % (min(d), max(d))
-    print >>o, '<li>Mean = %f<li>Standard deviation = %f' % stats(d)
+    print >>o, '<li>Zeroes: %d/%d<li>Mean = %f<li>Standard deviation = %f' % stats(d)
     print >>o, '</ul>'
     print >>o, '<h3>Largest per-box monthly residues</h3>'
     top(diffs, 10, o,

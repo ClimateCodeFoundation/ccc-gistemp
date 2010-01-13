@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+# $URL$
+# $Rev$
+#
+# trim_binary.py
+#
+# Clear Climate Code, 2009-02-22
+
 """Python replacement for code/STEP2/trim_binary.f
 
 The program reads the input files ``work/Ts.bin1``, ``work/Ts.bin2``, etc. and
@@ -10,14 +17,15 @@ __docformat__ = "restructuredtext"
 
 import sys
 
+# Clear Climate Code
 import fort
 import ccc_binary
 import script_support
 
 options = None
 
-def trimSingleFile(fileNumber):
-    """The main for this module.
+def trim_single_file(input_name, output_name):
+    """Trim a single binary file.  Used in STEP 2.
 
     Note:
         This (currently) tries to closely follow the form of the original
@@ -25,10 +33,8 @@ def trimSingleFile(fileNumber):
         nested, etc compared to typical Python code.
 
     """
-    filei = "work/Ts.bin%s" % fileNumber
-    f2 = fort.open(filei, "rb")
-    fileo = "work/Ts.GHCN.CL.%s" % fileNumber
-    f3 = ccc_binary.BufferedOutputRecordFile(fileo)
+    f2 = fort.open(input_name, "rb")
+    f3 = ccc_binary.BufferedOutputRecordFile(output_name)
 
     header = ccc_binary.CCHeader(f2.readline())
     f3.writeRecord(header)
@@ -49,7 +55,9 @@ def trimSingleFile(fileNumber):
     # - cause no record to be written.
 
     progress = script_support.countReport(
-            50, fmt="File %d: %%d records processed\n" % fileNumber, f=sys.stdout)
+            50,
+            fmt="File %s: %%d records processed\n" % input_name,
+            f=sys.stdout)
     for recordCount, s in enumerate(f2):
         inRec.setFromBinary(s)
         md = inRec.idata[0:i4]
@@ -88,11 +96,12 @@ def trimSingleFile(fileNumber):
 
 def main(args):
     """The main for this module.
-
-    This simply invokes trimSingleFile for n = 1, 2, ... 6.
     """
-    for n in range(1, 7):
-        trimSingleFile(n)
+
+    # http://python.org/doc/2.4.4/lib/module-os.path.html
+    import os
+    i,o = map(lambda f: os.path.join('work', f), ['Ts.bin', 'Ts.GHCN.CL'])
+    trim_single_file(i, o)
 
 
 if __name__ == "__main__":

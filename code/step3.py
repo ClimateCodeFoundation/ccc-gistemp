@@ -1,31 +1,35 @@
 #!/usr/bin/env python
+# $URL$
+# $Rev$
+#
 # step3.py
-# 
-# Python code reproducing the STEP3 part of the GISTEMP algorithm.
 #
-# Work in progress.
 # David Jones, Ravenbrook Limited, 2008-08-06
-#
-# The code is derived from the Fortran GISTEMP code.
-#
-# Python notes:
-#
-# Much of the binary IO uses the struct module.  A quick review will
-# help.
-#
-# I feel obliged to tell you that the Python expression N * list gives a
-# new list that conists of list repeated N times.  This is used every
-# now and then.
-#
-# We also make use of list slice assignment: a[2:4] = range(2)
-# 
-# $Id: //info.ravenbrook.com/project/ccc/master/code/step3.py#20 $
 
-# Ravenbrook
+""" 
+Python code reproducing the STEP3 part of the GISTEMP algorithm.
+
+Work in progress.
+
+The code is derived from the Fortran GISTEMP code.
+
+Python notes:
+
+Much of the binary IO uses the struct module.  A quick review will
+help.
+
+I feel obliged to tell you that the Python expression N * list gives a
+new list that conists of list repeated N times.  This is used every
+now and then.
+
+We also make use of list slice assignment: a[2:4] = range(2)
+"""
+
+# Clear Climate Code
 import earth # required for radius.
-# Ravenbrook
+# Clear Climate Code
 import eqarea
-# Ravenbrook
+# Clear Climate Code
 import fort
 
 # http://www.python.org/doc/2.3.5/lib/module-array.html
@@ -67,8 +71,11 @@ class Stations:
         """infile should be a sequence of file objects.  Each file
         object should be opened in binary onto a trimmed NCAR file,
         identical in format to the input files that GISTEMP's
-        to.SBBXgrid.f program expects.  Normally there will be 6 zonal
-        files, but this is not required; all input files are processed.
+        to.SBBXgrid.f program expects.
+        
+        Hostically (and in emulation of the GISS GISTEMP code) there
+        were be 6 zonal files, but now only one is usually supplied.
+        The "for f infile" loop is a relic, but still kept.
         """
 
         self.yrbeg = None
@@ -337,11 +344,11 @@ def sort(l, cmp):
 def subbox_grid(infile,
         subbox_out, box_out, station_use_out, radius=1200,
         year_begin=1880, base_year=(1951,1980), audit=None):
-    """(This is the equivalent of to.SBBXgrid.f) Convert the input files,
-    infile[0] through infile[5], into gridded datasets which are output
-    on the file (-like) object subbox_out and box_out.  station_use_out
-    should also be a file object, it is used to record which records are
-    used for which box (region).
+    """(This is the equivalent of to.SBBXgrid.f) Convert the input file,
+    infile, into gridded datasets which are output on the file (-like)
+    object subbox_out and box_out.
+    station_use_out should also be a file object, it is used to record
+    which records are used for which box (region).
 
     radius specifies a radius in kilometres, it is
     equivalent to the RCRIT value in the Fortran code.
@@ -539,7 +546,6 @@ def subbox_grid(infile,
     # the parameters are tempting to change, but some of the code might
     # accidentally rely on particular values.
 
-    assert len(infile) == 6
     assert radius > 0
 
     radius = float(radius)
@@ -572,7 +578,7 @@ def subbox_grid(infile,
     # Critical radius as an angle of arc
     arc = radius / earth.radius
 
-    stations = Stations(infile)
+    stations = Stations([infile])
 
     # Output series cannot begin earlier than input series.
     # See to.SBBXgrid.f line 151
@@ -758,8 +764,8 @@ def step3(label='GHCN.CL.PA', radius=1200, audit=None):
     box_grid_output = open('work/BX.%s' % labelr, 'wb')
     station_use_output = open('work/statn.use.%s' % labelr, 'wb')
 
-    # Open the 6 input files
-    infile = map(lambda n: open('work/Ts.%s.%d' % (label,n+1), 'rb'), range(6))
+    # Open the input file
+    infile = open('work/Ts.%s' % (label), 'rb')
 
     subbox_grid(infile,
         subbox_grid_output, box_grid_output, station_use_output,
@@ -791,7 +797,7 @@ def checksubboxsmall(r, stations=None, grid=None):
     checks this is so.
     """
 
-    # Ravenbrook
+    # Clear Climate Code
     import eqarea
 
     if grid is None:
@@ -809,16 +815,12 @@ def checksubboxsmall(r, stations=None, grid=None):
                 (eqarea.centre(box), r))
 
 # Mostly for debugging and development.  Avoid public use.
-def fst(prefix='Ts.GHCN.CL.PA.'):
-    """Load station data from file matching the glob "prefix?" and
+def fst(file='Ts.GHCN.CL.PA'):
+    """Load station data from file and
     return a Stations instance.
     """
 
-    # http://www.python.org/doc/2.3.5/lib/module-glob.html
-    import glob
-
-    fl = map(lambda n: open(n, 'rb'), glob.glob(prefix + '?'))
-    return Stations(fl)
+    return Stations([file])
 
 # Strictly utility, not part of the public interface.
 def singlefloat(x):

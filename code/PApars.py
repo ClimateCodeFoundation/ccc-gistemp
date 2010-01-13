@@ -1,9 +1,16 @@
 #!/usr/bin/env python
+# $URL$
+# $Rev$
+#
+# PApars.py
+#
+# Clear Climate Code, 2009-02-22
+
 """Python replacement for code/STEP2/PApars.f
 
 Input files:
 
-    fort.31,... copies/links of ANN.dTs.GHCN.CL.1,...
+    work/ANN.dTs.GHCN.CL
 
 """
 __docformat__ = "restructuredtext"
@@ -25,8 +32,10 @@ options = None
 km0 = 1
 iyrm0 = km0 * (3000 - 1880 + 1)
 
-# Earth radius, lower overlap limit, min.coverage of approx.range
-rearth = 6375.
+# Earth radius
+import earth
+rearth = earth.radius
+# lower overlap limit, min.coverage of approx.range
 ncrit = 20
 nrurm = 3
 xcrit = 2.0 / 3.0
@@ -95,8 +104,8 @@ def main(args):
     g.isrData = []
     g.isuData = []
 
-    # Open the 6 input files and single output file.
-    infiles = [fort.open("work/ANN.dTs.GHCN.CL.%d" % i) for i in range(1, 7)]
+    # Open the input and output files.
+    infile = fort.open("work/ANN.dTs.GHCN.CL")
     f78 = open("work/PApars.pre-flags", "w")
 
     #
@@ -109,8 +118,8 @@ def main(args):
     # Isolated urban stations
     f79 = open("log/PApars.noadj.stations.list", "w")
 
-    # Read header of the first file.
-    header = ccc_binary.CCHeader(data=infiles[0].readline())
+    # Read header of the input file.
+    header = ccc_binary.CCHeader(data=infile.readline())
     kq = header.info[1]
     if kq != 1:
         sys.exit("program not ready for quantity %s" % kq)
@@ -138,68 +147,67 @@ def main(args):
     g.isuData = []
  
     idata = []
-    for fidx in range(6):
-        progress = script_support.countReport(
-                50, fmt="file %s: %%d records processed\n" % fidx)
-        infiles[fidx].seek(0)
-        header = ccc_binary.CCHeader(data=infiles[fidx].readline())
-        mf = header.info[0]
-        ml = header.info[8]
+    progress = script_support.countReport(
+            50, fmt="file %s: %%d records processed\n" % infile.name)
+    infile.seek(0)
+    header = ccc_binary.CCHeader(data=infile.readline())
+    mf = header.info[0]
+    ml = header.info[8]
 
-        recc = 0
-        for recordcount, s in enumerate(infiles[fidx]):
-            if i1snow + ml - mf > msize:
-                sys.exit('error: msize too small')
+    recc = 0
+    for recordcount, s in enumerate(infile):
+        if i1snow + ml - mf > msize:
+            sys.exit('error: msize too small')
 
-            nmonths = ml - mf + 1 
-            inrec = ccc_binary.CCRecord(nmonths, data=s)
-            idata.extend(inrec.idata)
-            recc += 1
+        nmonths = ml - mf + 1 
+        inrec = ccc_binary.CCRecord(nmonths, data=s)
+        idata.extend(inrec.idata)
+        recc += 1
 
-            mfcur = mf
-            length = ml - mf + 1
-            mf, ml = inrec.m1, inrec.m2
-            lat = 0.1 * inrec.Lat
-            lon = 0.1 * inrec.Lon
+        mfcur = mf
+        length = ml - mf + 1
+        mf, ml = inrec.m1, inrec.m2
+        lat = 0.1 * inrec.Lat
+        lon = 0.1 * inrec.Lon
 
-            # note isr = rural stations, isu = non-rural stations
-            if inrec.name[30:32] == " R" or inrec.name[30] == "1":
-                d = Struct()
-                g.isrData.append(d)
-                
-                d.mfsr = mfcur
-                d.i1sr = i1snow
-                d.ilsr = i1snow + length - 1
-                d.cslatr = math.cos(lat * pi180)
-                d.snlatr = math.sin(lat * pi180)
-                d.cslonr = math.cos(lon * pi180)
-                d.snlonr = math.sin(lon * pi180)
-                d.idr = inrec.ID
-            else:
-                d = Struct()
-                g.isuData.append(d)
+        # note isr = rural stations, isu = non-rural stations
+        if inrec.name[30:32] == " R" or inrec.name[30] == "1":
+            d = Struct()
+            g.isrData.append(d)
+            
+            d.mfsr = mfcur
+            d.i1sr = i1snow
+            d.ilsr = i1snow + length - 1
+            d.cslatr = math.cos(lat * pi180)
+            d.snlatr = math.sin(lat * pi180)
+            d.cslonr = math.cos(lon * pi180)
+            d.snlonr = math.sin(lon * pi180)
+            d.idr = inrec.ID
+        else:
+            d = Struct()
+            g.isuData.append(d)
 
-                d.mfsu = mfcur
-                d.i1su = i1snow
-                d.ilsu = i1snow + length - 1
-                d.cslatu = math.cos(lat * pi180)
-                d.snlatu = math.sin(lat * pi180)
-                d.cslonu = math.cos(lon * pi180)
-                d.snlonu = math.sin(lon * pi180)
-                d.idu = inrec.ID
-                d.cc = inrec.name[33:36]
+            d.mfsu = mfcur
+            d.i1su = i1snow
+            d.ilsu = i1snow + length - 1
+            d.cslatu = math.cos(lat * pi180)
+            d.snlatu = math.sin(lat * pi180)
+            d.cslonu = math.cos(lon * pi180)
+            d.snlonu = math.sin(lon * pi180)
+            d.idu = inrec.ID
+            d.cc = inrec.name[33:36]
 
-            i1snow = i1snow + length
+        i1snow = i1snow + length
 
-            if options and options.verbose >= 2:
-                progress.next()
+        if options and options.verbose >= 2:
+            progress.next()
 
-            # Short-circuit
-            #if len(g.isrData) >=100:
-            #    break
         # Short-circuit
-        #if len(g.isrData) >= 100:
+        #if len(g.isrData) >=100:
         #    break
+    # Short-circuit
+    #if len(g.isrData) >= 100:
+    #    break
 
     verbose(1, "Load T=%s" % T.next())
 

@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+# $URL$
+# $Rev$
+#
+# flags.py
+#
+# Clear Climate Code, 2009-02-23
+
 """Python replacement for code/STEP2/flags.f
 
 Input files:

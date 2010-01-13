@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+# $URL$
+# $Rev$
+#
+# toANNanom.py
+#
+# Clear Climate Code, 2009-02-22
+
 """Python replacement for code/STEP2/toANNanom.f
 
 """
@@ -8,6 +15,7 @@ __docformat__ = "restructuredtext"
 import sys
 import os
 
+# Clear Climate Code
 import fort
 import ccc_binary
 import script_support
@@ -83,10 +91,9 @@ def annav(mon, nyrs, iy1, ibad, m1, recordIdx, emuBug=False):
     return iy1n, iy2n, iann
     
 
-def toANNanom(i):
-    fname = "work/Ts.GHCN.CL.%d" % i
-    f2 = fort.open(fname, "rb")
-    f3 = ccc_binary.BufferedOutputRecordFile("work/ANN.dTs.GHCN.CL.%d" % i)
+def toANNanom(input_name, output_name):
+    f2 = fort.open(input_name, "rb")
+    f3 = ccc_binary.BufferedOutputRecordFile(output_name)
     header = ccc_binary.CCHeader(data=f2.readline())
     ibad = header.info[7 - 1]
     if header.info[1 - 1] == ibad:
@@ -102,7 +109,7 @@ def toANNanom(i):
     m2 = header.info[8]
 
     progress = script_support.countReport(
-            50, fmt="File %s: %%d records processed\n" % fname)
+            50, fmt="File %s: %%d records processed\n" % input_name)
     f3.writeRecord(outHdr)
     doneHeader = False
 
@@ -150,11 +157,12 @@ def toANNanom(i):
 
 def main(args):
     """The main for this module.
-
-    This simply invokes invntSingleFile for n = 1, 2, ... 6.
     """
-    for i in range(1,7):
-        toANNanom(i)
+    # The input and output filenames.
+    i,o = 'Ts.GHCN.CL', 'ANN.dTs.GHCN.CL'
+    # Prefix the "work/" subdirectory to the names.
+    i,o = map(lambda f: os.path.join('work', f), [i, o])
+    toANNanom(i, o)
 
 
 if __name__ == "__main__":

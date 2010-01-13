@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # $URL$
-# $Id$
+# $Id: run.py 159 2010-01-12 10:39:07Z drj@pobox.com $
 # 
 # run.py -- run steps of the GISTEMP algorithm
 #
@@ -71,11 +71,13 @@ def run_step2():
     import text_to_binary
     text_to_binary.main([year])
 
-    log("... breaking up Ts.bin into 6 zonal files")
-    import split_binary
-    split_binary.main([])
+    # At this point we may need to reorder the Ts.bin/Ts.txt file so
+    # that all the stations between +60.1 and +90.0 comes first, then
+    # all the stations between +30.1 and +60.0 come next, and so on.
+    # Thus reflecting how they get re-ordered when they are split into 6
+    # files.
 
-    log("... trimming Ts.bin1-6")
+    log("... trimming Ts.bin")
     import trim_binary
     trim_binary.main([])
 

@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+# $URL$
+# $Rev$
+#
+# invnt.py
+#
+# Clear Climate Code, 2009-02-22
+
 """Python replacement for code/STEP2/invnt.f
 
 This basically scans the files ``Ts.GHCN.CL.1``, ``Ts.GHCN.CL.2``, etc.
@@ -17,6 +24,7 @@ __docformat__ = "restructuredtext"
 import sys
 import os
 
+# Clear Climate Code
 import fort
 import ccc_binary
 import script_support
@@ -30,8 +38,7 @@ nrecpy = 12
 ndpryr = nrecpy
 monm = ndpryr * (iyrend - iyrbeg + 1)
 
-def invntSingleFile(fileName, fileNumber):
-    fname = "%s.%d" % (fileName, fileNumber)
+def invnt_single_file(fname):
     progress = script_support.countReport(
             50, fmt="File %s: %%d records processed\n" % fname)
     f15 = fort.open(fname, "rb")
@@ -71,13 +78,9 @@ def invntSingleFile(fileName, fileNumber):
 
 def main(args):
     """The main for this module.
-
-    This simply invokes invntSingleFile for n = 1, 2, ... 6.
     """
-    for n in range(1, 7):
-        if not invntSingleFile(args[0], n):
-            # No data?
-            break
+
+    invnt_single_file(args[0])
 
 
 if __name__ == "__main__":

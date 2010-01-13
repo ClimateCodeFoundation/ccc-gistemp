@@ -1,15 +1,19 @@
 #!/usr/bin/env python
+# $URL$
+# $Rev$
+#
+# padjust.py
+#
+# Clear Climate Code, 2009-02-22
+
 """Python replacement for code/STEP2/padjust.f
 
 """
 __docformat__ = "restructuredtext"
 
 
-import time
 import sys
 import os
-import math
-from itertools import izip
 
 import fort
 import ccc_binary
@@ -49,104 +53,99 @@ def main(args):
     # Read the first adjustment record.
     cc, IDc, sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag = readRec(f1)
 
-    for iin in range(1, 7):
-        inF = fort.open("work/Ts.GHCN.CL.%d" % iin)
-        outF = fort.open("work/Ts.GHCN.CL.PA.%d" % iin, "wb")
+    inF = fort.open("work/Ts.GHCN.CL")
+    outF = fort.open("work/Ts.GHCN.CL.PA", "wb")
 
-        h = ccc_binary.CCHeader(inF.readline())
-        ibad = h.info[6]
-        if h.info[0] == ibad:
-            continue
-        m1o, m2o = h.info[0], h.info[8]
+    h = ccc_binary.CCHeader(inF.readline())
+    ibad = h.info[6]
+    if h.info[0] == ibad:
+        raise Exception("was break, but drj removed the while loop")
+    m1o, m2o = h.info[0], h.info[8]
 
-        # Loop until we find a station we do not want to skip. At that point,
-        # we start writing the current output file (i.w. write the header) and
-        # adjust the first record if necessary.
-        while True:
-            count = m2o - m1o + 1
-            s = data=inF.readline()
-            if not s:
-                break
-            rec_o = ccc_binary.CCRecord(count, data=s)
-            if rec_o.ID != IDc:
-                if rec_o.name[30:32] == " R" or rec_o.name[30] == "1":
-                    outF.writeline(h.binary)
-                    break
-                else: # skip the station
-                    h.info[0] = rec_o.m1
-                    h.info[8] = rec_o.m2
-                    m1o, m2o = rec_o.m1, rec_o.m2
-                    print " station   %9s  %s skipped" % (
-                            rec_o.ID, rec_o.name)
-                    continue
-
-            else:
-                # Record needs adjusting. Do so and get the next adjustment
-                # entry.
-                a, b = adj(h, rec_o.idata, sl1, sl2, knee, sl0, iy1e, iy2e, iy1, iy2,
-                        flag, m1o, m2o)
-                print " station   %9s  %s adjusted %s %s" % (
-                        rec_o.ID, rec_o.name, (m1o, m2o), (a, b))
-                aa = a - m1o
-                bb = b - a + 1
-                print "ADJ-1", rec_o.name, rec_o.count, len(rec_o.idata), aa, bb,
-                rec_o.idata[:] = rec_o.idata[aa:aa + bb]
-                rec_o.count = bb
-                print rec_o.count, len(rec_o.idata)
-                m1o, m2o = a, b
-                h.info[0] = m1o
-                h.info[8] = m2o
+    # Loop until we find a station we do not want to skip. At that point,
+    # we start writing the current output file (i.w. write the header) and
+    # adjust the first record if necessary.
+    while True:
+        count = m2o - m1o + 1
+        s = data=inF.readline()
+        if not s:
+            break
+        rec_o = ccc_binary.CCRecord(count, data=s)
+        if rec_o.ID != IDc:
+            if rec_o.name[30:32] == " R" or rec_o.name[30] == "1":
                 outF.writeline(h.binary)
-                ddd = readRec(f1)
-                if ddd[0] is not None:
-                    cc, IDc, sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag = ddd
                 break
+            else: # skip the station
+                h.info[0] = rec_o.m1
+                h.info[8] = rec_o.m2
+                m1o, m2o = rec_o.m1, rec_o.m2
+                print " station   %9s  %s skipped" % (
+                        rec_o.ID, rec_o.name)
+                continue
 
-        # Now read further records.
-        while True:
-            s = data=inF.readline()
-            if not s:
+        else:
+            # Record needs adjusting. Do so and get the next adjustment
+            # entry.
+            a, b = adj(h, rec_o.idata, sl1, sl2, knee, sl0, iy1e, iy2e, iy1, iy2,
+                    flag, m1o, m2o)
+            print " station   %9s  %s adjusted %s %s" % (
+                    rec_o.ID, rec_o.name, (m1o, m2o), (a, b))
+            aa = a - m1o
+            bb = b - a + 1
+            print "ADJ-1", rec_o.name, rec_o.count, len(rec_o.idata), aa, bb,
+            rec_o.idata[:] = rec_o.idata[aa:aa + bb]
+            rec_o.count = bb
+            print rec_o.count, len(rec_o.idata)
+            m1o, m2o = a, b
+            h.info[0] = m1o
+            h.info[8] = m2o
+            outF.writeline(h.binary)
+            ddd = readRec(f1)
+            if ddd[0] is not None:
+                cc, IDc, sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag = ddd
+            break
+
+    # Now read further records.
+    while True:
+        s = data=inF.readline()
+        if not s:
+            outF.writeline(rec_o.binary)
+            print " station   %9s  %s saved" % (rec_o.ID, rec_o.name)
+            break
+
+        rec = ccc_binary.CCRecord(rec_o.m2 - rec_o.m1 + 1, data=s)
+        if rec.ID != IDc:
+            if rec.name[30:32] == " R" or rec.name[30] == "1":
                 outF.writeline(rec_o.binary)
-                print " station   %9s  %s saved %11d" % (
-                        rec_o.ID, rec_o.name, iin)
-                break
-
-            rec = ccc_binary.CCRecord(rec_o.m2 - rec_o.m1 + 1, data=s)
-            if rec.ID != IDc:
-                if rec.name[30:32] == " R" or rec.name[30] == "1":
-                    outF.writeline(rec_o.binary)
-                    print " station   %9s  %s saved %11d" % (
-                            rec_o.ID, rec_o.name, iin)
-                else:
-                    rec_o.m1, rec_o.m2 = rec.m1, rec.m2
-                    print " station   %9s  %s skipped" % (
-                            rec.ID, rec.name)
-                    continue
-
+                print " station   %9s  %s saved" % (rec_o.ID, rec_o.name)
             else:
-                a, b = adj(h, rec.idata, sl1, sl2, knee, sl0, iy1e, iy2e, iy1, iy2,
-                        flag, rec_o.m1, rec_o.m2)
-                print " station   %9s  %s adjusted %s %s" % (
-                        rec.ID, rec.name, (rec_o.m1, rec_o.m2), (a, b))
-                aa = a - rec_o.m1
-                bb = b - a + 1
-                print "ADJ-2", rec.name, rec.count, len(rec.idata), aa, bb,
-                rec.idata[:] = rec.idata[aa:aa + bb]
-                rec.count = bb
-                print rec.count, len(rec.idata)
-                rec_o.m1, rec_o.m2 = a, b
-                outF.writeline(rec_o.binary)
-                print " station   %9s  %s saved %11d" % (
-                        rec_o.ID, rec_o.name, iin)
-                IDc = -9999
-                ddd = readRec(f1)
-                if ddd[0] is not None:
-                    cc, IDc, sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag = ddd
+                rec_o.m1, rec_o.m2 = rec.m1, rec.m2
+                print " station   %9s  %s skipped" % (rec.ID, rec.name)
+                continue
 
-            rec_o = rec.copy()
+        else:
+            a, b = adj(h, rec.idata, sl1, sl2, knee, sl0, iy1e, iy2e, iy1, iy2,
+                    flag, rec_o.m1, rec_o.m2)
+            print " station   %9s  %s adjusted %s %s" % (
+                    rec.ID, rec.name, (rec_o.m1, rec_o.m2), (a, b))
+            aa = a - rec_o.m1
+            bb = b - a + 1
+            print "ADJ-2", rec.name, rec.count, len(rec.idata), aa, bb,
+            rec.idata[:] = rec.idata[aa:aa + bb]
+            rec.count = bb
+            print rec.count, len(rec.idata)
+            rec_o.m1, rec_o.m2 = a, b
+            outF.writeline(rec_o.binary)
+            print " station   %9s  %s saved" % (
+                    rec_o.ID, rec_o.name)
+            IDc = -9999
+            ddd = readRec(f1)
+            if ddd[0] is not None:
+                cc, IDc, sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag = ddd
+
+        rec_o = rec.copy()
 
 
-import sys
 def adj(h, idata, sl1, sl2, knee, sl0, iy1, iy2, iy1a, iy2a, iflag, m1, m2):
     if iflag not in (0, 100):
         # Use linear approximation

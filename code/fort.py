@@ -69,6 +69,11 @@ class File :
     # the same convention.  See
     # http://docs.python.org/lib/module-struct.html
     self.bos = bos
+    # Try and assign name, but don't fuss if we can't.
+    try:
+      self.name = fd.name
+    except AttributeError:
+      pass
 
   def seek(self, offset, whence=0):
       """Proxy for the underlying ``fd`` seek.

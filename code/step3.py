@@ -415,8 +415,7 @@ def subbox_grid(infile,
             sumn = 0    # Sum of data in dnew
             sum = 0     # Sum of data in avg
             ncom = 0    # Number of years where both dnew and avg are valid
-            for n in range(nf1, nl1):
-                kn = k+km*n     # CSE for array index
+            for kn in range(nf1*km+k, nl1*km, km):
                 # Could specify that arguments are array.array and use
                 # array.count(BAD) and sum, instead of this loop.
                 if avg[kn] >= XBAD or dnew[kn] >= XBAD:
@@ -433,8 +432,7 @@ def subbox_grid(infile,
             bias[k] = float(wtm[k]*bias[k]+wt1*biask)/wtmnew
             wtm[k]=wtmnew
             # Update period of valid data, averages and weights
-            for n in range(nf1, nl1):
-                kn = k+km*n     # CSE for array index
+            for kn in range(nf1*km+k, nl1*km, km):
                 if dnew[kn] >= XBAD:
                     continue
                 wtnew = wt[kn] + wt1

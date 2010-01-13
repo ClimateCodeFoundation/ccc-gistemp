@@ -9,6 +9,14 @@
 """ 
 Python code reproducing the STEP3 part of the GISTEMP algorithm.
 
+python code/step3.py [-a N] [-s X,Y,Z]
+
+-a N
+  Restrict to subbox N and producing audit information
+
+-s X,Y,Z
+  Restrict to the list of subboxes
+
 Work in progress.
 
 The code is derived from the Fortran GISTEMP code.
@@ -343,7 +351,8 @@ def sort(l, cmp):
 
 def subbox_grid(infile,
         subbox_out, box_out, station_use_out, radius=1200,
-        year_begin=1880, base_year=(1951,1980), audit=None):
+        year_begin=1880, base_year=(1951,1980), audit=None,
+        subbox=()):
     """(This is the equivalent of to.SBBXgrid.f) Convert the input file,
     infile, into gridded datasets which are output on the file (-like)
     object subbox_out and box_out.
@@ -615,9 +624,14 @@ def subbox_grid(infile,
 
     regions = list(eqarea.gridsub())
     if audit:
+        subbox = [audit]
+    if subbox:
         # Restrict processing to region containing single gridbox of
         # interest.
-        regions=[regions[audit//100]]
+        n = list(set(map(lambda x: x//100, subbox)))
+        if len(n) > 1:
+            raise Exception('Sorry, only works within one region currently.')
+        regions = map(lambda x: regions[x], n)
 
     for region in regions:
         box = region[0]
@@ -656,9 +670,10 @@ def subbox_grid(infile,
                 print station.id
 
         subboxes = list(region[1])
-        if audit:
-            # Select single subbox for audit
-            subboxes = [subboxes[audit % 100]]
+        if subbox:
+            # Select subboxes for processing.
+            l = map(lambda x: x % 100, subbox)
+            subboxes = map(lambda x: subboxes[x], l)
 
         # Used to generate the "subbox at" rows in the log.
         lastcentre = (None, None)
@@ -698,7 +713,7 @@ def subbox_grid(infile,
             nstmns = station[0].ngood
             nstcmb = 1
             id0 = [station[0].id]
-            if audit :
+            if audit:
                 print "%+06.2f%+06.2f%+07.2f%+07.2f %s %r" % (subbox[0], subbox[1],
                     subbox[2], subbox[3], station[0].id, wti[0])
             # :todo: increment use count here. NUSEID
@@ -720,7 +735,7 @@ def subbox_grid(infile,
                 nf1 = station[i].databeg // km
                 # one more than the index of last year with data
                 nl1 = 1 + (station[i].dataend-1) // km
-                if audit :
+                if audit:
                     print "ADD %s %r" % (station[i].id, wti[i])
                 nsm = combine(avg, wt, dnew, nf1, nl1, wti[i], wtm, station[i].id)
                 nstmns += nsm
@@ -747,9 +762,10 @@ def subbox_grid(infile,
                     # :todo: increment LENC
             swrite(subboxf, dmin=radius*(1-wmax))
     flush_out(subboxf)
+    print >>log
 
 
-def step3(label='GHCN.CL.PA', radius=1200, audit=None):
+def step3(label='GHCN.CL.PA', radius=1200, audit=None, subbox=()):
     """Do STEP3 of the GISTEMP algorithm.  label specifies the common part
     of the filenames for the 6 input files.  The filenames that are
     actually used as inputs will be formed by prepending "Ts." to label
@@ -769,7 +785,7 @@ def step3(label='GHCN.CL.PA', radius=1200, audit=None):
 
     subbox_grid(infile,
         subbox_grid_output, box_grid_output, station_use_output,
-        radius=radius, audit=audit)
+        radius=radius, audit=audit, subbox=subbox)
 
     # if [[ $rad -eq 1200 ]] ; then ./zonav $label ; fi
     # ./trimSBBX SBBX1880.Ts.${label}.$rad
@@ -835,11 +851,14 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
     audit = None
-    opt,arg = getopt.getopt(argv[1:], 'a:')
+    subbox = ()
+    opt,arg = getopt.getopt(argv[1:], 'a:s:')
     for o,v in opt:
         if o == '-a':
             audit = eval(v, {'__builtins__':None})
-    return step3(audit=audit)
+        if o == '-s':
+            subbox = map(int, v.split(','))
+    return step3(audit=audit, subbox=subbox)
 
 if __name__ == '__main__':
     main()

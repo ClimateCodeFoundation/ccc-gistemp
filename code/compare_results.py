@@ -178,7 +178,7 @@ def distribution_url(d, w):
 
     # Increase the number of bins by decreasing the bin width, so that the
     # chart still looks interesting even if the range is tiny.
-    while d > 0 and w > d_range:
+    while len(d) > 0 and d_range > 0 and w > d_range:
         w /= 10
 
     # Map from integer multiple of w to number of values in that bin.
@@ -237,11 +237,13 @@ def differences_url(anns):
 
     return 'http://chart.apis.google.com/chart?' + '&'.join(chart)
 
-def top(diffs, n, o, fmt = str):
+def top(diffs, n, o, title, fmt = str):
     """Output a list of the top at-most-*n* largest differences (in
     magnitude) from the list *diffs* to the stream *o*, using *fmt* to
     format the results.  Does not output any zeroes."""
     topn = sorted(diffs, key = lambda a: abs(a[1]), reverse = True)[:n]
+    if topn[0][1] != 0:
+        print >>o, '<h3>%s</h3>' % title
     print >>o, "<ol>"
     for k, v in topn:
         if v == 0:
@@ -300,8 +302,8 @@ def compare(dirs, labels, o):
         print >>o, '<li>Zeroes: %d/%d<li>Mean = %f<li>Standard deviation = %f' % stats(d)
         print >>o, '<li>Min = %f<li>Max = %f' % (min(d), max(d))
         print >>o, '</ul>'
-        print >>o, '<h3>Largest %s annual residues</h3>' % region
-        top(diffs, 10, o, lambda k, v: "%04d: %f" % (k, v))
+        top(diffs, 10, o, 'Largest %s annual residues' % region,
+            lambda k, v: "%04d: %f" % (k, v))
 
         # Monthly series
         fs = map(lambda d: open(os.path.join(d, anomaly_file % code), 'r'), dirs)
@@ -315,8 +317,8 @@ def compare(dirs, labels, o):
         print >>o, '<li>Min = %f<li>Max = %f' % (min(d), max(d))
         print >>o, '<li>Zeroes: %d/%d<li>Mean = %f<li>Standard deviation = %f' % stats(d)
         print >>o, '</ul>'
-        print >>o, '<h3>Largest %s monthly residues</h3>' % region
-        top(diffs, 10, o, lambda k, v: "%04d-%02d: %f" % (k[0], k[1] + 1, v))
+        top(diffs, 10, o, 'Largest %s monthly residues' % region,
+            lambda k, v: "%04d-%02d: %f" % (k[0], k[1] + 1, v))
 
     # Box series
     fs = map(lambda d: open(os.path.join(d, box_file), 'r'), dirs)
@@ -330,8 +332,7 @@ def compare(dirs, labels, o):
     print >>o, '<li>Min = %f<li>Max = %f' % (min(d), max(d))
     print >>o, '<li>Zeroes: %d/%d<li>Mean = %f<li>Standard deviation = %f' % stats(d)
     print >>o, '</ul>'
-    print >>o, '<h3>Largest per-box monthly residues</h3>'
-    top(diffs, 10, o,
+    top(diffs, 10, o,'Largest per-box monthly residues',
         lambda k, v: "Box %02d, %04d-%02d: %f" % (k[0], k[1], k[2] + 1, v))
 
     print >>o, "</body>"

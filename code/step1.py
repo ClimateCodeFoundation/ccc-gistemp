@@ -574,34 +574,25 @@ def get_ids(old_db):
     ids.sort()
     return ids, rec_id_dict
 
-def comb_records(stemname):
+def comb_records(old_db_name, new_db_name):
     global comb_log
     comb_log = open('log/comb.log','w')
-    old_bdb_name = 'work/' + stemname + '.bdb'
-    new_bdb_name = 'work/' + stemname + '.combined.bdb'
-    print "opening db file '%s'" % old_bdb_name
-    old_db = bsddb.hashopen(old_bdb_name, 'r')
-    print "creating db file '%s'" % new_bdb_name
-    new_db = bsddb.hashopen(new_bdb_name, 'n')
+    print "opening db file '%s'" % old_db_name
+    old_db = bsddb.hashopen(old_db_name, 'r')
+    print "creating db file '%s'" % new_db_name
+    new_db = bsddb.hashopen(new_db_name, 'n')
     global BAD
     BAD = int(old_db["IBAD"]) / 10.0
     BAD = 0.1 * int(BAD * 10.0)
-    new_db['IBAD'] = old_db['IBAD']
     ids, rec_id_dict = get_ids(old_db)
     records_fill_new_db(ids, rec_id_dict, old_db, new_db)
     comb_log.close()
 
 # From comb_pieces.py.
 
-BAD = '???'
 MIN_MID_YEARS = 5            # MIN_MID_YEARS years closest to ymid
 BUCKET_RADIUS = 10
-BIG_X = 1.                     # "we may then use a fraction X of ..."
-GET_ALL = 1
-VERBOSE = 0
 pieces_log = None
-
-HELENA_IN_NAME = 'combine_pieces_helena.in'
 
 def sigma(list, bad):
     sos = sum = count = 0
@@ -643,8 +634,7 @@ def pieces_get_longest_overlap(new_sums, new_wgts, new_data, begin, years, recor
         # diff = sum / wgt
         best_id = rec_id
         best_record = record
-    ignore_me = "ignore_me"
-    return best_record, best_id, ignore_me
+    return best_record, best_id
 
 def get_actual_endpoints(new_wgts, begin, years):
     tmp_begin = 9999
@@ -691,9 +681,6 @@ def find_quintuples(new_sums, new_wgts, new_data,
     ov_success = 0
     okay_flag = 0
     for rad in range(1, BUCKET_RADIUS + 1):
-        if rad > 1:
-            if VERBOSE:
-                pieces_log.write("incrementing bucket radius: %s -> %s\n" % (rad - 1, rad))
         count1 = sum1 = 0
         count2 = sum2 = 0
         for i in range(0, rad + 1):
@@ -710,17 +697,10 @@ def find_quintuples(new_sums, new_wgts, new_data,
                     anom2 = BAD
                 else:
                     anom2 = sublist2[index2]
-                if VERBOSE:
-                    rec_mean = anom2 + rec_ann_mean
-                    mean = anom1 + ann_mean
-                    pieces_log.write ("*%s\t%s\t%s\t%s\t%s*\n" % 
-                                      (middle_year, index1 + begin,
-                                       index2 + rec_begin,
-                                       mean, rec_mean))
-                if anom1 != BAD and (GET_ALL or count1 < MIN_MID_YEARS):
+                if anom1 != BAD:
                     sum1 = sum1 + anom1 + ann_mean
                     count1 = count1 + 1
-                if anom2 != BAD and (GET_ALL or count2 < MIN_MID_YEARS):
+                if anom2 != BAD:
                     sum2 = sum2 + anom2 + rec_ann_mean
                     count2 = count2 + 1
         if count1 >= MIN_MID_YEARS and count2 >= MIN_MID_YEARS:
@@ -730,7 +710,7 @@ def find_quintuples(new_sums, new_wgts, new_data,
             avg2 = sum2 / float(count2)
             diff = abs(avg1 - avg2)
             pieces_log.write("diff = %s\n" % diff)
-            if diff < BIG_X * ann_std_dev:
+            if diff < ann_std_dev:
                 okay_flag = 1
                 pieces_log.write("combination success: %s %s\n" % (new_id, rec_id))
             else:
@@ -746,7 +726,7 @@ def pieces_combine(*args, **kwargs):
     new_id = kwargs['new_id']
     end = begin + years - 1
 
-    record, rec_id, ignore_me = apply(pieces_get_longest_overlap, args)
+    record, rec_id = apply(pieces_get_longest_overlap, args)
     rec_begin = record['dict']['begin']
     rec_end = rec_begin + record['years'] - 1
 
@@ -775,12 +755,12 @@ def get_longest(records):
             longest_id = rec_id
     return longest_rec, longest_id
 
-def pieces_generator(ids, rec_id_dict, old_db, helena_ds):
+def pieces_generator(ids, rec_id_dict, db, helena_ds):
     for id in ids:
         rec_ids = rec_id_dict[id]
         pieces_log.write('%s\n' % id)
         while 1:
-            records, begin, end = get_records(old_db, rec_ids)
+            records, begin, end = get_records(db, rec_ids)
 
             if len(records) == 1:
                 rec_id, record = records.items()[0]
@@ -788,7 +768,7 @@ def pieces_generator(ids, rec_id_dict, old_db, helena_ds):
                 break
 
             if helena_ds.has_key(id):
-                id1, id2, this_year, month, summand = helena_ds[id]
+                id1, this_year, month, summand = helena_ds[id]
                 dict = records[id1]['dict']
                 data = records[id1]['data']
                 begin = dict['begin']
@@ -821,7 +801,7 @@ def pieces_generator(ids, rec_id_dict, old_db, helena_ds):
             ok_flag = 1
             while ok_flag and records.keys():
                 ok_flag = pieces_combine(new_sums, new_wgts, new_data,
-                                  begin, years, records, new_id=rec_id)
+                                         begin, years, records, new_id=rec_id)
             begin = final_average(new_sums, new_wgts, new_data, years, begin)
             new_dict['begin'] = begin
             yield (new_dict, new_data)
@@ -829,39 +809,26 @@ def pieces_generator(ids, rec_id_dict, old_db, helena_ds):
             if not records.keys():
                 break
 
-def comb_pieces(stemname):
+def get_helena_dict():
+    """Reads the file config/combine_pieces_helena.in into a dict,
+    mapping a station id to a tuple (ID with duplicate marker, year,
+    month, summand)."""
+    
+    helena_ds = {}
+    for line in open('config/combine_pieces_helena.in', 'r'):
+        id, _, year, month, summand = line.split()
+        helena_ds[id[:-1]] = (id, int(year), int(month), float(summand))
+    return helena_ds
+
+def comb_pieces(db_name):
     global pieces_log
     pieces_log = open('log/pieces.log','w')
-    old_name = 'work/' + stemname + '.bdb'
-    new_name = 'work/' + stemname + '.pieces.bdb'
-    print "opening db file '%s'" % old_name
-    old_db = bsddb.hashopen(old_name, 'r')
-    print "creating db file '%s'" % new_name
-    global BAD
-    BAD = int(old_db["IBAD"]) / 10.0
-    BAD = 0.1 * int(BAD * 10.0)
-    comb_records.BAD = BAD
-    ids, rec_id_dict = get_ids(old_db)
-
-    try:
-        helena_in = open('config/' + HELENA_IN_NAME, 'r')
-        helena_ls = helena_in.readlines()
-        helena_in.close()
-        print "successfully read '%s'" % HELENA_IN_NAME
-    except IOError:
-        helena_ls = []
-    helena_ds = {}
-    for x in helena_ls:
-        id1, id2, year, month, summand = x.split()
-        year = int(year)
-        month = int(month)
-        summand = float(summand)
-        id = id1[:-1]
-        helena_ds[id] = id1, id2, year, month, summand
-    for record in pieces_generator(ids, rec_id_dict, old_db, helena_ds):
+    print "opening db file '%s'" % db_name
+    db = bsddb.hashopen(db_name, 'r')
+    ids, rec_id_dict = get_ids(db)
+    helena_ds = get_helena_dict()
+    for record in pieces_generator(ids, rec_id_dict, db, helena_ds):
         yield record
-
-BAD = 9999
 
 def get_changes_dict():
     """Reads the file config/Ts.strange.RSU.list.IN and returns a dict
@@ -875,8 +842,7 @@ def get_changes_dict():
     """
 
     dict = {}
-    f = open('config/Ts.strange.RSU.list.IN', 'r')
-    for line in f.readlines():
+    for line in open('config/Ts.strange.RSU.list.IN', 'r'):
         split_line = line.split()
         id = split_line[0]
         try:
@@ -935,9 +901,8 @@ def get_alter_dict():
     year, delta).
     """
 
-    f = open('config/Ts.discont.RS.alter.IN')
     dict = {}
-    for line in f:
+    for line in open('config/Ts.discont.RS.alter.IN'):
         id, month, year, num = line.split()
         dict[id] = [int(month), int(year), float(num)]
     return dict
@@ -952,7 +917,6 @@ def alter_discont(data):
     for (dict, series) in data:
         if (alter_dict.has_key(dict['id'])):
             (a_month, a_year, a_num) = alter_dict[dict['id']]
-            years = len(series[0])
             begin = dict['begin']
             for year in range(begin, a_year + 1):
                 index = year - begin
@@ -981,8 +945,8 @@ def write_to_file(data, file):
 
 def main():
   v2_to_bdb('v2.mean_comb')
-  comb_records('v2.mean_comb')
-  combined_data = comb_pieces('v2.mean_comb.combined')
+  comb_records('work/v2.mean_comb.bdb', 'work/v2.mean_comb.combined.bdb')
+  combined_data = comb_pieces('work/v2.mean_comb.combined.bdb')
   without_strange = drop_strange(combined_data)
   without_discontinuities = alter_discont(without_strange)
   write_to_file(without_discontinuities, 'work/Ts.txt')

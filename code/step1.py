@@ -9,12 +9,6 @@
 """
 Python code reproducing the STEP1 part of the GISTEMP algorithm.
 
-Very much first draft, but does product the correct Ts.txt.
-
-To run:
-$ ./step1.py
-$
-
 Requires the following files in the input/ directory,
 from GISTEMP STEP1/input_files/:
 
@@ -65,6 +59,7 @@ def FEQUALS(x, y):
 # instance, data[2] is an array of all the values for March.
 #
 # The dict has various fields, including the following:
+# 'id'      : the station ID
 # 'begin'   : first year of data
 # 'name'
 # 'lat'     : (floating-point) latitude
@@ -90,28 +85,11 @@ def FEQUALS(x, y):
 # v2.mean_comb file and metadata files) by the from_lines() and
 # v2_fill_dbm() functions.
 #
-# StationStrings are finally written out to a text file, at the end of
-# step 1, as serialized by the to_text() method.
-# 
 # The rotation between year-major data (in the inputs and outputs
 # of this step) and month-major data (everywhere inside this step) is
-# done by from_lines() and to_text().
+# done by from_lines() and write_to_file().
 
 class StationString:
-  def to_text(self, id):
-    dict = self.dict
-    data = self.data
-    begin = dict['begin']
-    text = ' %4d%5d%s%4s%-36s\n' % (math.floor(dict['lat']*10+0.5),
-                                    math.floor(dict['lon']*10+0.5),
-                                    id, dict['elevs'], dict['name'])
-    lines = []
-    for y in range(self.years):
-      l = map(lambda m: "%5d" % math.floor(data[m][y] * 10.0 + 0.5), range(12))
-      lines.append('%4d%s\n' % (y + begin, ''.join(l)))
-    text = text + ''.join(lines)
-    return text
-
   def __init__(self, sp):
     sep = sp.index('\n')
 
@@ -311,6 +289,7 @@ def v2_fill_dbm(f, dbm, info, sources):
         dict = info[st_id]
         dict['begin'] = begin
         dict['source'] = sources.get(last_id, 'UNKNOWN')
+        dict['id' ] = last_id
         mystring = serialize(dict, data)
         dbm[last_id] = mystring
         count = inc_count(count)
@@ -357,7 +336,6 @@ def v2_get_info():
         hash = dict(zip(keys, values))
         id = hash['id']
         info[id] = hash
-        del hash['id']
     return info
 
 def v2_to_bdb(infile_name):
@@ -797,9 +775,7 @@ def get_longest(records):
             longest_id = rec_id
     return longest_rec, longest_id
 
-def pieces_fill_new_db(ids, rec_id_dict, old_db, new_db, helena_ds):
-    new_ids = []
-    count = 0
+def pieces_generator(ids, rec_id_dict, old_db, helena_ds):
     for id in ids:
         rec_ids = rec_id_dict[id]
         pieces_log.write('%s\n' % id)
@@ -808,9 +784,7 @@ def pieces_fill_new_db(ids, rec_id_dict, old_db, new_db, helena_ds):
 
             if len(records) == 1:
                 rec_id, record = records.items()[0]
-                new_db[rec_id] = record['string']
-                count = inc_count(count)
-                new_ids.append(rec_id)
+                yield (record['dict'], record['data'])
                 break
 
             if helena_ds.has_key(id):
@@ -850,15 +824,10 @@ def pieces_fill_new_db(ids, rec_id_dict, old_db, new_db, helena_ds):
                                   begin, years, records, new_id=rec_id)
             begin = final_average(new_sums, new_wgts, new_data, years, begin)
             new_dict['begin'] = begin
-            s = serialize(new_dict, new_data)
-            new_db[rec_id] = s
-            count = inc_count(count)
-            new_ids.append(rec_id)
+            yield (new_dict, new_data)
             rec_ids = records.keys()
-            if not rec_ids:
+            if not records.keys():
                 break
-    print count
-    new_db['IDS'] = ' '.join(new_ids)
 
 def comb_pieces(stemname):
     global pieces_log
@@ -868,12 +837,10 @@ def comb_pieces(stemname):
     print "opening db file '%s'" % old_name
     old_db = bsddb.hashopen(old_name, 'r')
     print "creating db file '%s'" % new_name
-    new_db = bsddb.hashopen(new_name, 'n')
     global BAD
     BAD = int(old_db["IBAD"]) / 10.0
     BAD = 0.1 * int(BAD * 10.0)
     comb_records.BAD = BAD
-    new_db['IBAD'] = old_db['IBAD']
     ids, rec_id_dict = get_ids(old_db)
 
     try:
@@ -891,262 +858,154 @@ def comb_pieces(stemname):
         summand = float(summand)
         id = id1[:-1]
         helena_ds[id] = id1, id2, year, month, summand
+    for record in pieces_generator(ids, rec_id_dict, old_db, helena_ds):
+        yield record
 
-    pieces_fill_new_db(ids, rec_id_dict, old_db, new_db, helena_ds)
-    pieces_log.close()
-
-# From drop_strange.py
-#
-# Removes records as specified in config/Ts.strange.RSU.list.IN. Each
-# line in that file begins with a 12-digit station ID - actually the
-# tuple (country-code, WMO station, modifier, duplicate) - and ends
-# with either yyyy/mm, specifying a month datum to omit or with
-# xxxx-yyyy, specifying years to omit.  xxxx can be 0, meaning from
-# the beginning. yyyy can be 9999, meaning to the end.
-#
-# I have looked through this code; it's very straightforward.  It
-# could be very much more concise, and quicker, but it's not too bad.
-# 
-# Nick Barnes 2008-09-18.
-
-BAD_YEAR = 9999
-BAD = None
-
-TS_CHANGES_NAME = "Ts.strange.RSU.list.IN"
-
-def drop_get_new_data(new_begin, new_years, old_begin, old_years, old_data,
-                 year1, year2):
-    assert new_begin >= old_begin
-    assert new_begin + new_years <= old_begin + old_years
-
-    new_data = [None] * 12
-    for m in range(12):
-        new_monthly = []
-        old_monthly = old_data[m]
-        for n in range(new_years):
-            year = n + new_begin
-            if year1 <= year <= year2:
-                datum = BAD
-            else:
-                datum = old_monthly[year - old_begin]
-            new_monthly.append(datum)
-        new_data[m] = new_monthly
-    return new_data
-
-def remove_middle(dict, data, years, begin, year1, year2):
-    end = begin + years - 1
-    if year1 <= begin:
-        new_begin = year2 + 1
-    else:
-        new_begin = begin
-    if year2 > end:
-        year2 = end
-    new_end = end
-    new_years = new_end - new_begin + 1
-
-    new_data = drop_get_new_data(new_begin, new_years, begin, years, data,
-                            year1, year2)
-    new_dict = dict.copy()
-    new_dict['begin'] = new_begin
-
-    return serialize(new_dict, new_data)
-
-def implement_changes(changes_dict, old_bdb, new_bdb):
-    new_ids = []
-    count = 0
-    for id, el in changes_dict.items():
-        s = None
-        for a, x, y in el:
-            if x == 0 and y == BAD_YEAR:
-                continue
-            if s is None:
-                s = old_bdb[id]
-            st = StationString(s)
-            begin = st.dict['begin']
-            if a == "month":
-                year = x
-                month = y
-                st.data[month - 1][year - begin] = BAD
-                new_s = serialize(st.dict, st.data)
-            else:
-                assert a == "period"
-                new_s = remove_middle(st.dict, st.data, st.years, begin, x, y)
-            s = new_s
-        if s is not None:
-            new_bdb[id] = s
-            count = inc_count(count)
-            new_ids.append(id)
-
-    old_ids = old_bdb['IDS'].split()
-    for id in old_ids:
-        if changes_dict.has_key(id):
-            continue
-        new_bdb[id] = old_bdb[id]
-        count = inc_count(count)
-        new_ids.append(id)
-
-    print count
-    new_ids.sort()
-    new_bdb['IDS'] = ' '.join(new_ids)
-    new_bdb['IBAD'] = old_bdb['IBAD']
+BAD = 9999
 
 def get_changes_dict():
+    """Reads the file config/Ts.strange.RSU.list.IN and returns a dict
+    result.  Each line in that file begins with a 12-digit station ID
+    - actually the tuple (country-code, WMO station, modifier,
+    duplicate) - and ends with either yyyy/mm, specifying a month
+    datum to omit or with xxxx-yyyy, specifying years to omit.  xxxx
+    can be 0, meaning from the beginning. yyyy can be 9999, meaning to
+    the end.  The dict is a map from ID to ('month',yyyy,mm) or
+    ('years',xxxx,yyyy).
+    """
+
     dict = {}
-
-    f = open('config/' + TS_CHANGES_NAME, 'r')
-    print "reading", TS_CHANGES_NAME
-
+    f = open('config/Ts.strange.RSU.list.IN', 'r')
     for line in f.readlines():
         split_line = line.split()
         id = split_line[0]
         try:
             year1, year2 = map(int, split_line[-1].split("-"))
-            val = ("period", year1, year2)
+            val = ("years", year1, year2)
         except ValueError:
             year, month = map(int, split_line[-1].split("/"))
             val = ("month", year, month)
-        try:
-            dict[id].append(val)
-        except KeyError:
-            dict[id] = [val]
+        dict[id] = dict.get(id,[])
+        dict[id].append(val)
     return dict
 
-def drop_strange(in_name):
+def drop_strange(data):
+    """Drops data from station records, under control of the file
+    'config/Ts.strange.RSU.list.IN' file.  A filter generator.
+    """
+
     changes_dict = get_changes_dict()
-
-    OLD_BDB_NAME = 'work/' + in_name + ".bdb"
-    NEW_BDB_NAME = 'work/' + in_name + ".strange.bdb"
-    old_bdb = bsddb.hashopen(OLD_BDB_NAME, 'r')
-    print "reading", OLD_BDB_NAME
-
-    global BAD
-    BAD = int(old_bdb["IBAD"]) / 10.0
-
-    new_bdb = bsddb.hashopen(NEW_BDB_NAME, "c" or "n")
-    print "writing", NEW_BDB_NAME
-
-    implement_changes(changes_dict, old_bdb, new_bdb)
-
-# From alter_discont.py
-#
-# Modifies records as specified in config/Ts.discont.RS.alter.IN.
-# Each line in that file has a 12 digit station ID, a month, a year,
-# and a floating-point temperature delta.
-# This phase adds the delta to every datum for that station prior to
-# the specified month.
-#
-# I have looked through this code; it's tolerable. It could be very
-# much more concise, and quicker, but it's not too bad.  Also it could
-# be combined with other phases very easily.
-
-# 
-# Nick Barnes 2008-09-18.
-
-BAD = None
-IN_FILE_NAME = "Ts.discont.RS.alter.IN"
-
-def alter_discont(in_name):
-    IN_BDB_NAME = 'work/' + in_name + ".bdb"
-    OUT_BDB_NAME = 'work/' + in_name + ".alter.bdb"
-    in_bdb = bsddb.hashopen(IN_BDB_NAME, "r")
-    print "reading", IN_BDB_NAME
-    out_bdb = bsddb.hashopen(OUT_BDB_NAME, "c")
-    print "writing", OUT_BDB_NAME
-
-    alter_dict = get_alter_dict()
-
-    global BAD
-    BAD = int(in_bdb["IBAD"]) / 10.0
-    BAD = 0.1 * int(BAD * 10.0)
-    out_bdb["IBAD"] = in_bdb["IBAD"]
-
-    alter_fill_new_bdb(in_bdb, out_bdb, alter_dict)
+    for (dict, series) in data:
+        changes = changes_dict.get(dict['id'], [])
+        begin = dict['begin']
+        end = begin + len(series[0]) - 1
+        for (kind, year, x) in changes:
+            if kind == 'years': # omit all the data from year1 to year2, inclusive
+                year1 = year
+                year2 = x
+                if (year1 <= begin and year2 >= end): # drop this whole record
+                    series = None
+                    break
+                if (year1 <= begin):
+                    if (year2 >= begin): # trim at the start
+                        for m in range(12):
+                            series[m] = series[m][year2 - begin + 1:]
+                        begin = year2 + 1
+                        dict['begin'] = begin
+                    continue
+                if (year2 >= end):
+                    if (year1 <= end): # trim at the end
+                        for m in range(12):
+                            series[m] = series[m][:year1 - begin]
+                        end = year1 - 1
+                    continue
+                # remove some years from mid-series
+                for year in range(year1, year2 + 1):
+                    for m in range(12):
+                        series[m][year - begin] = BAD
+            else: # remove a single month
+                series[x-1][year-begin] = BAD
+        if series is not None:
+            yield (dict, series)
 
 def get_alter_dict():
-    f = open('config/' + IN_FILE_NAME)
-    print "reading", IN_FILE_NAME
+    """Reads the file config/Ts.discont.RS.alter.IN into a dict.  Each
+    line has a 12 digit station ID, a month, a year, and a
+    floating-point temperature delta.  The dict maps the ID to (month,
+    year, delta).
+    """
+
+    f = open('config/Ts.discont.RS.alter.IN')
     dict = {}
     for line in f:
         id, month, year, num = line.split()
         dict[id] = [int(month), int(year), float(num)]
     return dict
 
-def alter_fill_new_bdb(in_bdb, out_bdb, alter_dict):
-    ids = in_bdb["IDS"].split()
-    count = 0
-    for id, (a_month, a_year, a_num) in alter_dict.items():
-        s = in_bdb[id]
-        st = StationString(s)
-        data = st.data
-        years = len(data[0])
-        begin = st.dict["begin"]
-        for year in range(begin, a_year + 1):
-            index = year - begin
-            for m in range(12):
-                if year == a_year and m > a_month - 2:
-                    continue
-                datum = data[m][index]
-                if datum == BAD:
-                    continue
-                data[m][index] = datum + a_num
-        s = serialize(st.dict, data)
-        out_bdb[id] = s
-        count = inc_count(count)
-    for id in ids:
-        if alter_dict.has_key(id):
-            continue
-        out_bdb[id] = in_bdb[id]
-        count = inc_count(count)
-    print count
-    out_bdb["IDS"] = ' '.join(ids)
+def alter_discont(data):
+    """Modifies records as specified in config/Ts.discont.RS.alter.IN,
+    by adding the delta to every datum for that station prior to the
+    specified month.  A filter generator.
+    """
 
-# From bdb_to_text.py
+    alter_dict = get_alter_dict()
+    for (dict, series) in data:
+        if (alter_dict.has_key(dict['id'])):
+            (a_month, a_year, a_num) = alter_dict[dict['id']]
+            years = len(series[0])
+            begin = dict['begin']
+            for year in range(begin, a_year + 1):
+                index = year - begin
+                for m in range(12):
+                    if year == a_year and m > a_month - 2:
+                        continue
+                    if series[m][index] != BAD:
+                        series[m][index] += a_num
+        yield(dict, series)
 
-def bdb_to_text(db_file, txt_file):
-    db = bsddb.hashopen('work/' + db_file, 'r')
-    print "reading", db_file
-    f = open('work/' + txt_file, 'w')
-    print "creating", txt_file
-    ids = db['IDS'].split()
-    count = 0
-    for id in ids:
-        count = inc_count(count)
-        s = db[id]
-        st = StationString(s)
-        f.write(st.to_text(id))
-    print count
+def write_to_file(data, file):
+    """Writes *data* (an iterable of (dict, series) pairs) to the file
+    named *file*.
+    """
+
+    f = open(file, 'w')
+    for (dict, series) in data:
+            begin = dict['begin']
+            f.write(' %4d%5d%s%4s%-36s\n' % (math.floor(dict['lat']*10+0.5),
+                                             math.floor(dict['lon']*10+0.5),
+                                             dict['id'], dict['elevs'], dict['name']))
+            for y in range(len(series[0])):
+                l = map(lambda m: "%5d" % math.floor(series[m][y] * 10.0 + 0.5), range(12))
+                f.write('%4d%s\n' % (y + begin, ''.join(l)))
     f.close()
-    db.close()
 
 def main():
   v2_to_bdb('v2.mean_comb')
   comb_records('v2.mean_comb')
-  comb_pieces('v2.mean_comb.combined')
-  drop_strange('v2.mean_comb.combined.pieces')
-  alter_discont('v2.mean_comb.combined.pieces.strange')
-  bdb_to_text('v2.mean_comb.combined.pieces.strange.alter.bdb', 'Ts.txt')
+  combined_data = comb_pieces('v2.mean_comb.combined')
+  without_strange = drop_strange(combined_data)
+  without_discontinuities = alter_discont(without_strange)
+  write_to_file(without_discontinuities, 'work/Ts.txt')
 
 if __name__ == '__main__':
   main()
 
-# Notes on STEP1 algorithm:
+# Notes:
 #
-# The step is driven by do_comb_step1.sh, a ksh script
-# 
-# 1. v2_to_bdb.py creates v2.mean_comb.bdb containing the same data as v2.mean_comb.
 # The records in each BDB are as follows:
 # 
 # IDS -> space-separated list of station IDs
 # BAD -> '9999'
 # id  -> station data (format defined by stationstring.serialize)
 # 
-# 2. comb_records.py creates v2.mean_comb.combined.bdb and comb.log
+# 1. v2_to_bdb() creates v2.mean_comb.bdb containing the same data as v2.mean_comb.
 #
-# 3. comb_pieces.py creates v2.mean_comb.combined.pieces.bdb and piece.log
+# 2. comb_records() creates v2.mean_comb.combined.bdb and comb.log
 #
-# 4. drop_strange.py creates v2.mean_comb.combined.pieces.strange.bdb
+# 3. comb_pieces() returns a generator and makes piece.log
 #
-# 5. alter_discont.py creates  v2.mean_comb.combined.pieces.strange.alter.bdb
+# 4. drop_strange() is a filter
 #
-# 6. bdb_to_text.py creates v2.mean_comb.combined.pieces.strange.alter.txt
-# which is then renamed to to_next_step/Ts.txt
+# 5. alter_discont() is a filter
+#
+# 6. write_to_file() writes the results to work/Ts.txt

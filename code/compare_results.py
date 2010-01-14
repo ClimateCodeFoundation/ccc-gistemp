@@ -205,7 +205,7 @@ def distribution_url(d):
     # Google chart documentation at http://code.google.com/apis/chart/
     rx = '|'.join(map(lambda x: '%d' % x, range(bin_min, bin_max + 1)))
     bin_count = bin_max - bin_min + 1
-    notex = '|'*(bin_count/2) + '(bin size %f)' % w
+    notex = '|'*(bin_count/2) + '(bin size %g)' % w
     ry = '0,%d,%d' % (dmax, 10 ** math.floor(math.log10(dmax)))
     chart = [
         'chs=600x300', # Chart size (pixels).
@@ -312,11 +312,11 @@ def compare(dirs, labels, o):
         print >>o, '<img src="%s">' % escape(distribution_url(d))
         print >>o, '<h3>%s annual residue summary</h3>' % region.capitalize()
         print >>o, '<ul>'
-        print >>o, '<li>Zeroes: %d/%d<li>Mean = %f<li>Standard deviation = %f' % stats(d)
-        print >>o, '<li>Min = %f<li>Max = %f' % (min(d), max(d))
+        print >>o, '<li>Zeroes: %d/%d<li>Mean = %g<li>Standard deviation = %g' % stats(d)
+        print >>o, '<li>Min = %g<li>Max = %g' % (min(d), max(d))
         print >>o, '</ul>'
         top(diffs, 10, o, 'Largest %s annual residues' % region,
-            lambda k, v: "%04d: %f" % (k, v))
+            lambda k, v: "%04d: %g" % (k, v))
 
         # Monthly series
         fs = map(lambda d: open(os.path.join(d, anomaly_file % code), 'r'), dirs)
@@ -327,11 +327,11 @@ def compare(dirs, labels, o):
         print >>o, '<img src="%s">' % escape(distribution_url(d))
         print >>o, '<h3>%s monthly residue summary</h3>' % region.capitalize()
         print >>o, '<ul>'
-        print >>o, '<li>Min = %f<li>Max = %f' % (min(d), max(d))
-        print >>o, '<li>Zeroes: %d/%d<li>Mean = %f<li>Standard deviation = %f' % stats(d)
+        print >>o, '<li>Min = %g<li>Max = %g' % (min(d), max(d))
+        print >>o, '<li>Zeroes: %d/%d<li>Mean = %g<li>Standard deviation = %g' % stats(d)
         print >>o, '</ul>'
         top(diffs, 10, o, 'Largest %s monthly residues' % region,
-            lambda k, v: "%04d-%02d: %f" % (k[0], k[1] + 1, v))
+            lambda k, v: "%04d-%02d: %g" % (k[0], k[1] + 1, v))
 
     # Box series
     fs = map(lambda d: open(os.path.join(d, box_file), 'r'), dirs)
@@ -342,11 +342,11 @@ def compare(dirs, labels, o):
     print >>o, '<img src="%s">' % escape(distribution_url(d))
     print >>o, '<h3>Per-box monthly residue summary</h3>'
     print >>o, '<ul>'
-    print >>o, '<li>Min = %f<li>Max = %f' % (min(d), max(d))
-    print >>o, '<li>Zeroes: %d/%d<li>Mean = %f<li>Standard deviation = %f' % stats(d)
+    print >>o, '<li>Min = %g<li>Max = %g' % (min(d), max(d))
+    print >>o, '<li>Zeroes: %d/%d<li>Mean = %g<li>Standard deviation = %g' % stats(d)
     print >>o, '</ul>'
     top(diffs, 10, o,'Largest per-box monthly residues',
-        lambda k, v: "Box %02d, %04d-%02d: %f" % (k[0], k[1], k[2] + 1, v))
+        lambda k, v: "Box %02d, %04d-%02d: %g" % (k[0], k[1], k[2] + 1, v))
 
     print >>o, "</body>"
     print >>o, "</html>"

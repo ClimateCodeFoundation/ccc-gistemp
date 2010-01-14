@@ -1,42 +1,45 @@
 #! /usr/bin/env python
+# $URL$
+# $Rev$
 # 
 # step1.py
-# 
-# Python code reproducing the STEP1 part of the GISTEMP algorithm.
 #
-# Very much first draft, but does product the correct Ts.txt.
 # Nick Barnes, Ravenbrook Limited, 2008-08-06
-# 
-# $Id: //info.ravenbrook.com/project/ccc/master/code/step1.py#8 $
-#
-# To run:
-# $ ./step1.py
-# $
-# 
-# Requires the following files in the input/ directory,
-# from GISTEMP STEP1/input_files/:
-# 
-# mcdw.tbl
-# ushcn2.tbl
-# sumofday.tbl
-# v2.inv
-#
-# Do not be tempted to replace v2.inv with the apparently similar
-# v2.temperature.inv file available from NOAA,
-# ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.temperature.inv .  The
-# NOAA file has been treated for GISTEMP's use by, for example, adding
-# records corresponding to Antarctic stations that are not used in GHCN
-# but are used in the GISTEMP analysis.  Step 1 (this step) expects to
-# find a record in v2.inv for every station it has a time series for.
-#
-# Requires the following files in the config/ directory,
-# from GISTEMP STEP1/input_files/:
-# 
-# combine_pieces_helena.in
-# Ts.strange.RSU.list.IN
-# Ts.discont.RS.alter.IN
-#
-# Also requires the existence of writeable work/ and log/ directories.
+
+"""
+Python code reproducing the STEP1 part of the GISTEMP algorithm.
+
+Very much first draft, but does product the correct Ts.txt.
+
+To run:
+$ ./step1.py
+$
+
+Requires the following files in the input/ directory,
+from GISTEMP STEP1/input_files/:
+
+mcdw.tbl
+ushcn2.tbl
+sumofday.tbl
+v2.inv
+
+Do not be tempted to replace v2.inv with the apparently similar
+v2.temperature.inv file available from NOAA,
+ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.temperature.inv .  The
+NOAA file has been treated for GISTEMP's use by, for example, adding
+records corresponding to Antarctic stations that are not used in GHCN
+but are used in the GISTEMP analysis.  Step 1 (this step) expects to
+find a record in v2.inv for every station it has a time series for.
+
+Requires the following files in the config/ directory,
+from GISTEMP STEP1/input_files/:
+
+combine_pieces_helena.in
+Ts.strange.RSU.list.IN
+Ts.discont.RS.alter.IN
+
+Also requires the existence of writeable work/ and log/ directories.
+"""
 
 import math, sys, struct, bsddb, re, array
 
@@ -145,6 +148,19 @@ def serialize(dict, data):
     return   '\t'.join(dict_l) + '\n' + ' '.join(data_l)
 
 def from_lines(lines):
+    """*lines* is a list of lines (strings) that comprise a station's
+    entire record.  The lines are an extract from a file in the same
+    format as the GHCN file v2.mean.Z.  The data are converted to a 2D
+    array, *data*, where data[m][yi] gives the temperature (a floating
+    point value in degrees C) for month *m* of year begin+yi (*begin* is
+    the first year for which there is data for the station).
+    (*data*,*begin*) is returned.
+
+    Invalid data are marked in the input file with -9999 but are
+    translated in the data arrays to 9999*0.1 (which is not quite
+    999.9).
+    """
+
     begin = 9999
     end = 0
     for line in lines:
@@ -267,6 +283,14 @@ def monthly_annual(data, bad):
 # From v2_to_bdb.py
 
 def v2_fill_dbm(f, dbm, info, sources):
+    """All of the temperature data in *f* are written to the bsddb in
+    *dbm* (one record per station).  As the station data is read the
+    station metadata in *info* is updated so that info[st_id]['begin']
+    is the first year for which there is data, and info[st_id]['source']
+    is the source of that data (extracted from the *sources*
+    dictionary).
+    """
+
     ids = []
     count = 0
     line = f.readline()
@@ -296,6 +320,12 @@ def v2_fill_dbm(f, dbm, info, sources):
     dbm.close()
 
 def v2_get_sources():
+    """Reads the three tables mcdw.tbl, ushcn2.tbl, sumofday.tbl and
+    return a dictionary that maps from 12-digit (string) station ID to
+    the source (which is one of the strings 'MCDW', 'USHCN2',
+    'SUMOFDAY').
+    """
+
     sources = {}
     for source in ['MCDW', 'USHCN2', 'SUMOFDAY']:
         for line in open('input/%s.tbl' % source.lower()):
@@ -304,6 +334,19 @@ def v2_get_sources():
     return sources
 
 def v2_get_info():
+    """Open the input/v2.inv file and convert it into a dictionary, *d*,
+    that is returned.
+
+    d[id] contains the metadata of the station with identification *id*
+      where *id* is an 11-digit string.
+
+    The input file is in the same format as the GHCN V2 file
+    v2.temperature.inv (in fact, it's the same file, but with records
+    added for the Antarctic stations that GHCN doesn't have).  The best
+    description of that file's format is the Fortran program:
+    ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.read.inv.f
+    """
+
     keys = ('id', 'name', 'lat', 'lon', 'elevs',
             'elevg', 'pop', 'ipop', 'topo', 'stveg',
             'stloc', 'iloc', 'airstn', 'itowndis', 'grveg')

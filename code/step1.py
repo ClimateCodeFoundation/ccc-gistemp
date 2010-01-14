@@ -563,6 +563,12 @@ def records_fill_new_db(ids, rec_id_dict, old_db, new_db):
     new_db['IDS'] = ' '.join(new_ids)
 
 def get_ids(old_db):
+    """From a bdb file return a pair (*ids*, *dict*) where *ids* is a
+    sorted list of 11-digit (string) station IDs, and *dict* maps
+    11-digit station ID to a list of all 12-digit IDs (in other words,
+    including the GHCN duplicate number) used for that station.
+    """
+
     rec_ids = old_db['IDS'].split()
     rec_id_dict = {}
     for rec_id in rec_ids:

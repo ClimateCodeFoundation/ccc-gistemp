@@ -312,8 +312,8 @@ def compare(dirs, labels, o):
         print >>o, '<img src="%s">' % escape(distribution_url(d))
         print >>o, '<h3>%s annual residue summary</h3>' % region.capitalize()
         print >>o, '<ul>'
-        print >>o, '<li>Zeroes: %d/%d<li>Mean = %g<li>Standard deviation = %g' % stats(d)
         print >>o, '<li>Min = %g<li>Max = %g' % (min(d), max(d))
+        print >>o, '<li>Zeroes: %d/%d<li>Mean = %g<li>Standard deviation = %g' % stats(d)
         print >>o, '</ul>'
         top(diffs, 10, o, 'Largest %s annual residues' % region,
             lambda k, v: "%04d: %g" % (k, v))

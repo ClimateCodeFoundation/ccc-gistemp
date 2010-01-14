@@ -509,7 +509,7 @@ def records_get_new_data(record, begin, years):
         wgts[m] = wgts_row
     return sums, wgts, data
 
-def get_ids(old_db):
+def get_ids(db):
     """From a bdb file return a pair (*ids*, *dict*) where *ids* is a
     sorted list of 11-digit (string) station IDs, and *dict* maps
     11-digit station ID to a list of all 12-digit IDs (in other words,

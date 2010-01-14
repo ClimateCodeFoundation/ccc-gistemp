@@ -146,6 +146,9 @@ def run_step5():
     sys.stdout = old_stdout
 
 def main(argv = None):
+    # http://www.python.org/doc/2.4.4/lib/module-time.html
+    import time
+
     if argv is None:
         argv = sys.argv
     try:
@@ -195,12 +198,23 @@ def main(argv = None):
             4: run_step4,
             5: run_step5,
         }
+        # Record start time now, and ending times for each step.
+        laptime = [time.time()]
+        elapsed = []
         for s in step_list:
             if not step_fn.has_key(s):
                 raise Fatal("Can't run step %d" % s)
             ret = step_fn[s]()
             if ret not in (0, None):
                 raise Fatal("Step %d failed" % s)
+            laptime.append(time.time())
+            elapsed.append(laptime[-1] - laptime[-2])
+            log("STEP %s took %.1f seconds" %
+                  (s, elapsed[-1]))
+
+        log("====> Timing Summary ====")
+        for step,took in zip(step_list, elapsed):
+            log("STEP %s: %6.1f seconds" % (step, took))
 
         return 0
     except Fatal, err:

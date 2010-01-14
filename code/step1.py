@@ -37,14 +37,6 @@ Also requires the existence of writeable work/ and log/ directories.
 
 import math, sys, struct, bsddb, re, array
 
-# progress counter, used when writing records into a database file.
-
-def inc_count(count):
-    count += 1
-    if count % 100 == 0:
-        print count
-    return count
-
 def FEQUALS(x, y):
   return abs(x - y) < 0.1
 
@@ -270,7 +262,6 @@ def v2_fill_dbm(f, dbm, info, sources):
     """
 
     ids = []
-    count = 0
     line = f.readline()
     while line:
         lines = [line]
@@ -292,8 +283,6 @@ def v2_fill_dbm(f, dbm, info, sources):
         dict['id' ] = last_id
         mystring = serialize(dict, data)
         dbm[last_id] = mystring
-        count = inc_count(count)
-    print count
     dbm['IDS'] = ' '.join(ids)
     dbm['IBAD'] = '9999'
     dbm.close()
@@ -412,7 +401,6 @@ def add(new_sums, new_wgts, diff, begin, record):
             wgts_row[index] = wgts_row[index] + 1
 
 def get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records):
-    end = begin + years - 1
     average(new_sums, new_wgts, new_data, years)
     ann_mean, ann_anoms = monthly_annual(new_data, BAD)
     overlap = 0
@@ -445,17 +433,16 @@ def get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records):
         return 0, 0, BAD
     return best_record, best_id, diff
 
-def combine(*args):
-    new_sums, new_wgts, new_data, begin, years, records = args
-    record, rec_id, diff = apply(get_longest_overlap, args)
-    if abs(diff - BAD) < 0.1:
-        comb_log.write("\tno other records okay\n")
-        return 0
-    del records[rec_id]
-    add(new_sums, new_wgts, diff, begin, record)
-    rec_begin = record['dict']['begin']
-    comb_log.write("\t %s %d %d %f\n" % (rec_id, rec_begin, record['years'] + rec_begin - 1, diff))
-    return 1
+def combine(new_sums, new_wgts, new_data, begin, years, records):
+    while records:
+        record, rec_id, diff = get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records)
+        if abs(diff - BAD) < 0.1:
+            comb_log.write("\tno other records okay\n")
+            return
+        del records[rec_id]
+        add(new_sums, new_wgts, diff, begin, record)
+        rec_begin = record['dict']['begin']
+        comb_log.write("\t %s %d %d %f\n" % (rec_id, rec_begin, record['years'] + rec_begin - 1, diff))
 
 def get_best(records):
     ranks = {'MCDW': 4, 'USHCN2': 3, 'SUMOFDAY': 2, 'UNKNOWN': 1}
@@ -486,7 +473,6 @@ def get_records(old_db, rec_ids):
     for rec_id in rec_ids:
         s = old_db[rec_id]
         st = StationString(s)
-        assert st.years == len(st.data[0])
         begin = st.dict['begin']
         end = begin + st.years - 1
         if min > begin:
@@ -523,45 +509,6 @@ def records_get_new_data(record, begin, years):
         wgts[m] = wgts_row
     return sums, wgts, data
 
-def records_fill_new_db(ids, rec_id_dict, old_db, new_db):
-    count = 0
-    new_ids = []
-    for id in ids:
-        rec_ids = rec_id_dict[id]
-        comb_log.write('%s\n' % id)
-        while 1:
-            records, begin, end = get_records(old_db, rec_ids)
-            if len(records) == 1:
-                rec_id, record = records.items()[0]
-                new_db[rec_id] = record['string']
-                new_ids.append(rec_id)
-                count = inc_count(count)
-                break
-            years = end - begin + 1
-            record, rec_id = get_best(records)
-            rec_dict = record['dict']
-            source = rec_dict['source']
-            del records[rec_id]
-            new_sums, new_wgts, new_data = records_get_new_data(record, begin, years)
-            new_dict = rec_dict.copy()
-            new_dict['begin'] = begin
-            comb_log.write ("\t%s %s %s -- %s\n" % (rec_id, begin, end,source))
-            ok_flag = 1
-            while ok_flag and records.keys():
-                ok_flag = combine(new_sums, new_wgts, new_data,
-                                  begin, years, records)
-            begin = final_average(new_sums, new_wgts, new_data, years, begin)
-            new_dict['begin'] = begin
-            s = serialize(new_dict, new_data)
-            new_db[rec_id] = s
-            new_ids.append(rec_id)
-            count = inc_count(count)
-            rec_ids = records.keys()
-            if not rec_ids:
-                break
-    print count
-    new_db['IDS'] = ' '.join(new_ids)
-
 def get_ids(old_db):
     """From a bdb file return a pair (*ids*, *dict*) where *ids* is a
     sorted list of 11-digit (string) station IDs, and *dict* maps
@@ -569,16 +516,16 @@ def get_ids(old_db):
     including the GHCN duplicate number) used for that station.
     """
 
-    rec_ids = old_db['IDS'].split()
-    rec_id_dict = {}
-    for rec_id in rec_ids:
+    ids = db['IDS'].split()
+    dict = {}
+    for rec_id in ids:
         id = rec_id[:-1]
-        if not rec_id_dict.has_key(id):
-            rec_id_dict[id] = []
-        rec_id_dict[id].append(rec_id)
-    ids = rec_id_dict.keys()
+        if not dict.has_key(id):
+            dict[id] = []
+        dict[id].append(rec_id)
+    ids = dict.keys()
     ids.sort()
-    return ids, rec_id_dict
+    return ids, dict
 
 def comb_records(old_db_name, new_db_name):
     global comb_log
@@ -590,8 +537,36 @@ def comb_records(old_db_name, new_db_name):
     global BAD
     BAD = int(old_db["IBAD"]) / 10.0
     BAD = 0.1 * int(BAD * 10.0)
+
     ids, rec_id_dict = get_ids(old_db)
-    records_fill_new_db(ids, rec_id_dict, old_db, new_db)
+    new_ids = []
+    for id in ids:
+        rec_ids = rec_id_dict[id]
+        comb_log.write('%s\n' % id)
+        while 1:
+            records, begin, end = get_records(old_db, rec_ids)
+            if len(records) == 1:
+                rec_id, record = records.items()[0]
+                new_db[rec_id] = record['string']
+                new_ids.append(rec_id)
+                break
+            years = end - begin + 1
+            record, rec_id = get_best(records)
+            rec_dict = record['dict']
+            source = rec_dict['source']
+            del records[rec_id]
+            new_sums, new_wgts, new_data = records_get_new_data(record, begin, years)
+            new_dict = rec_dict.copy()
+            comb_log.write ("\t%s %s %s -- %s\n" % (rec_id, begin, end,source))
+            combine(new_sums, new_wgts, new_data, begin, years, records)
+            begin = final_average(new_sums, new_wgts, new_data, years, begin)
+            new_dict['begin'] = begin
+            new_db[rec_id] = serialize(new_dict, new_data)
+            new_ids.append(rec_id)
+            rec_ids = records.keys()
+            if not rec_ids:
+                break
+    new_db['IDS'] = ' '.join(new_ids)
     comb_log.close()
 
 # From comb_pieces.py.
@@ -614,7 +589,6 @@ def sigma(list, bad):
         return math.sqrt(sos / count - mean * mean)
 
 def pieces_get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records):
-    end = begin + years - 1
     average(new_sums, new_wgts, new_data, years)
     ann_mean, ann_anoms = monthly_annual(new_data, BAD)
     overlap = 0
@@ -659,9 +633,7 @@ def get_actual_endpoints(new_wgts, begin, years):
 
 def find_quintuples(new_sums, new_wgts, new_data,
                     begin, years, record, rec_begin,
-                    new_id=None, rec_id=None):
-    end = begin + years - 1
-
+                    new_id, rec_id):
     rec_begin = record['dict']['begin']
     rec_end = rec_begin + record['years'] - 1
 
@@ -727,29 +699,25 @@ def find_quintuples(new_sums, new_wgts, new_data,
     pieces_log.write("counts: %s\n" % ((count1, count2),))
     return okay_flag
 
-def pieces_combine(*args, **kwargs):
-    new_sums, new_wgts, new_data, begin, years, records = args
-    new_id = kwargs['new_id']
-    end = begin + years - 1
+def pieces_combine(new_sums, new_wgts, new_data, begin, years, records, new_id):
+    while records:
+        record, rec_id = pieces_get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records)
+        rec_begin = record['dict']['begin']
+        rec_end = rec_begin + record['years'] - 1
 
-    record, rec_id = apply(pieces_get_longest_overlap, args)
-    rec_begin = record['dict']['begin']
-    rec_end = rec_begin + record['years'] - 1
-
-    pieces_log.write("\t %s %d %d\n" % (rec_id, rec_begin, record['years'] + rec_begin - 1))
-
-    is_okay = find_quintuples(new_sums, new_wgts, new_data,
-                              begin, years, record, rec_begin,
-                              new_id=new_id, rec_id=rec_id)
-
-    if not is_okay:
-        pieces_log.write("\t***no other pieces okay***\n")
-        return 0
-    else:
-        del records[rec_id]
-        add(new_sums, new_wgts, 0.0, begin, record)
         pieces_log.write("\t %s %d %d\n" % (rec_id, rec_begin, record['years'] + rec_begin - 1))
-        return 1
+
+        is_okay = find_quintuples(new_sums, new_wgts, new_data,
+                                  begin, years, record, rec_begin,
+                                  new_id, rec_id)
+
+        if is_okay:
+            del records[rec_id]
+            add(new_sums, new_wgts, 0.0, begin, record)
+            pieces_log.write("\t %s %d %d\n" % (rec_id, rec_begin, record['years'] + rec_begin - 1))
+        else:
+            pieces_log.write("\t***no other pieces okay***\n")
+            return
 
 def get_longest(records):
     longest = 0
@@ -761,7 +729,25 @@ def get_longest(records):
             longest_id = rec_id
     return longest_rec, longest_id
 
-def pieces_generator(ids, rec_id_dict, db, helena_ds):
+def get_helena_dict():
+    """Reads the file config/combine_pieces_helena.in into a dict,
+    mapping a station id to a tuple (ID with duplicate marker, year,
+    month, summand)."""
+    
+    helena_ds = {}
+    for line in open('config/combine_pieces_helena.in', 'r'):
+        id, _, year, month, summand = line.split()
+        helena_ds[id[:-1]] = (id, int(year), int(month), float(summand))
+    return helena_ds
+
+def comb_pieces(db_name):
+    global pieces_log
+    pieces_log = open('log/pieces.log','w')
+    print "opening db file '%s'" % db_name
+    db = bsddb.hashopen(db_name, 'r')
+    helena_ds = get_helena_dict()
+
+    ids, rec_id_dict = get_ids(db)
     for id in ids:
         rec_ids = rec_id_dict[id]
         pieces_log.write('%s\n' % id)
@@ -802,39 +788,14 @@ def pieces_generator(ids, rec_id_dict, db, helena_ds):
             del records[rec_id]
             new_sums, new_wgts, new_data = records_get_new_data(record, begin, years)
             new_dict = rec_dict.copy()
-            new_dict['begin'] = begin
             pieces_log.write("\t%s %s %s -- %s\n" % (rec_id, begin, begin + years -1,source))
-            ok_flag = 1
-            while ok_flag and records.keys():
-                ok_flag = pieces_combine(new_sums, new_wgts, new_data,
-                                         begin, years, records, new_id=rec_id)
+            pieces_combine(new_sums, new_wgts, new_data, begin, years, records, rec_id)
             begin = final_average(new_sums, new_wgts, new_data, years, begin)
             new_dict['begin'] = begin
             yield (new_dict, new_data)
             rec_ids = records.keys()
             if not records.keys():
                 break
-
-def get_helena_dict():
-    """Reads the file config/combine_pieces_helena.in into a dict,
-    mapping a station id to a tuple (ID with duplicate marker, year,
-    month, summand)."""
-    
-    helena_ds = {}
-    for line in open('config/combine_pieces_helena.in', 'r'):
-        id, _, year, month, summand = line.split()
-        helena_ds[id[:-1]] = (id, int(year), int(month), float(summand))
-    return helena_ds
-
-def comb_pieces(db_name):
-    global pieces_log
-    pieces_log = open('log/pieces.log','w')
-    print "opening db file '%s'" % db_name
-    db = bsddb.hashopen(db_name, 'r')
-    ids, rec_id_dict = get_ids(db)
-    helena_ds = get_helena_dict()
-    for record in pieces_generator(ids, rec_id_dict, db, helena_ds):
-        yield record
 
 def get_changes_dict():
     """Reads the file config/Ts.strange.RSU.list.IN and returns a dict

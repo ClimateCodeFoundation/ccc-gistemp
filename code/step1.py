@@ -116,15 +116,14 @@ def from_lines(lines):
     return (series, begin)
 
 def monthly_annual(data):
-    """Computing a mean and set of annual anomalies.  This has a particular
-    algorithm (via monthly and then seasonal means and anomalies, with
-    particular thresholds for missing values at each step), which must
-    be maintained for bit-for-bit compatibility with GISTEMP; maybe we
-    can drop it later.
+    """Computing a mean and set of annual anomalies.  This has a
+    particular algorithm (via monthly and then seasonal means and
+    anomalies), which must be maintained for bit-for-bit compatibility
+    with GISTEMP; maybe we can drop it later.
     """
 
     years = len(data[0])
-    # compute monthly means and anomalies   
+    # compute monthly means and anomalies
     monthly_means = array.array('d',[BAD]*12)
     monthly_anoms = []
     for m in range(12):
@@ -146,6 +145,8 @@ def monthly_annual(data):
                 monthly_anoms_row[n] = datum - mean
         monthly_anoms.append(monthly_anoms_row)
 
+    # Average monthly means to make seasonal means,
+    # and monthly anomalies to make seasonal anomalies.
     seasonal_means = array.array('d',[BAD, BAD, BAD, BAD])
     seasonal_anoms = []
     # compute seasonal anomalies
@@ -156,20 +157,19 @@ def monthly_annual(data):
             months = range(s*3-1, s*3+2)
         sum = 0.0
         count = 0
-        for i in range(3):
-            m = months[i]
+        for m in months:
             monthly_mean = monthly_means[m]
             if valid(monthly_mean):
                 sum += monthly_mean
                 count += 1
+        # need at least two valid months for a valid season
         if count > 1:
             seasonal_means[s] = sum / count
         seasonal_anoms_row = array.array('d', [BAD] * years)
         for n in range(years):
             sum = 0.0
             count = 0
-            for i in range(3):
-                m = months[i]
+            for m in months:
                 if m == 11:
                   if n == 0:
                     continue
@@ -180,18 +180,21 @@ def monthly_annual(data):
                 if valid(monthly_anom):
                     sum += monthly_anom
                     count += 1
+            # need at least two valid months for a valid season
             if count > 1:
                 seasonal_anoms_row[n] = sum / count
         seasonal_anoms.append(seasonal_anoms_row)
     
-    # annual mean and anomalies
+    # Average seasonal means to make annual mean,
+    # and average seasonal anomalies to make annual anomalies
+    # (note: annual anomalies are December-to-November).
     sum = 0.0
     count = 0
-    for s in range(4):
-        seasonal_mean = seasonal_means[s]
+    for seasonal_mean in seasonal_means:
         if valid(seasonal_mean):
             sum += seasonal_mean
             count += 1
+    # need 3 valid seasons for a valid year
     if count > 2:
             annual_mean = sum / count
     else:
@@ -205,6 +208,7 @@ def monthly_annual(data):
             if valid(anom):
                 sum += anom
                 count += 1
+        # need 3 valid seasons for a valid year
         if count > 2:
             annual_anoms[n] = sum / count
     return (annual_mean, annual_anoms)
@@ -573,16 +577,16 @@ def find_quintuples(new_sums, new_wgts, new_data,
     pieces_log.write("max begin: %s\tmin end: %s\n" % (max_begin, min_end))
 
     average(new_sums, new_wgts, new_data, years)
-    ann_mean, sublist1 = monthly_annual(new_data)
-    ann_std_dev = sigma(sublist1)
+    new_ann_mean, new_ann_anoms = monthly_annual(new_data)
+    ann_std_dev = sigma(new_ann_anoms)
     pieces_log.write("ann_std_dev = %s\n" % ann_std_dev)
-    offset1 = (middle_year - begin)
-    len1 = len(sublist1)
+    new_offset = (middle_year - begin)
+    new_len = len(new_ann_anoms)
 
-    sublist2 = record['ann_anoms']
+    rec_ann_anoms = record['ann_anoms']
     rec_ann_mean = record['ann_mean']
-    offset2 = (middle_year - rec_begin)
-    len2 = len(sublist2)
+    rec_offset = (middle_year - rec_begin)
+    rec_len = len(rec_ann_anoms)
 
     ov_success = 0
     okay_flag = 0
@@ -593,18 +597,18 @@ def find_quintuples(new_sums, new_wgts, new_data,
             for sign in [-1, 1]:
                 if sign == 1 and i == 0:
                     continue
-                index1 = i * sign + offset1
-                index2 = i * sign + offset2
-                if index1 < 0 or index1 >= len1:
+                index1 = i * sign + new_offset
+                index2 = i * sign + rec_offset
+                if index1 < 0 or index1 >= new_len:
                     anom1 = BAD
                 else:
-                    anom1 = sublist1[index1]
-                if index2 < 0 or index2 >= len2:
+                    anom1 = new_ann_anoms[index1]
+                if index2 < 0 or index2 >= rec_len:
                     anom2 = BAD
                 else:
-                    anom2 = sublist2[index2]
+                    anom2 = rec_ann_anoms[index2]
                 if valid(anom1):
-                    sum1 = sum1 + anom1 + ann_mean
+                    sum1 = sum1 + anom1 + new_ann_mean
                     count1 = count1 + 1
                 if valid(anom2):
                     sum2 = sum2 + anom2 + rec_ann_mean

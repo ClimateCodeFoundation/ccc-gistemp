@@ -45,14 +45,6 @@ def run_step0():
     log("====> STEP 0 ====")
     import step0
     step0.main()
-    log("... sorting the output of step 0")
-    f = open(os.path.join('work', 'v2.mean_comb.unsorted'), 'r')
-    v2_mean_data = f.readlines()
-    f.close()
-    v2_mean_data.sort()
-    f = open(os.path.join('work', 'v2.mean_comb'), 'w')
-    f.writelines(v2_mean_data)
-    f.close()
 
 def run_step1():
     log("====> STEP 1 ====")

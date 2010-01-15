@@ -402,8 +402,8 @@ def write_data(set, filename):
     """Writes a dataset to a file in v2.mean format."""
 
     f = open(filename, 'w')
-    for line in set:
-        f.write(str_line(line))
+    for line in sorted(str_line(item) for item in set):
+        f.write(line)
     f.close()
 
 def step0(input_file):
@@ -420,8 +420,7 @@ def step0(input_file):
                            remove_Hohenpeissenberg(including_US))
 
 def main():
-    write_data(step0("v2.mean"),
-               "work/v2.mean_comb.unsorted")
+    write_data(step0("v2.mean"), "work/v2.mean_comb")
 
 if __name__ == '__main__':
     main()

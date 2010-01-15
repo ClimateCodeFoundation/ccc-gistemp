@@ -776,8 +776,10 @@ def step3(label='GHCN.CL.PA', radius=1200, audit=None, subbox=()):
     labelr = 'Ts.%(label)s.%(radius)d' % locals()
 
     subbox_grid_output = open('work/SBBX1880.%s' % labelr, 'wb')
+    # This output file doesn't get written.  But it might one day.
     box_grid_output = open('work/BX.%s' % labelr, 'wb')
-    station_use_output = open('work/statn.use.%s' % labelr, 'wb')
+    # This log file doesn't actually get used.  But it might one day.
+    station_use_output = open('log/statn.use.%s' % labelr, 'wb')
 
     # Open the input file
     infile = open('work/Ts.%s' % (label), 'rb')

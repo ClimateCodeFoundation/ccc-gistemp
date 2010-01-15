@@ -54,6 +54,20 @@ def valid(x):
     # return 0 or 1 (or False or True, which it does).
     return not invalid(x)
 
+def sum_valid(seq):
+    """Takes a sequence, *seq*, and sums up all the valid items (using
+    the valid() function).  *sum*,*count* is returned (where *count* is
+    the number of valid items).
+    """
+
+    count = 0
+    a = 0.0
+    for x in seq:
+        if valid(x):
+            a += x
+            count += 1
+    return a,count
+
 # For each station record we carry around a dict and a series of
 # temperature records.  The series is a 2D array of floating-point
 # temperatures: data[m][y], where m ranges from 0 to 11 and y from 0
@@ -134,13 +148,7 @@ def monthly_annual(data):
     monthly_anoms = []
     for m in range(12):
         row = data[m]
-        sum = 0.0
-        count = 0
-        for n in range(years):
-            datum = row[n]
-            if valid(datum):
-                sum += datum
-                count += 1
+        sum,count = sum_valid(row)
         if count > 0:
             monthly_means[m] = sum/count
         mean = monthly_means[m]
@@ -161,13 +169,7 @@ def monthly_annual(data):
             months = [11, 0, 1]
         else:
             months = range(s*3-1, s*3+2)
-        sum = 0.0
-        count = 0
-        for m in months:
-            monthly_mean = monthly_means[m]
-            if valid(monthly_mean):
-                sum += monthly_mean
-                count += 1
+        sum,count = sum_valid(monthly_means[m] for m in months)
         # need at least two valid months for a valid season
         if count > 1:
             seasonal_means[s] = sum / count
@@ -194,12 +196,7 @@ def monthly_annual(data):
     # Average seasonal means to make annual mean,
     # and average seasonal anomalies to make annual anomalies
     # (note: annual anomalies are December-to-November).
-    sum = 0.0
-    count = 0
-    for seasonal_mean in seasonal_means:
-        if valid(seasonal_mean):
-            sum += seasonal_mean
-            count += 1
+    sum,count = sum_valid(seasonal_means)
     # need 3 valid seasons for a valid year
     if count > 2:
         annual_mean = sum / count
@@ -207,13 +204,7 @@ def monthly_annual(data):
         annual_mean = BAD
     annual_anoms = array.array('d',[BAD]*years)
     for n in range(years):
-        sum = 0.0
-        count = 0
-        for s in range(4):
-            anom = seasonal_anoms[s][n]
-            if valid(anom):
-                sum += anom
-                count += 1
+        sum,count = sum_valid(seasonal_anoms[s][n] for s in range(4))
         # need 3 valid seasons for a valid year
         if count > 2:
             annual_anoms[n] = sum / count
@@ -322,16 +313,13 @@ def average(new_sums, new_counts, new_data, years):
 def final_average(new_sums, new_wgts, new_data, years, begin):
     y_min, y_max = 9999, -9999
     for m in range(12):
-        mon_min, mon_max = 9999, -9999
         wgts_row = new_wgts[m]
         for n in range(years):
             wgt = wgts_row[n]
             if wgt == 0:
                 continue
-            mon_min = min(mon_min, n)
-            mon_max = max(mon_max, n)
-        y_min = min(y_min, mon_min)
-        y_max = max(y_max, mon_max)
+            y_min = min(y_min, n)
+            y_max = max(y_max, n)
     if y_min == 0 and y_max == years - 1:
         average(new_sums, new_wgts, new_data, years)
         return begin
@@ -349,10 +337,8 @@ def add(new_sums, new_wgts, diff, begin, record):
     rec_begin = record['dict']['begin']
     rec_years = record['years']
     rec_data = record['data']
-    for m in range(12):
-        sums_row = new_sums[m]
-        wgts_row = new_wgts[m]
-        data_row = rec_data[m]
+    assert 12 == len(new_sums)
+    for sums_row,wgts_row,data_row in zip(new_sums, new_wgts, rec_data):
         for n in range(rec_years):
             datum = data_row[n]
             if invalid(datum):
@@ -512,8 +498,8 @@ def sigma(list):
     for x in list:
         if invalid(x):
             continue
-        sos = sos + x * x
-        sum = sum + x
+        sos += x * x
+        sum += x
         count = count + 1
     if count == 0:
         return BAD
@@ -552,10 +538,10 @@ def pieces_get_longest_overlap(new_sums, new_wgts, new_data, begin, years, recor
 def get_actual_endpoints(new_wgts, begin, years):
     tmp_begin = 9999
     tmp_end = 0
-    for m in range(12):
-        wgts_row = new_wgts[m]
-        for n in range(years):
-            if wgts_row[n] == 0:
+    assert 12 == len(new_wgts)
+    for wgts_row in new_wgts:
+        for n,weight in enumerate(wgts_row):
+            if weight == 0:
                 continue
             year = n + begin
             tmp_begin = min(tmp_begin, year)

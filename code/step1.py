@@ -35,17 +35,15 @@ Ts.discont.RS.alter.IN
 Also requires the existence of writeable work/ and log/ directories.
 """
 
-import math, sys, struct, bsddb, re, array
+import math, struct, array
 
 def FEQUALS(x, y):
   return abs(x - y) < 0.1
 
-# From stationstring.py
-#
-# A StationString encapsulates a dict and a set of temperature records
-# for a single station.  The set of temperature records is a 2D array
-# of floating-point temperatures: data[m][y], where m ranges from 0 to
-# 11 and y from 0 to N.  Missing values are recorded as 999.9.
+# For each station record we carry around a dict and a series of
+# temperature records.  The series is a 2D array of floating-point
+# temperatures: data[m][y], where m ranges from 0 to 11 and y from 0
+# to N.  Missing values are recorded as 999.9.
 #
 # This "2D array" is actually a list of array.array values. For
 # instance, data[2] is an array of all the values for March.
@@ -68,63 +66,22 @@ def FEQUALS(x, y):
 # 'itowndis'
 # 'grveg'
 # 
-# The BDB files contain StationStrings as serialized by the
-# serialize() function.  When manipulating data for a station from a
-# BDB file, it is converted to a StationString using the __init__()
-# method.
-# 
 # The data and dict items are originally created (from the
 # v2.mean_comb file and metadata files) by the from_lines() and
-# v2_fill_dbm() functions.
+# read_v2() functions.
 #
 # The rotation between year-major data (in the inputs and outputs
 # of this step) and month-major data (everywhere inside this step) is
 # done by from_lines() and write_to_file().
 
-class StationString:
-  def __init__(self, sp):
-    sep = sp.index('\n')
-
-    self.dict = {}
-    l = sp[:sep].split('\t')
-    while l:
-        k = l[0]
-        v = l[1]
-        l = l[2:]
-        if k in ['begin', 'ipop']:
-          v = int(v)
-        elif k in ['lat', 'lon']:
-          v = float(v)
-        self.dict[k] = v
-
-    l = sp[sep+1:].split(' ')
-    years = int(len(l)/12)
-    assert len(l) == years * 12
-    l = map(lambda s: float(s) * 0.1, l)
-    self.data = []
-    while(l):
-      self.data.append(array.array('d',l[:years]))
-      l = l[years:]
-    self.years = years
-
-def serialize(dict, data):
-    dict_l = []
-    for (k,v) in dict.items():
-      dict_l.append(k)
-      dict_l.append(str(v))
-    data_l = []
-    for m in range(12):
-      data_l.extend(map(lambda d: "%d" % math.floor(d*10.0 + 0.5), data[m]))
-    return   '\t'.join(dict_l) + '\n' + ' '.join(data_l)
-
 def from_lines(lines):
     """*lines* is a list of lines (strings) that comprise a station's
     entire record.  The lines are an extract from a file in the same
     format as the GHCN file v2.mean.Z.  The data are converted to a 2D
-    array, *data*, where data[m][yi] gives the temperature (a floating
+    array, *series*, where series[m][yi] gives the temperature (a floating
     point value in degrees C) for month *m* of year begin+yi (*begin* is
     the first year for which there is data for the station).
-    (*data*,*begin*) is returned.
+    (*series*,*begin*) is returned.
 
     Invalid data are marked in the input file with -9999 but are
     translated in the data arrays to 9999*0.1 (which is not quite
@@ -141,7 +98,7 @@ def from_lines(lines):
         end = year
     years = end - begin + 1
     l = [999.9]*years
-    data = map(lambda x: array.array('d',l), range(12))
+    series = map(lambda x: array.array('d',l), range(12))
     for line in lines:
       year = int(line[12:16])
       index = year-begin
@@ -149,24 +106,19 @@ def from_lines(lines):
         datum = int(line[16+5*m:21+5*m])
         if datum == -9999:
           datum = 9999
-        data[m][index] = datum * 0.1
-    return (data, begin)
+        series[m][index] = datum * 0.1
+    return (series, begin)
 
-# Derived from the monthlydata.c python extension, which defined a lot
-# of methods which are not called anywhere in GISTEMP.
-# 
-# The only thing it was used for is calculating a mean and set of
-# annual anomalies.
-# 
-# However, the particular algorithm for computing these (via monthly
-# and then seasonal means and anomalies, with particular thresholds
-# for missing values at each step) must be maintained for bit-for-bit
-# compatibility with GISTEMP.
+# Computing a mean and set of annual anomalies.  This has a particular
+# algorithm (via monthly and then seasonal means and anomalies, with
+# particular thresholds for missing values at each step), which must
+# be maintained for bit-for-bit compatibility with GISTEMP; maybe we
+# can drop it later.
 
-def monthly_annual(data, bad):
+def monthly_annual(data):
         years = len(data[0])
         # compute monthly means and anomalies   
-        monthly_means = array.array('d',[bad]*12)
+        monthly_means = array.array('d',[BAD]*12)
         monthly_anoms = []
         for m in range(12):
             row = data[m]
@@ -174,20 +126,20 @@ def monthly_annual(data, bad):
             count = 0
             for n in range(years):
                 datum = row[n]
-                if not FEQUALS(datum, bad):
+                if not FEQUALS(datum, BAD):
                     sum += datum
                     count += 1
             if count > 0:
                 monthly_means[m] = sum/count
             mean = monthly_means[m]
-            monthly_anoms_row = array.array('d',[bad]*years)
+            monthly_anoms_row = array.array('d',[BAD]*years)
             for n in range(years):
                 datum = row[n]
-                if (not FEQUALS(mean, bad) and not FEQUALS(datum, bad)):
+                if (not FEQUALS(mean, BAD) and not FEQUALS(datum, BAD)):
                     monthly_anoms_row[n] = datum - mean
             monthly_anoms.append(monthly_anoms_row)
 
-        seasonal_means = array.array('d',[bad, bad, bad, bad])
+        seasonal_means = array.array('d',[BAD, BAD, BAD, BAD])
         seasonal_anoms = []
         # compute seasonal anomalies
         for s in range(4):
@@ -200,12 +152,12 @@ def monthly_annual(data, bad):
             for i in range(3):
                 m = months[i]
                 monthly_mean = monthly_means[m]
-                if not FEQUALS(monthly_mean, bad):
+                if not FEQUALS(monthly_mean, BAD):
                     sum += monthly_mean
                     count += 1
             if count > 1:
                 seasonal_means[s] = sum / count
-            seasonal_anoms_row = array.array('d', [bad] * years)
+            seasonal_anoms_row = array.array('d', [BAD] * years)
             for n in range(years):
                 sum = 0.0
                 count = 0
@@ -218,7 +170,7 @@ def monthly_annual(data, bad):
                         monthly_anom = monthly_anoms[m][n-1]
                     else:
                         monthly_anom = monthly_anoms[m][n]
-                    if not FEQUALS(monthly_anom, bad):
+                    if not FEQUALS(monthly_anom, BAD):
                         sum += monthly_anom
                         count += 1
                 if count > 1:
@@ -230,61 +182,25 @@ def monthly_annual(data, bad):
         count = 0
         for s in range(4):
             seasonal_mean = seasonal_means[s]
-            if not FEQUALS(seasonal_mean, bad):
+            if not FEQUALS(seasonal_mean, BAD):
                 sum += seasonal_mean
                 count += 1
         if count > 2:
                 annual_mean = sum / count
         else:
-                annual_mean = bad
-        annual_anoms = array.array('d',[bad]*years)
+                annual_mean = BAD
+        annual_anoms = array.array('d',[BAD]*years)
         for n in range(years):
             sum = 0.0
             count = 0
             for s in range(4):
                 anom = seasonal_anoms[s][n]
-                if not FEQUALS(anom, bad):
+                if not FEQUALS(anom, BAD):
                     sum += anom
                     count += 1
             if count > 2:
                 annual_anoms[n] = sum / count
         return (annual_mean, annual_anoms)
-
-# From v2_to_bdb.py
-
-def v2_fill_dbm(f, dbm, info, sources):
-    """All of the temperature data in *f* are written to the mapping
-    object *dbm* (one (key,value) pair per station).  As the station
-    data is read the station metadata in *info* is updated so that
-    info[st_id]['begin'] is the first year for which there is data,
-    and info[st_id]['source'] is the source of that data (extracted
-    from the *sources* dictionary).
-    """
-
-    ids = []
-    line = f.readline()
-    while line:
-        lines = [line]
-        id = line[:12]
-        ids.append(id)
-        last_id = id
-        line = f.readline()
-        while line:
-            id = line[:12]
-            if id != last_id:
-                break
-            lines.append(line)
-            line = f.readline()
-        data, begin = from_lines(lines)
-        st_id = last_id[:-1]
-        dict = info[st_id]
-        dict['begin'] = begin
-        dict['source'] = sources.get(last_id, 'UNKNOWN')
-        dict['id' ] = last_id
-        mystring = serialize(dict, data)
-        dbm[last_id] = mystring
-    dbm['IDS'] = ' '.join(ids)
-    dbm['IBAD'] = '9999'
 
 def v2_get_sources():
     """Reads the three tables mcdw.tbl, ushcn2.tbl, sumofday.tbl and
@@ -314,41 +230,62 @@ def v2_get_info():
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.read.inv.f
     """
 
-    keys = ('id', 'name', 'lat', 'lon', 'elevs',
-            'elevg', 'pop', 'ipop', 'topo', 'stveg',
-            'stloc', 'iloc', 'airstn', 'itowndis', 'grveg')
+    keys = 'id name lat lon elevs elevg pop ipop topo stveg stloc iloc airstn itowndis grveg'.split()
     info = {}
     for row in open('input/v2.inv', 'r'):
         values = struct.unpack('11sx30sx6sx7sx4s5sc5s2s2s2s2sc2s16sx', row[:101])
         # Would use struct.unpack_from if we knew we had Python 2.5
         hash = dict(zip(keys, values))
-        id = hash['id']
-        info[id] = hash
+        hash['ipop'] = int(hash['ipop'])
+        hash['lat'] = float(hash['lat'])
+        hash['lon'] = float(hash['lon'])
+        info[hash['id']] = hash
     return info
 
-def v2_to_bdb(infile_name):
-    """Convert *infile_name*, temperature records in GHCN V2 format, to
-    a database, and return a handle to that database.
+def read_v2():
+    """A generator to iterate through the temperature data in
+    'work/v2.mean_comb'.  Each item in the iterator is a pair (id11,
+    dict), where id11 is the 11-digit station ID and dict is a map
+    from 12-digit station ID to a (dict, series) pair.
     """
 
-    bdb_name = 'work/' + infile_name + '.bdb'
-    f = open('work/' + infile_name, 'r')
-    print "reading " + infile_name
+    f = open('work/v2.mean_comb', 'r')
+    print "reading work/v2.mean_comb"
     info = v2_get_info()
     sources = v2_get_sources()
-    dbm = bsddb.hashopen(bdb_name, 'n')
-    print "writing " + bdb_name
-    v2_fill_dbm(f, dbm, info, sources)
-    dbm.close()
-    return bdb_name
+    ids = []
+    line = f.readline()
+    iterdict = {}
+    id11 = line[:11]
+    while line:
+        lines = [line]
+        id = line[:12]
+        ids.append(id)
+        last_id = id
+        line = f.readline()
+        while line:
+            id = line[:12]
+            if id != last_id:
+                break
+            lines.append(line)
+            line = f.readline()
+        series, begin = from_lines(lines)
+        st_id = last_id[:11]
+        dict = info[st_id].copy()
+        dict['begin'] = begin
+        dict['source'] = sources.get(last_id, 'UNKNOWN')
+        dict['id' ] = last_id
+        if last_id[:11] != id11:
+          yield (id11, iterdict)
+          iterdict = {}
+          id11 = last_id[:11]
+        iterdict[last_id] = (dict, series)
+    yield (id11, iterdict)
 
-# from comb_records.py
-# 
-# Note that unlike the other phases, some of this code was shared with
-# comb_pieces.py
-
-BAD = '???'
+BAD = 9999 / 10.0
+BAD = 0.1 * int(BAD * 10.0)
 MIN_OVERLAP = 4
+comb_log = None
 
 def average(new_sums, new_counts, new_data, years):
     for m in range(12):
@@ -406,7 +343,7 @@ def add(new_sums, new_wgts, diff, begin, record):
 
 def get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records):
     average(new_sums, new_wgts, new_data, years)
-    ann_mean, ann_anoms = monthly_annual(new_data, BAD)
+    ann_mean, ann_anoms = monthly_annual(new_data)
     overlap = 0
     length = 0
     for rec_id, record in records.items():
@@ -437,16 +374,16 @@ def get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records):
         return 0, 0, BAD
     return best_record, best_id, diff
 
-def combine(new_sums, new_wgts, new_data, begin, years, records, log):
+def combine(new_sums, new_wgts, new_data, begin, years, records):
     while records:
         record, rec_id, diff = get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records)
         if abs(diff - BAD) < 0.1:
-            log.write("\tno other records okay\n")
+            comb_log.write("\tno other records okay\n")
             return
         del records[rec_id]
         add(new_sums, new_wgts, diff, begin, record)
         rec_begin = record['dict']['begin']
-        log.write("\t %s %d %d %f\n" % (rec_id, rec_begin, record['years'] + rec_begin - 1, diff))
+        comb_log.write("\t %s %d %d %f\n" % (rec_id, rec_begin, record['years'] + rec_begin - 1, diff))
 
 def get_best(records):
     ranks = {'MCDW': 4, 'USHCN2': 3, 'SUMOFDAY': 2, 'UNKNOWN': 1}
@@ -471,28 +408,29 @@ def get_best(records):
         return best_rec, best_id
     return longest_rec, longest_id
 
-def get_records(old_db, rec_ids):
-    res = {}
+def make_record_dict(records, ids):
+    record_dict = {}
     min, max = 9999, -9999
-    for rec_id in rec_ids:
-        s = old_db[rec_id]
-        st = StationString(s)
-        begin = st.dict['begin']
-        end = begin + st.years - 1
+    for rec_id in ids:
+        s = records[rec_id]
+        (dict, data) = s
+        begin = dict['begin']
+        years = len(data[0])
+        end = begin + years - 1
         if min > begin:
             min = begin
         if max < end:
             max = end
-        ann_mean, ann_anoms = monthly_annual(st.data, BAD)
+        ann_mean, ann_anoms = monthly_annual(data)
         length = 0
         for anom in ann_anoms:
             if anom != BAD:
                 length = length + 1
-        res[rec_id] = {'dict': st.dict, 'data': st.data,
-                       'string': s, 'years': st.years,
-                       'length': length, 'ann_anoms': ann_anoms,
-                       'ann_mean': ann_mean}
-    return res, min, max
+        record_dict[rec_id] = {'dict': dict, 'data': data,
+                               'string': s, 'years': years,
+                               'length': length, 'ann_anoms': ann_anoms,
+                               'ann_mean': ann_mean}
+    return record_dict, min, max
 
 def records_get_new_data(record, begin, years):
     sums, wgts, data = [None] * 12, [None] * 12, [None] *12
@@ -513,75 +451,38 @@ def records_get_new_data(record, begin, years):
         wgts[m] = wgts_row
     return sums, wgts, data
 
-def get_ids(db):
-    """From a bdb file return a pair (*ids*, *dict*) where *ids* is a
-    sorted list of 11-digit (string) station IDs, and *dict* maps
-    11-digit station ID to a list of all 12-digit IDs (in other words,
-    including the GHCN duplicate number) used for that station.
-    """
+def comb_records(stream):
+    global comb_log
+    comb_log = open('log/comb.log','w')
 
-    ids = db['IDS'].split()
-    dict = {}
-    for rec_id in ids:
-        id = rec_id[:-1]
-        if not dict.has_key(id):
-            dict[id] = []
-        dict[id].append(rec_id)
-    ids = dict.keys()
-    ids.sort()
-    return ids, dict
-
-def comb_records(db_name):
-    """Take database handle, combine records, return new database
-    handle."""
-
-    new_db_name = db_name.split('.')
-    # Insert 'combined' just before last component of old name.
-    new_db_name[-1:-1] = ['combined']
-    new_db_name = '.'.join(new_db_name)
-
-    log = open('log/comb.log','w')
-    print "opening db file '%s'" % db_name
-    old_db = bsddb.hashopen(db_name, 'r')
-    print "creating db file '%s'" % new_db_name
-    new_db = bsddb.hashopen(new_db_name, 'n')
-    global BAD
-    BAD = int(old_db["IBAD"]) / 10.0
-    BAD = 0.1 * int(BAD * 10.0)
-
-    ids, rec_id_dict = get_ids(old_db)
-    new_ids = []
-    for id in ids:
-        rec_ids = rec_id_dict[id]
-        log.write('%s\n' % id)
+    for (id, records) in stream:
+        comb_log.write('%s\n' % id)
+        iterdict = {}
+        ids = records.keys()
         while 1:
-            records, begin, end = get_records(old_db, rec_ids)
-            if len(records) == 1:
-                rec_id, record = records.items()[0]
-                new_db[rec_id] = record['string']
-                new_ids.append(rec_id)
+            record_dict, begin, end = make_record_dict(records, ids)
+            if len(record_dict) == 1:
+                rec_id, record = record_dict.items()[0]
+                iterdict[rec_id] = (record['dict'],record['data'])
+                yield (id, iterdict)
                 break
             years = end - begin + 1
-            record, rec_id = get_best(records)
+            record, rec_id = get_best(record_dict)
             rec_dict = record['dict']
             source = rec_dict['source']
-            del records[rec_id]
+            del record_dict[rec_id]
             new_sums, new_wgts, new_data = records_get_new_data(record, begin, years)
             new_dict = rec_dict.copy()
-            log.write ("\t%s %s %s -- %s\n" % (rec_id, begin, end,source))
-            combine(new_sums, new_wgts, new_data, begin, years, records, log)
+            comb_log.write ("\t%s %s %s -- %s\n" % (rec_id, begin, end,source))
+            combine(new_sums, new_wgts, new_data, begin, years, record_dict)
             begin = final_average(new_sums, new_wgts, new_data, years, begin)
             new_dict['begin'] = begin
-            new_db[rec_id] = serialize(new_dict, new_data)
-            new_ids.append(rec_id)
-            rec_ids = records.keys()
-            if not rec_ids:
-                break
-    new_db['IDS'] = ' '.join(new_ids)
-    log.close()
-    return new_db_name
-
-# From comb_pieces.py.
+            iterdict[rec_id] = (new_dict, new_data)
+            ids = record_dict.keys()
+            if not ids:
+              yield (id, iterdict)
+              break
+    comb_log.close()
 
 MIN_MID_YEARS = 5            # MIN_MID_YEARS years closest to ymid
 BUCKET_RADIUS = 10
@@ -602,7 +503,7 @@ def sigma(list, bad):
 
 def pieces_get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records):
     average(new_sums, new_wgts, new_data, years)
-    ann_mean, ann_anoms = monthly_annual(new_data, BAD)
+    ann_mean, ann_anoms = monthly_annual(new_data)
     overlap = 0
     length = 0
     for rec_id, record in records.items():
@@ -657,7 +558,7 @@ def find_quintuples(new_sums, new_wgts, new_data,
     pieces_log.write("max begin: %s\tmin end: %s\n" % (max_begin, min_end))
 
     average(new_sums, new_wgts, new_data, years)
-    ann_mean, sublist1 = monthly_annual(new_data, BAD)
+    ann_mean, sublist1 = monthly_annual(new_data)
     ann_std_dev = sigma(sublist1, BAD)
     pieces_log.write("ann_std_dev = %s\n" % ann_std_dev)
     offset1 = (middle_year - begin)
@@ -752,31 +653,28 @@ def get_helena_dict():
         helena_ds[id[:-1]] = (id, int(year), int(month), float(summand))
     return helena_ds
 
-def comb_pieces(db_name):
+def comb_pieces(stream):
     global pieces_log
     pieces_log = open('log/pieces.log','w')
-    print "opening db file '%s'" % db_name
-    db = bsddb.hashopen(db_name, 'r')
     helena_ds = get_helena_dict()
 
-    ids, rec_id_dict = get_ids(db)
-    for id in ids:
-        rec_ids = rec_id_dict[id]
+    for (id, records) in stream:
         pieces_log.write('%s\n' % id)
+        ids = records.keys()
         while 1:
-            records, begin, end = get_records(db, rec_ids)
+            record_dict, begin, end = make_record_dict(records, ids)
 
-            if len(records) == 1:
-                rec_id, record = records.items()[0]
+            if len(record_dict) == 1:
+                rec_id, record = record_dict.items()[0]
                 yield (record['dict'], record['data'])
                 break
 
             if helena_ds.has_key(id):
                 id1, this_year, month, summand = helena_ds[id]
-                dict = records[id1]['dict']
-                data = records[id1]['data']
+                dict = record_dict[id1]['dict']
+                data = record_dict[id1]['data']
                 begin = dict['begin']
-                years = records[id1]['years']
+                years = record_dict[id1]['years']
                 for n in range(years):
                     year = n + begin
                     if year > this_year:
@@ -789,24 +687,24 @@ def comb_pieces(db_name):
                             continue
                         data[m][n] = datum + summand
                 del helena_ds[id]
-                ann_mean, ann_anoms = monthly_annual(data, BAD)
-                records[id1]['ann_anoms'] = ann_anoms
-                records[id1]['ann_mean'] = ann_mean
+                ann_mean, ann_anoms = monthly_annual(data)
+                record_dict[id1]['ann_anoms'] = ann_anoms
+                record_dict[id1]['ann_mean'] = ann_mean
 
-            record, rec_id = get_longest(records)
+            record, rec_id = get_longest(record_dict)
             years = end - begin + 1
             rec_dict = record['dict']
             source = rec_dict['source']
-            del records[rec_id]
+            del record_dict[rec_id]
             new_sums, new_wgts, new_data = records_get_new_data(record, begin, years)
             new_dict = rec_dict.copy()
             pieces_log.write("\t%s %s %s -- %s\n" % (rec_id, begin, begin + years -1,source))
-            pieces_combine(new_sums, new_wgts, new_data, begin, years, records, rec_id)
+            pieces_combine(new_sums, new_wgts, new_data, begin, years, record_dict, rec_id)
             begin = final_average(new_sums, new_wgts, new_data, years, begin)
             new_dict['begin'] = begin
             yield (new_dict, new_data)
-            rec_ids = records.keys()
-            if not records.keys():
+            ids = record_dict.keys()
+            if not ids:
                 break
 
 def get_changes_dict():
@@ -906,6 +804,16 @@ def alter_discont(data):
                         series[m][index] += a_num
         yield(dict, series)
 
+def to_text(dict, series):
+    begin = dict['begin']
+    t = ' %4d%5d%s%4s%-36s\n' % (math.floor(dict['lat']*10+0.5),
+                                 math.floor(dict['lon']*10+0.5),
+                                 dict['id'], dict['elevs'], dict['name'])
+    for y in range(len(series[0])):
+        l = map(lambda m: "%5d" % math.floor(series[m][y] * 10.0 + 0.5), range(12))
+        t += '%4d%s\n' % (y + begin, ''.join(l))
+    return t
+
 def write_to_file(data, file):
     """Writes *data* (an iterable of (dict, series) pairs) to the file
     named *file*.
@@ -913,39 +821,29 @@ def write_to_file(data, file):
 
     f = open(file, 'w')
     for (dict, series) in data:
-            begin = dict['begin']
-            f.write(' %4d%5d%s%4s%-36s\n' % (math.floor(dict['lat']*10+0.5),
-                                             math.floor(dict['lon']*10+0.5),
-                                             dict['id'], dict['elevs'], dict['name']))
-            for y in range(len(series[0])):
-                l = map(lambda m: "%5d" % math.floor(series[m][y] * 10.0 + 0.5), range(12))
-                f.write('%4d%s\n' % (y + begin, ''.join(l)))
+      f.write(to_text(dict, series))
     f.close()
 
+def results():
+  data = read_v2()
+  records = comb_records(data)
+  combined_pieces = comb_pieces(records)
+  without_strange = drop_strange(combined_pieces)
+  return alter_discont(without_strange)
+
 def main():
-  db = v2_to_bdb('v2.mean_comb')
-  db = comb_records(db)
-  combined_data = comb_pieces(db)
-  without_strange = drop_strange(combined_data)
-  without_discontinuities = alter_discont(without_strange)
-  write_to_file(without_discontinuities, 'work/Ts.txt')
+  write_to_file(results(), 'work/Ts.txt')
 
 if __name__ == '__main__':
   main()
 
 # Notes:
 #
-# The records in each BDB are as follows:
-# 
-# IDS -> space-separated list of station IDs
-# BAD -> '9999'
-# id  -> station data (format defined by stationstring.serialize)
-# 
-# 1. v2_to_bdb() creates v2.mean_comb.bdb containing the same data as v2.mean_comb.
+# 1. read_v2() reads work/v2.mean_comb
 #
-# 2. comb_records() creates v2.mean_comb.combined.bdb and comb.log
+# 2. comb_records() is a filter
 #
-# 3. comb_pieces() returns a generator and makes piece.log
+# 3. comb_pieces() is a filter
 #
 # 4. drop_strange() is a filter
 #

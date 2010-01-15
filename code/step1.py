@@ -253,12 +253,12 @@ def monthly_annual(data, bad):
 # From v2_to_bdb.py
 
 def v2_fill_dbm(f, dbm, info, sources):
-    """All of the temperature data in *f* are written to the bsddb in
-    *dbm* (one record per station).  As the station data is read the
-    station metadata in *info* is updated so that info[st_id]['begin']
-    is the first year for which there is data, and info[st_id]['source']
-    is the source of that data (extracted from the *sources*
-    dictionary).
+    """All of the temperature data in *f* are written to the mapping
+    object *dbm* (one (key,value) pair per station).  As the station
+    data is read the station metadata in *info* is updated so that
+    info[st_id]['begin'] is the first year for which there is data,
+    and info[st_id]['source'] is the source of that data (extracted
+    from the *sources* dictionary).
     """
 
     ids = []
@@ -285,7 +285,6 @@ def v2_fill_dbm(f, dbm, info, sources):
         dbm[last_id] = mystring
     dbm['IDS'] = ' '.join(ids)
     dbm['IBAD'] = '9999'
-    dbm.close()
 
 def v2_get_sources():
     """Reads the three tables mcdw.tbl, ushcn2.tbl, sumofday.tbl and
@@ -328,6 +327,10 @@ def v2_get_info():
     return info
 
 def v2_to_bdb(infile_name):
+    """Convert *infile_name*, temperature records in GHCN V2 format, to
+    a database, and return a handle to that database.
+    """
+
     bdb_name = 'work/' + infile_name + '.bdb'
     f = open('work/' + infile_name, 'r')
     print "reading " + infile_name
@@ -336,6 +339,8 @@ def v2_to_bdb(infile_name):
     dbm = bsddb.hashopen(bdb_name, 'n')
     print "writing " + bdb_name
     v2_fill_dbm(f, dbm, info, sources)
+    dbm.close()
+    return bdb_name
 
 # from comb_records.py
 # 
@@ -344,7 +349,6 @@ def v2_to_bdb(infile_name):
 
 BAD = '???'
 MIN_OVERLAP = 4
-comb_log = None
 
 def average(new_sums, new_counts, new_data, years):
     for m in range(12):
@@ -433,16 +437,16 @@ def get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records):
         return 0, 0, BAD
     return best_record, best_id, diff
 
-def combine(new_sums, new_wgts, new_data, begin, years, records):
+def combine(new_sums, new_wgts, new_data, begin, years, records, log):
     while records:
         record, rec_id, diff = get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records)
         if abs(diff - BAD) < 0.1:
-            comb_log.write("\tno other records okay\n")
+            log.write("\tno other records okay\n")
             return
         del records[rec_id]
         add(new_sums, new_wgts, diff, begin, record)
         rec_begin = record['dict']['begin']
-        comb_log.write("\t %s %d %d %f\n" % (rec_id, rec_begin, record['years'] + rec_begin - 1, diff))
+        log.write("\t %s %d %d %f\n" % (rec_id, rec_begin, record['years'] + rec_begin - 1, diff))
 
 def get_best(records):
     ranks = {'MCDW': 4, 'USHCN2': 3, 'SUMOFDAY': 2, 'UNKNOWN': 1}
@@ -527,11 +531,18 @@ def get_ids(db):
     ids.sort()
     return ids, dict
 
-def comb_records(old_db_name, new_db_name):
-    global comb_log
-    comb_log = open('log/comb.log','w')
-    print "opening db file '%s'" % old_db_name
-    old_db = bsddb.hashopen(old_db_name, 'r')
+def comb_records(db_name):
+    """Take database handle, combine records, return new database
+    handle."""
+
+    new_db_name = db_name.split('.')
+    # Insert 'combined' just before last component of old name.
+    new_db_name[-1:-1] = ['combined']
+    new_db_name = '.'.join(new_db_name)
+
+    log = open('log/comb.log','w')
+    print "opening db file '%s'" % db_name
+    old_db = bsddb.hashopen(db_name, 'r')
     print "creating db file '%s'" % new_db_name
     new_db = bsddb.hashopen(new_db_name, 'n')
     global BAD
@@ -542,7 +553,7 @@ def comb_records(old_db_name, new_db_name):
     new_ids = []
     for id in ids:
         rec_ids = rec_id_dict[id]
-        comb_log.write('%s\n' % id)
+        log.write('%s\n' % id)
         while 1:
             records, begin, end = get_records(old_db, rec_ids)
             if len(records) == 1:
@@ -557,8 +568,8 @@ def comb_records(old_db_name, new_db_name):
             del records[rec_id]
             new_sums, new_wgts, new_data = records_get_new_data(record, begin, years)
             new_dict = rec_dict.copy()
-            comb_log.write ("\t%s %s %s -- %s\n" % (rec_id, begin, end,source))
-            combine(new_sums, new_wgts, new_data, begin, years, records)
+            log.write ("\t%s %s %s -- %s\n" % (rec_id, begin, end,source))
+            combine(new_sums, new_wgts, new_data, begin, years, records, log)
             begin = final_average(new_sums, new_wgts, new_data, years, begin)
             new_dict['begin'] = begin
             new_db[rec_id] = serialize(new_dict, new_data)
@@ -567,7 +578,8 @@ def comb_records(old_db_name, new_db_name):
             if not rec_ids:
                 break
     new_db['IDS'] = ' '.join(new_ids)
-    comb_log.close()
+    log.close()
+    return new_db_name
 
 # From comb_pieces.py.
 
@@ -911,9 +923,9 @@ def write_to_file(data, file):
     f.close()
 
 def main():
-  v2_to_bdb('v2.mean_comb')
-  comb_records('work/v2.mean_comb.bdb', 'work/v2.mean_comb.combined.bdb')
-  combined_data = comb_pieces('work/v2.mean_comb.combined.bdb')
+  db = v2_to_bdb('v2.mean_comb')
+  db = comb_records(db)
+  combined_data = comb_pieces(db)
   without_strange = drop_strange(combined_data)
   without_discontinuities = alter_discont(without_strange)
   write_to_file(without_discontinuities, 'work/Ts.txt')

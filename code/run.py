@@ -53,60 +53,8 @@ def run_step1():
 
 def run_step2():
     log("====> STEP 2 ====")
-
-    # Save standard output so we can restore it when we're done with this step.
-    old_stdout = sys.stdout
-
-    log("... converting text to binary file")
-    year = open(os.path.join('work', 'GHCN.last_year'), 'r').read().strip()
-    log("... last year = %s" % year)
-    import text_to_binary
-    text_to_binary.main([year])
-
-    # At this point we may need to reorder the Ts.bin/Ts.txt file so
-    # that all the stations between +60.1 and +90.0 comes first, then
-    # all the stations between +30.1 and +60.0 come next, and so on.
-    # Thus reflecting how they get re-ordered when they are split into 6
-    # files.
-    # Not doing the reordering makes a tiny amount of difference, see
-    # http://code.google.com/p/ccc-gistemp/issues/detail?id=25
-    # But if you feel like doing, you'll need to look at the, now
-    # deleted, split_binary.py program to see exactly how the split
-    # happens.
-
-    log("... trimming Ts.bin")
-    import trim_binary
-    trim_binary.main([])
-
-    log("... Making station list")
-    import invnt
-    sys.stdout = open(os.path.join('log', 'Ts.GHCN.CL.station.list'), 'w')
-    invnt.main([os.path.join('work', 'Ts.GHCN.CL')])
-    sys.stdout.close()
-
-    log("... Creating annual anomalies")
-    import toANNanom
-    toANNanom.main([])
-    import PApars
-    sys.stdout = open(os.path.join('log', 'PApars.GHCN.CL.1000.20.log'), 'w')
-    PApars.main(['1000', '20'])
-    import flags
-    flags.main([])
-    sys.stdout.close()
-
-    log("... Applying peri-urban adjustment")
-    import padjust
-    sys.stdout = open(os.path.join('log', 'padjust.log'), 'w')
-    padjust.main([])
-    sys.stdout.close()
-
-    log("... Making station list")
-    sys.stdout = open(os.path.join('log', 'Ts.GHCN.CL.PA.station.list'), 'w')
-    invnt.main([os.path.join('work', 'Ts.GHCN.CL.PA')])
-    sys.stdout.close()
-
-    # Restore standard output.
-    sys.stdout = old_stdout
+    import step2
+    step2.main()
 
 def run_step3():
     log("====> STEP 3 ====")

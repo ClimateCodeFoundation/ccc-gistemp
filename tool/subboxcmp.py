@@ -28,6 +28,7 @@
 # Record numbers start at 0 for the first record in the file which is a
 # header.  Thus the records corresponding to subboxes are from 1 to 8000
 
+sys.path.append(os.path.join(os.getcwd(),'code'))
 import fort
 import struct
 import sys

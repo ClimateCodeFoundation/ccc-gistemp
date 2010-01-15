@@ -55,6 +55,7 @@
 # compatible versions.
 
 # Ravenbrook
+sys.path.append(os.path.join(os.getcwd(),'code'))
 import fort
 # http://www.python.org/doc/2.3.5/lib/module-getopt.html
 import getopt

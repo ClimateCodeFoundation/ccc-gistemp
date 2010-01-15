@@ -36,6 +36,7 @@ import sys
 # http://www.python.org/doc/2.4.4/lib/module-xml.sax.saxutils.html
 import xml.sax.saxutils
 # Clear Climate Code
+sys.path.append(os.path.join(os.getcwd(),'code'))
 import fort
 import vischeck
 

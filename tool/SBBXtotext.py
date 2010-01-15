@@ -17,6 +17,7 @@ The plan is for this tool (SBBXtotext) to evolve into the preferred tool.
 """
 
 # Ravenbrook
+sys.path.append(os.path.join(os.getcwd(),'code'))
 import subbox
 
 def totext(inp, out, metaonly=False, bos='>', trimmed=None):

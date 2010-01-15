@@ -8,6 +8,7 @@
 # 
 # Nick Barnes.  Ravenbrook Limited.
 
+sys.path.append(os.path.join(os.getcwd(),'code'))
 import fort
 import struct
 import sys

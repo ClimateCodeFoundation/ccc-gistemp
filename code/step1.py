@@ -37,8 +37,14 @@ Also requires the existence of writeable work/ and log/ directories.
 
 import math, struct, array
 
-def FEQUALS(x, y):
-  return abs(x - y) < 0.1
+BAD = 9999 / 10.0
+BAD = 0.1 * int(BAD * 10.0)
+
+def invalid(x):
+  return abs(x - BAD) < 0.1
+
+def valid(x):
+  return not invalid(x)
 
 # For each station record we carry around a dict and a series of
 # temperature records.  The series is a 2D array of floating-point
@@ -109,98 +115,99 @@ def from_lines(lines):
         series[m][index] = datum * 0.1
     return (series, begin)
 
-# Computing a mean and set of annual anomalies.  This has a particular
-# algorithm (via monthly and then seasonal means and anomalies, with
-# particular thresholds for missing values at each step), which must
-# be maintained for bit-for-bit compatibility with GISTEMP; maybe we
-# can drop it later.
-
 def monthly_annual(data):
-        years = len(data[0])
-        # compute monthly means and anomalies   
-        monthly_means = array.array('d',[BAD]*12)
-        monthly_anoms = []
-        for m in range(12):
-            row = data[m]
-            sum = 0.0
-            count = 0
-            for n in range(years):
-                datum = row[n]
-                if not FEQUALS(datum, BAD):
-                    sum += datum
-                    count += 1
-            if count > 0:
-                monthly_means[m] = sum/count
-            mean = monthly_means[m]
-            monthly_anoms_row = array.array('d',[BAD]*years)
-            for n in range(years):
-                datum = row[n]
-                if (not FEQUALS(mean, BAD) and not FEQUALS(datum, BAD)):
-                    monthly_anoms_row[n] = datum - mean
-            monthly_anoms.append(monthly_anoms_row)
+    """Computing a mean and set of annual anomalies.  This has a particular
+    algorithm (via monthly and then seasonal means and anomalies, with
+    particular thresholds for missing values at each step), which must
+    be maintained for bit-for-bit compatibility with GISTEMP; maybe we
+    can drop it later.
+    """
 
-        seasonal_means = array.array('d',[BAD, BAD, BAD, BAD])
-        seasonal_anoms = []
-        # compute seasonal anomalies
-        for s in range(4):
-            if s == 0:
-                months = [11, 0, 1]
-            else:
-                months = range(s*3-1, s*3+2)
+    years = len(data[0])
+    # compute monthly means and anomalies   
+    monthly_means = array.array('d',[BAD]*12)
+    monthly_anoms = []
+    for m in range(12):
+        row = data[m]
+        sum = 0.0
+        count = 0
+        for n in range(years):
+            datum = row[n]
+            if valid(datum):
+                sum += datum
+                count += 1
+        if count > 0:
+            monthly_means[m] = sum/count
+        mean = monthly_means[m]
+        monthly_anoms_row = array.array('d',[BAD]*years)
+        for n in range(years):
+            datum = row[n]
+            if (valid(mean) and valid(datum)):
+                monthly_anoms_row[n] = datum - mean
+        monthly_anoms.append(monthly_anoms_row)
+
+    seasonal_means = array.array('d',[BAD, BAD, BAD, BAD])
+    seasonal_anoms = []
+    # compute seasonal anomalies
+    for s in range(4):
+        if s == 0:
+            months = [11, 0, 1]
+        else:
+            months = range(s*3-1, s*3+2)
+        sum = 0.0
+        count = 0
+        for i in range(3):
+            m = months[i]
+            monthly_mean = monthly_means[m]
+            if valid(monthly_mean):
+                sum += monthly_mean
+                count += 1
+        if count > 1:
+            seasonal_means[s] = sum / count
+        seasonal_anoms_row = array.array('d', [BAD] * years)
+        for n in range(years):
             sum = 0.0
             count = 0
             for i in range(3):
                 m = months[i]
-                monthly_mean = monthly_means[m]
-                if not FEQUALS(monthly_mean, BAD):
-                    sum += monthly_mean
+                if m == 11:
+                  if n == 0:
+                    continue
+                  else:
+                    monthly_anom = monthly_anoms[m][n-1]
+                else:
+                    monthly_anom = monthly_anoms[m][n]
+                if valid(monthly_anom):
+                    sum += monthly_anom
                     count += 1
             if count > 1:
-                seasonal_means[s] = sum / count
-            seasonal_anoms_row = array.array('d', [BAD] * years)
-            for n in range(years):
-                sum = 0.0
-                count = 0
-                for i in range(3):
-                    m = months[i]
-                    if m == 11:
-                      if n == 0:
-                        continue
-                      else:
-                        monthly_anom = monthly_anoms[m][n-1]
-                    else:
-                        monthly_anom = monthly_anoms[m][n]
-                    if not FEQUALS(monthly_anom, BAD):
-                        sum += monthly_anom
-                        count += 1
-                if count > 1:
-                    seasonal_anoms_row[n] = sum / count
-            seasonal_anoms.append(seasonal_anoms_row)
-        
-        # annual mean and anomalies
+                seasonal_anoms_row[n] = sum / count
+        seasonal_anoms.append(seasonal_anoms_row)
+    
+    # annual mean and anomalies
+    sum = 0.0
+    count = 0
+    for s in range(4):
+        seasonal_mean = seasonal_means[s]
+        if valid(seasonal_mean):
+            sum += seasonal_mean
+            count += 1
+    if count > 2:
+            annual_mean = sum / count
+    else:
+            annual_mean = BAD
+    annual_anoms = array.array('d',[BAD]*years)
+    for n in range(years):
         sum = 0.0
         count = 0
         for s in range(4):
-            seasonal_mean = seasonal_means[s]
-            if not FEQUALS(seasonal_mean, BAD):
-                sum += seasonal_mean
+            anom = seasonal_anoms[s][n]
+            if valid(anom):
+                sum += anom
                 count += 1
         if count > 2:
-                annual_mean = sum / count
-        else:
-                annual_mean = BAD
-        annual_anoms = array.array('d',[BAD]*years)
-        for n in range(years):
-            sum = 0.0
-            count = 0
-            for s in range(4):
-                anom = seasonal_anoms[s][n]
-                if not FEQUALS(anom, BAD):
-                    sum += anom
-                    count += 1
-            if count > 2:
-                annual_anoms[n] = sum / count
-        return (annual_mean, annual_anoms)
+            annual_anoms[n] = sum / count
+    return (annual_mean, annual_anoms)
 
 def v2_get_sources():
     """Reads the three tables mcdw.tbl, ushcn2.tbl, sumofday.tbl and
@@ -291,8 +298,6 @@ def round_series(series):
       series[m][n] = float(math.floor(series[m][n] * 10.0 + 0.5)) * 0.1
   return series
 
-BAD = 9999 / 10.0
-BAD = 0.1 * int(BAD * 10.0)
 MIN_OVERLAP = 4
 comb_log = None
 
@@ -343,7 +348,7 @@ def add(new_sums, new_wgts, diff, begin, record):
         data_row = rec_data[m]
         for n in range(rec_years):
             datum = data_row[n]
-            if abs(datum - BAD) < 0.1:
+            if invalid(datum):
                 continue
             year = n + rec_begin
             index = year - begin
@@ -363,11 +368,11 @@ def get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records):
         sum = wgt = 0
         for n in range(rec_years):
             rec_anom = rec_ann_anoms[n]
-            if abs(rec_anom - BAD) < 0.1:
+            if invalid(rec_anom):
                 continue
             year = n + rec_begin
             anom = ann_anoms[year - begin]
-            if abs(anom - BAD) < 0.1:
+            if invalid(anom):
                 continue
             wgt = wgt + 1
             sum = sum + (rec_ann_mean + rec_anom) - (ann_mean + anom)
@@ -386,7 +391,7 @@ def get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records):
 def combine(new_sums, new_wgts, new_data, begin, years, records):
     while records:
         record, rec_id, diff = get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records)
-        if abs(diff - BAD) < 0.1:
+        if invalid(diff):
             comb_log.write("\tno other records okay\n")
             return
         del records[rec_id]
@@ -433,7 +438,7 @@ def make_record_dict(records, ids):
         ann_mean, ann_anoms = monthly_annual(data)
         length = 0
         for anom in ann_anoms:
-            if anom != BAD:
+            if valid(anom):
                 length = length + 1
         record_dict[rec_id] = {'dict': dict, 'data': data,
                                'string': s, 'years': years,
@@ -451,7 +456,7 @@ def records_get_new_data(record, begin, years):
         rec_row = rec_data[m]
         for n in range(rec_years):
             datum = rec_row[n]
-            if abs(datum - BAD) < 0.1:
+            if invalid(datum):
                 continue
             index = n + rec_begin - begin
             sums_row[index] = datum
@@ -497,15 +502,16 @@ MIN_MID_YEARS = 5            # MIN_MID_YEARS years closest to ymid
 BUCKET_RADIUS = 10
 pieces_log = None
 
-def sigma(list, bad):
+def sigma(list):
     sos = sum = count = 0
     for x in list:
-        if x == bad: continue
+        if invalid(x):
+          continue
         sos = sos + x * x
         sum = sum + x
         count = count + 1
     if count == 0:
-        return bad
+        return BAD
     else:
         mean = sum/count
         return math.sqrt(sos / count - mean * mean)
@@ -522,11 +528,11 @@ def pieces_get_longest_overlap(new_sums, new_wgts, new_data, begin, years, recor
         sum = wgt = 0
         for n in range(rec_years):
             rec_anom = rec_ann_anoms[n]
-            if abs(rec_anom - BAD) < 0.1:
+            if invalid(rec_anom):
                 continue
             year = n + rec_begin
             anom = ann_anoms[year - begin]
-            if abs(anom - BAD) < 0.1:
+            if invalid(anom):
                 continue
             wgt = wgt + 1
             sum = sum + rec_anom - anom
@@ -568,7 +574,7 @@ def find_quintuples(new_sums, new_wgts, new_data,
 
     average(new_sums, new_wgts, new_data, years)
     ann_mean, sublist1 = monthly_annual(new_data)
-    ann_std_dev = sigma(sublist1, BAD)
+    ann_std_dev = sigma(sublist1)
     pieces_log.write("ann_std_dev = %s\n" % ann_std_dev)
     offset1 = (middle_year - begin)
     len1 = len(sublist1)
@@ -597,10 +603,10 @@ def find_quintuples(new_sums, new_wgts, new_data,
                     anom2 = BAD
                 else:
                     anom2 = sublist2[index2]
-                if anom1 != BAD:
+                if valid(anom1):
                     sum1 = sum1 + anom1 + ann_mean
                     count1 = count1 + 1
-                if anom2 != BAD:
+                if valid(anom2):
                     sum2 = sum2 + anom2 + rec_ann_mean
                     count2 = count2 + 1
         if count1 >= MIN_MID_YEARS and count2 >= MIN_MID_YEARS:
@@ -692,7 +698,7 @@ def comb_pieces(stream):
                         if year == this_year and m > month:
                             break
                         datum = data[m][n]
-                        if datum == BAD:
+                        if invalid(datum):
                             continue
                         data[m][n] = datum + summand
                 del helena_ds[id]
@@ -809,7 +815,7 @@ def alter_discont(data):
                 for m in range(12):
                     if year == a_year and m > a_month - 2:
                         continue
-                    if series[m][index] != BAD:
+                    if valid(series[m][index]):
                         series[m][index] += a_num
         yield(dict, series)
 

@@ -41,10 +41,18 @@ BAD = 9999 / 10.0
 BAD = 0.1 * int(BAD * 10.0)
 
 def invalid(x):
-  return abs(x - BAD) < 0.1
+    """Test for invalid datum ("equal" to the BAD value, for some
+    definition of "equal").
+    """
+
+    return abs(x - BAD) < 0.1
 
 def valid(x):
-  return not invalid(x)
+    """Test for valid datum.  See invalid()."""
+
+    # It's important that this obey Iverson's convention: in other words
+    # return 0 or 1 (or False or True, which it does).
+    return not invalid(x)
 
 # For each station record we carry around a dict and a series of
 # temperature records.  The series is a 2D array of floating-point
@@ -97,22 +105,20 @@ def from_lines(lines):
     begin = 9999
     end = 0
     for line in lines:
-      year = int(line[12:16])
-      if year < begin:
-        begin = year
-      if year > end:
-        end = year
+        year = int(line[12:16])
+        begin = min(year, begin)
+        end = max(year, end)
     years = end - begin + 1
     l = [999.9]*years
     series = map(lambda x: array.array('d',l), range(12))
     for line in lines:
-      year = int(line[12:16])
-      index = year-begin
-      for m in range(12):
-        datum = int(line[16+5*m:21+5*m])
-        if datum == -9999:
-          datum = 9999
-        series[m][index] = datum * 0.1
+        year = int(line[12:16])
+        index = year-begin
+        for m in range(12):
+            datum = int(line[16+5*m:21+5*m])
+            if datum == -9999:
+                datum = 9999
+            series[m][index] = datum * 0.1
     return (series, begin)
 
 def monthly_annual(data):
@@ -141,7 +147,7 @@ def monthly_annual(data):
         monthly_anoms_row = array.array('d',[BAD]*years)
         for n in range(years):
             datum = row[n]
-            if (valid(mean) and valid(datum)):
+            if valid(mean) and valid(datum):
                 monthly_anoms_row[n] = datum - mean
         monthly_anoms.append(monthly_anoms_row)
 
@@ -171,10 +177,10 @@ def monthly_annual(data):
             count = 0
             for m in months:
                 if m == 11:
-                  if n == 0:
-                    continue
-                  else:
-                    monthly_anom = monthly_anoms[m][n-1]
+                    if n == 0:
+                        continue
+                    else:
+                        monthly_anom = monthly_anoms[m][n-1]
                 else:
                     monthly_anom = monthly_anoms[m][n]
                 if valid(monthly_anom):
@@ -196,9 +202,9 @@ def monthly_annual(data):
             count += 1
     # need 3 valid seasons for a valid year
     if count > 2:
-            annual_mean = sum / count
+        annual_mean = sum / count
     else:
-            annual_mean = BAD
+        annual_mean = BAD
     annual_anoms = array.array('d',[BAD]*years)
     for n in range(years):
         sum = 0.0
@@ -294,13 +300,14 @@ def read_v2():
     yield (id11, iterdict)
 
 def round_series(series):
-  """Round every element in *series*, in-place, to the nearest 0.1.  Returns *series*.
-  """
+    """Round every element in *series*, in-place, to the nearest 0.1.
+    Returns *series*.
+    """
 
-  for m in range(12):
-    for n in range(len(series[m])):
-      series[m][n] = float(math.floor(series[m][n] * 10.0 + 0.5)) * 0.1
-  return series
+    for m in range(12):
+        for n in range(len(series[m])):
+            series[m][n] = float(math.floor(series[m][n] * 10.0 + 0.5)) * 0.1
+    return series
 
 MIN_OVERLAP = 4
 comb_log = None
@@ -313,7 +320,7 @@ def average(new_sums, new_counts, new_data, years):
                 new_data[m][n] = new_sums[m][n] / count
 
 def final_average(new_sums, new_wgts, new_data, years, begin):
-    min, max = 9999, -9999
+    y_min, y_max = 9999, -9999
     for m in range(12):
         mon_min, mon_max = 9999, -9999
         wgts_row = new_wgts[m]
@@ -321,23 +328,19 @@ def final_average(new_sums, new_wgts, new_data, years, begin):
             wgt = wgts_row[n]
             if wgt == 0:
                 continue
-            if mon_min > n:
-                mon_min = n
-            if mon_max < n:
-                mon_max = n
-        if min > mon_min:
-            min = mon_min
-        if max < mon_max:
-            max = mon_max
-    if min == 0 and max == years - 1:
+            mon_min = min(mon_min, n)
+            mon_max = max(mon_max, n)
+        y_min = min(y_min, mon_min)
+        y_max = max(y_max, mon_max)
+    if y_min == 0 and y_max == years - 1:
         average(new_sums, new_wgts, new_data, years)
         return begin
-    years = max - min + 1
-    begin = begin + min
+    years = y_max - y_min + 1
+    begin = begin + y_min
     end = begin + years - 1
     for m in range(12):
-        new_sums[m] = new_sums[m][min: max + 1]
-        new_wgts[m] = new_wgts[m][min: max + 1]
+        new_sums[m] = new_sums[m][y_min: y_max + 1]
+        new_wgts[m] = new_wgts[m][y_min: y_max + 1]
         new_data[m] = [BAD] * years
     average(new_sums, new_wgts, new_data, years)
     return begin
@@ -428,27 +431,25 @@ def get_best(records):
 
 def make_record_dict(records, ids):
     record_dict = {}
-    min, max = 9999, -9999
+    y_min, y_max = 9999, -9999
     for rec_id in ids:
         s = records[rec_id]
         (dict, data) = s
         begin = dict['begin']
         years = len(data[0])
         end = begin + years - 1
-        if min > begin:
-            min = begin
-        if max < end:
-            max = end
+        y_min = min(y_min, begin)
+        y_max = max(y_max, end)
         ann_mean, ann_anoms = monthly_annual(data)
+        # Let length be the number of valid data in ann_anoms.
         length = 0
         for anom in ann_anoms:
-            if valid(anom):
-                length = length + 1
+            length += valid(anom)
         record_dict[rec_id] = {'dict': dict, 'data': data,
                                'string': s, 'years': years,
                                'length': length, 'ann_anoms': ann_anoms,
                                'ann_mean': ann_mean}
-    return record_dict, min, max
+    return record_dict, y_min, y_max
 
 def records_get_new_data(record, begin, years):
     sums, wgts, data = [None] * 12, [None] * 12, [None] *12
@@ -498,8 +499,8 @@ def comb_records(stream):
             iterdict[rec_id] = (new_dict, round_series(new_data))
             ids = record_dict.keys()
             if not ids:
-              yield (id, iterdict)
-              break
+                yield (id, iterdict)
+                break
     comb_log.close()
 
 MIN_MID_YEARS = 5            # MIN_MID_YEARS years closest to ymid
@@ -510,7 +511,7 @@ def sigma(list):
     sos = sum = count = 0
     for x in list:
         if invalid(x):
-          continue
+            continue
         sos = sos + x * x
         sum = sum + x
         count = count + 1
@@ -557,10 +558,8 @@ def get_actual_endpoints(new_wgts, begin, years):
             if wgts_row[n] == 0:
                 continue
             year = n + begin
-            if year < tmp_begin:
-                tmp_begin = year
-            if tmp_end < year:
-                tmp_end = year
+            tmp_begin = min(tmp_begin, year)
+            tmp_end = max(tmp_end, year)
     return tmp_begin, tmp_end
 
 def find_quintuples(new_sums, new_wgts, new_data,
@@ -765,18 +764,18 @@ def drop_strange(data):
             if kind == 'years': # omit all the data from year1 to year2, inclusive
                 year1 = year
                 year2 = x
-                if (year1 <= begin and year2 >= end): # drop this whole record
+                if year1 <= begin and year2 >= end: # drop this whole record
                     series = None
                     break
-                if (year1 <= begin):
-                    if (year2 >= begin): # trim at the start
+                if year1 <= begin:
+                    if year2 >= begin: # trim at the start
                         for m in range(12):
                             series[m] = series[m][year2 - begin + 1:]
                         begin = year2 + 1
                         dict['begin'] = begin
                     continue
-                if (year2 >= end):
-                    if (year1 <= end): # trim at the end
+                if year2 >= end:
+                    if year1 <= end: # trim at the end
                         for m in range(12):
                             series[m] = series[m][:year1 - begin]
                         end = year1 - 1
@@ -811,7 +810,7 @@ def alter_discont(data):
 
     alter_dict = get_alter_dict()
     for (dict, series) in data:
-        if (alter_dict.has_key(dict['id'])):
+        if alter_dict.has_key(dict['id']):
             (a_month, a_year, a_num) = alter_dict[dict['id']]
             begin = dict['begin']
             for year in range(begin, a_year + 1):
@@ -840,21 +839,21 @@ def write_to_file(data, file):
 
     f = open(file, 'w')
     for (dict, series) in data:
-      f.write(to_text(dict, series))
+        f.write(to_text(dict, series))
     f.close()
 
 def results():
-  data = read_v2()
-  records = comb_records(data)
-  combined_pieces = comb_pieces(records)
-  without_strange = drop_strange(combined_pieces)
-  return alter_discont(without_strange)
+    data = read_v2()
+    records = comb_records(data)
+    combined_pieces = comb_pieces(records)
+    without_strange = drop_strange(combined_pieces)
+    return alter_discont(without_strange)
 
 def main():
-  write_to_file(results(), 'work/Ts.txt')
+    write_to_file(results(), 'work/Ts.txt')
 
 if __name__ == '__main__':
-  main()
+    main()
 
 # Notes:
 #

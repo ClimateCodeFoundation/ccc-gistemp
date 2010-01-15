@@ -279,8 +279,17 @@ def read_v2():
           yield (id11, iterdict)
           iterdict = {}
           id11 = last_id[:11]
-        iterdict[last_id] = (dict, series)
+        iterdict[last_id] = (dict, round_series(series))
     yield (id11, iterdict)
+
+def round_series(series):
+  """Round every element in *series*, in-place, to the nearest 0.1.  Returns *series*.
+  """
+
+  for m in range(12):
+    for n in range(len(series[m])):
+      series[m][n] = float(math.floor(series[m][n] * 10.0 + 0.5)) * 0.1
+  return series
 
 BAD = 9999 / 10.0
 BAD = 0.1 * int(BAD * 10.0)
@@ -477,7 +486,7 @@ def comb_records(stream):
             combine(new_sums, new_wgts, new_data, begin, years, record_dict)
             begin = final_average(new_sums, new_wgts, new_data, years, begin)
             new_dict['begin'] = begin
-            iterdict[rec_id] = (new_dict, new_data)
+            iterdict[rec_id] = (new_dict, round_series(new_data))
             ids = record_dict.keys()
             if not ids:
               yield (id, iterdict)

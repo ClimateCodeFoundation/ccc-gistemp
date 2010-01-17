@@ -862,4 +862,4 @@ def main(argv=None):
     return step3(audit=audit, subbox=subbox)
 
 if __name__ == '__main__':
-    main()
+    main(argv=sys.argv)

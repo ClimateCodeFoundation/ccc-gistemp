@@ -7,6 +7,8 @@
 # David Jones, Ravenbrook Limited, 2010-01-07
 # Copyright (C) 2008-2010 Ravenbrook Limited.
 
+import os
+
 """
 fetch.py [--help] [input-files] ...
 
@@ -23,6 +25,14 @@ import getopt
 import sys
 # http://www.python.org/doc/2.4.4/lib/module-urllib.html
 import urllib
+
+# http://www.python.org/doc/2.4.4/lib/module-tarfile.html
+# Conditionally import our modified tarfile for Python2.4
+if sys.version_info[:2] == (2, 4):
+    import ccc_tarfile as tarfile
+else:
+    import tarfile
+
 
 def fetch(files, prefix='input/', output=sys.stdout):
     """Download a bunch of files.  *files* is a list of the files to
@@ -195,13 +205,20 @@ def fetch_tar(l, prefix, output):
     # Group by URL so that we process all the members from the same tar
     # file together.
     for url,group in itertools.groupby(l, key=lambda x: x[0][1]):
+        base, ext = os.path.splitext(url)
+        if ext == ".tar":
+            tar_compression_type = ""
+        else:
+            tar_compression_type = ext[1:]
         u = urllib.urlopen(url)
         members = map(lambda x: x[0][2], group)
         print >>output, 'Extracting members from', url, '...'
-        fetch_from_tar(u, members, prefix, output)
+        fetch_from_tar(u, members, prefix, output,
+            compression_type=tar_compression_type)
         print >>output, "  ... finished extracting"
 
-def fetch_from_tar(inp, want, prefix='input', log=sys.stdout):
+def fetch_from_tar(inp, want, prefix='input', log=sys.stdout,
+        compression_type=""):
     """Fetch a list of files from a tar file.  *inp* is an open file
     object, *want* is the list of names that are required.  Each file
     will be stored in the directory *prefix* using just the last
@@ -213,19 +230,26 @@ def fetch_from_tar(inp, want, prefix='input', log=sys.stdout):
 
     import os
 
-    # http://www.python.org/doc/2.4.4/lib/module-tarfile.html
-    import tarfile
     # The first argument, an empty string, is a dummy which works around
     # a bug in Python 2.5.1.  See
     # http://code.google.com/p/ccc-gistemp/issues/detail?id=26
-    tar = tarfile.open('', mode='r|*', fileobj=inp)
+    tar = tarfile.open('', mode='r|%s' % compression_type, fileobj=inp)
     for info in tar:
         if info.name in want:
             short = info.name.split('/')[-1]
             local = os.path.join(prefix, short)
             out = open(local, 'wb')
             print >>log, "  ... %s from %s." % (short, info.name)
-            out.writelines(tar.extractfile(info))
+
+            # The following used to be simply
+            # ``out.writelines(tar.extractfile(info))``, but the Python2.4
+            # tarfile.py does not provide iteration support.
+            member = tar.extractfile(info)
+            while True:
+                buf = member.read(4096)
+                if not buf:
+                    break
+                out.write(buf)
 
 def progress_hook(out):
     """Return a progress hook function, suitable for passing to

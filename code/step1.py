@@ -410,11 +410,10 @@ def comb_records(stream):
             records[dict['id']] = (dict, series)
         ids = records.keys()
         while 1:
-            record_dict, begin, end = make_record_dict(records, ids)
-            if len(record_dict) == 1:
-                _, record = record_dict.items()[0]
-                yield (record['dict'],record['data'])
+            if len(ids) == 1:
+                yield records[ids[0]]
                 break
+            record_dict, begin, end = make_record_dict(records, ids)
             years = end - begin + 1
             record, rec_id = get_best(record_dict)
             rec_dict = record['dict']
@@ -600,12 +599,10 @@ def comb_pieces(stream):
             records[dict['id']] = (dict, series)
         ids = records.keys()
         while 1:
-            record_dict, begin, end = make_record_dict(records, ids)
-
-            if len(record_dict) == 1:
-                rec_id, record = record_dict.items()[0]
-                yield (record['dict'], record['data'])
+            if len(ids) == 1:
+                yield records[ids[0]]
                 break
+            record_dict, begin, end = make_record_dict(records, ids)
 
             if helena_ds.has_key(id11):
                 id1, this_year, month, summand = helena_ds[id11]

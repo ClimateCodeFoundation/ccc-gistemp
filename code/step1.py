@@ -35,7 +35,10 @@ Ts.discont.RS.alter.IN
 Also requires the existence of writeable work/ and log/ directories.
 """
 
-import math, struct, array
+import math
+import struct
+import array
+import itertools
 
 import read_config
 
@@ -215,43 +218,22 @@ def monthly_annual(data):
 
 def read_v2():
     """A generator to iterate through the temperature data in
-    'work/v2.mean_comb'.  Each item in the iterator is a pair (id11,
-    dict), where id11 is the 11-digit station ID and dict is a map
-    from 12-digit station ID to a (dict, series) pair.
+    'work/v2.mean_comb'.  Each item in the iterator is a (dict,
+    series) pair for a single 12-character scribal station ID.
     """
 
-    f = open('work/v2.mean_comb', 'r')
-    print "reading work/v2.mean_comb"
     info = read_config.v2_get_info()
     sources = read_config.v2_get_sources()
-    ids = []
-    line = f.readline()
-    iterdict = {}
-    id11 = line[:11]
-    while line:
-        lines = [line]
-        id = line[:12]
-        ids.append(id)
-        last_id = id
-        line = f.readline()
-        while line:
-            id = line[:12]
-            if id != last_id:
-                break
-            lines.append(line)
-            line = f.readline()
-        series, begin = from_lines(lines)
-        st_id = last_id[:11]
-        dict = info[st_id].copy()
+    f = open('work/v2.mean_comb', 'r')
+    print "reading work/v2.mean_comb"
+    for (id, lines) in itertools.groupby(f, lambda line: line[:12]):
+        # lines is a set of lines which all begin with the same 12 character id
+        series, begin = from_lines(list(lines))
+        dict = info[id[:11]].copy()
         dict['begin'] = begin
-        dict['source'] = sources.get(last_id, 'UNKNOWN')
-        dict['id' ] = last_id
-        if last_id[:11] != id11:
-          yield (id11, iterdict)
-          iterdict = {}
-          id11 = last_id[:11]
-        iterdict[last_id] = (dict, round_series(series))
-    yield (id11, iterdict)
+        dict['source'] = sources.get(id, 'UNKNOWN')
+        dict['id' ] = id
+        yield (dict, round_series(series))
 
 def round_series(series):
     """Round every element in *series*, in-place, to the nearest 0.1.
@@ -382,22 +364,20 @@ def make_record_dict(records, ids):
     record_dict = {}
     y_min, y_max = 9999, -9999
     for rec_id in ids:
-        s = records[rec_id]
-        (dict, data) = s
+        (dict, series) = records[rec_id]
         begin = dict['begin']
-        years = len(data[0])
+        years = len(series[0])
         end = begin + years - 1
         y_min = min(y_min, begin)
         y_max = max(y_max, end)
-        ann_mean, ann_anoms = monthly_annual(data)
+        ann_mean, ann_anoms = monthly_annual(series)
         # Let length be the number of valid data in ann_anoms.
         length = 0
         for anom in ann_anoms:
             length += valid(anom)
-        record_dict[rec_id] = {'dict': dict, 'data': data,
-                               'string': s, 'years': years,
-                               'length': length, 'ann_anoms': ann_anoms,
-                               'ann_mean': ann_mean}
+        record_dict[rec_id] = {'dict': dict, 'data': series,
+                               'years': years, 'length': length,
+                               'ann_anoms': ann_anoms, 'ann_mean': ann_mean}
     return record_dict, y_min, y_max
 
 def records_get_new_data(record, begin, years):
@@ -423,16 +403,17 @@ def comb_records(stream):
     global comb_log
     comb_log = open('log/comb.log','w')
 
-    for (id, records) in stream:
-        comb_log.write('%s\n' % id)
-        iterdict = {}
+    for id11, record_set in itertools.groupby(stream, lambda (dict, series): dict['id'][:11]):
+        comb_log.write('%s\n' % id11)
+        records = {}
+        for (dict, series) in record_set:
+            records[dict['id']] = (dict, series)
         ids = records.keys()
         while 1:
             record_dict, begin, end = make_record_dict(records, ids)
             if len(record_dict) == 1:
-                rec_id, record = record_dict.items()[0]
-                iterdict[rec_id] = (record['dict'],record['data'])
-                yield (id, iterdict)
+                _, record = record_dict.items()[0]
+                yield (record['dict'],record['data'])
                 break
             years = end - begin + 1
             record, rec_id = get_best(record_dict)
@@ -445,12 +426,10 @@ def comb_records(stream):
             combine(new_sums, new_wgts, new_data, begin, years, record_dict)
             begin = final_average(new_sums, new_wgts, new_data, years, begin)
             new_dict['begin'] = begin
-            iterdict[rec_id] = (new_dict, round_series(new_data))
+            yield (new_dict, round_series(new_data))
             ids = record_dict.keys()
             if not ids:
-                yield (id, iterdict)
                 break
-    comb_log.close()
 
 MIN_MID_YEARS = 5            # MIN_MID_YEARS years closest to ymid
 BUCKET_RADIUS = 10
@@ -614,8 +593,11 @@ def comb_pieces(stream):
     pieces_log = open('log/pieces.log','w')
     helena_ds = read_config.get_helena_dict()
 
-    for (id, records) in stream:
-        pieces_log.write('%s\n' % id)
+    for id11, record_set in itertools.groupby(stream, lambda (dict, series): dict['id'][:11]):
+        pieces_log.write('%s\n' % id11)
+        records = {}
+        for (dict, series) in record_set:
+            records[dict['id']] = (dict, series)
         ids = records.keys()
         while 1:
             record_dict, begin, end = make_record_dict(records, ids)
@@ -625,8 +607,8 @@ def comb_pieces(stream):
                 yield (record['dict'], record['data'])
                 break
 
-            if helena_ds.has_key(id):
-                id1, this_year, month, summand = helena_ds[id]
+            if helena_ds.has_key(id11):
+                id1, this_year, month, summand = helena_ds[id11]
                 dict = record_dict[id1]['dict']
                 data = record_dict[id1]['data']
                 begin = dict['begin']
@@ -642,7 +624,7 @@ def comb_pieces(stream):
                         if invalid(datum):
                             continue
                         data[m][n] = datum + summand
-                del helena_ds[id]
+                del helena_ds[id11]
                 ann_mean, ann_anoms = monthly_annual(data)
                 record_dict[id1]['ann_anoms'] = ann_anoms
                 record_dict[id1]['ann_mean'] = ann_mean

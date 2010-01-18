@@ -44,10 +44,10 @@ def v2_get_info():
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.read.inv.f
     """
 
-    keys = 'id name lat lon elevs elevg pop ipop topo stveg stloc iloc airstn itowndis grveg'.split()
+    keys = 'id name lat lon elevs elevg pop ipop topo stveg stloc iloc airstn itowndis grveg GHCN-brightness US-brightness'.split()
     info = {}
     for row in open('input/v2.inv', 'r'):
-        values = struct.unpack('11sx30sx6sx7sx4s5sc5s2s2s2s2sc2s16sx', row[:101])
+        values = struct.unpack('11sx30sx6sx7sx4s5sc5s2s2s2s2sc2s16scc', row[:102])
         # Would use struct.unpack_from if we knew we had Python 2.5
         hash = dict(zip(keys, values))
         hash['ipop'] = int(hash['ipop'])

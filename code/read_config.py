@@ -42,6 +42,31 @@ def v2_get_info():
     added for the Antarctic stations that GHCN doesn't have).  The best
     description of that file's format is the Fortran program:
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.read.inv.f
+
+    Here is a typical line, with a record diagram
+
+    40371148001 ALMASIPPI,MA                    49.55  -98.20  274  287R   -9FLxxno-9x-9COOL FIELD/WOODSA1   0
+
+    0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345
+    id---------xname--------------------------xlat---xlon----x1---2----34----5-6-7-8-910grveg-----------GU
+
+    id: 40371148001
+    name: ALMASIPPI,MA
+    lat: 49.55
+    lon: -98.20
+     1: elevs: 274
+     2: elevg: 287R
+     3: pop: R
+     4: ipop: -9
+     5: topo: FL
+     6: stveg: xx
+     7: stloc: no
+     8: iloc: -9
+     9: airstn: x
+    10: itowndis: -9
+    grveg: COOL FIELD/WOODS
+     G: GHCN-brightness: A
+     U: US-brightness:1
     """
 
     keys = 'id name lat lon elevs elevg pop ipop topo stveg stloc iloc airstn itowndis grveg GHCN-brightness US-brightness'.split()

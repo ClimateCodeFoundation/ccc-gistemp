@@ -359,7 +359,7 @@ def annav(mon, nyrs, iy1, ibad, m1, recordIdx, emuBug=False):
     return iy1n, iy2n, iann
     
 
-def toANNanom(input_name, output_name):
+def toANNanom(input_name, output_name, count = None):
     f2 = fort.open(input_name, "rb")
     f3 = ccc_binary.BufferedOutputRecordFile(output_name)
     header = ccc_binary.CCHeader(data=f2.readline())
@@ -393,6 +393,8 @@ def toANNanom(input_name, output_name):
 
         i1, i2, iann = annav(inRec.idata[0:nMonths], nyrs, iy1, ibad, m1, recordCount,
                 emuBug=(m2 % 12 == 0))
+        if count is not None and recordCount > count:
+            return
         m1, m2 = inRec.m1, inRec.m2
         if i1 == ibad:
             continue

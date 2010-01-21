@@ -385,22 +385,31 @@ def make_record_dict(records, ids):
     return record_dict, y_min, y_max
 
 def records_get_new_data(record, begin, years):
-    sums, wgts, data = [None] * 12, [None] * 12, [None] *12
+    """Make and return a fresh set of sums, wgts, and data arrays.  Each
+    array is list (of length 12) of lists (each of length *years*).  In
+    month-major order in other words.  *begin* should be the starting year
+    for the arrays, which must be no later than the starting year for
+    the record.
+    """
+
+    sums = [None] * 12
+    wgts = [None] * 12
+    data = [None] * 12
     rec_data = record['data']
     rec_begin, rec_years = record['dict']['begin'], record['years']
-    rec_end = rec_begin + rec_years - 1
+    # The record may begin at a later year from the arrays we are
+    # creating, so we need to offset it when we copy.
+    offset = rec_begin - begin
+    assert offset >= 0
     for m in range(12):
-        sums_row, wgts_row, data[m] = [0.0] * years, [0] * years, [BAD] * years
+        sums_row = [0.0] * years
+        wgts_row = [0] * years
         rec_row = rec_data[m]
-        for n in range(rec_years):
-            datum = rec_row[n]
-            if invalid(datum):
-                continue
-            index = n + rec_begin - begin
-            sums_row[index] = datum
-            wgts_row[index] = 1
+        sums_row[offset:offset+rec_years] = (valid(x)*x for x in rec_row)
+        wgts_row[offset:offset+rec_years] = (valid(x) for x in rec_row)
         sums[m] = sums_row
         wgts[m] = wgts_row
+        data[m] = [BAD] * years
     return sums, wgts, data
 
 def get_id11(item):

@@ -214,6 +214,7 @@ def read_GHCN(filename):
         yield((country_code, WMO_station, modifier, duplicate, year, temps))
     t = open('work/GHCN.last_year','w')
     t.write('%d\n' % GHCN_last_year)
+    t.close()
 
 def dump_old(set, year):
     """Returns the input set without any items in years prior to the
@@ -305,7 +306,7 @@ def include_US(GHCN):
                 GHCN_hash[key][year] = data
             else:
                 yield GHCN_line
-        except: # end of GHCN iterator
+        except StopIteration: # end of GHCN iterator
             # now iterate over USHCN stations.
             for (key, udata) in USHCN.items():
                 (WMO_station, modifier) = key

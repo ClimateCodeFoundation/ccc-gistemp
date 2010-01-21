@@ -226,7 +226,11 @@ def read_v2():
     sources = read_config.v2_get_sources()
     f = open('work/v2.mean_comb', 'r')
     print "reading work/v2.mean_comb"
-    for (id, lines) in itertools.groupby(f, lambda line: line[:12]):
+    def id12(l):
+        """Extract the 12-digit station record identifier."""
+        return l[:12]
+
+    for (id, lines) in itertools.groupby(f, id12):
         # lines is a set of lines which all begin with the same 12 character id
         series, begin = from_lines(list(lines))
         dict = info[id[:11]].copy()
@@ -312,8 +316,8 @@ def get_longest_overlap(new_sums, new_wgts, new_data, begin, years, records):
             anom = ann_anoms[year - begin]
             if invalid(anom):
                 continue
-            wgt = wgt + 1
-            sum = sum + (rec_ann_mean + rec_anom) - (ann_mean + anom)
+            wgt += 1
+            sum += (rec_ann_mean + rec_anom) - (ann_mean + anom)
         if wgt < MIN_OVERLAP:
             continue
         if wgt < overlap:
@@ -399,11 +403,19 @@ def records_get_new_data(record, begin, years):
         wgts[m] = wgts_row
     return sums, wgts, data
 
+def get_id11(item):
+    """Given an item from the stream passed to comb_records,
+    comb_pieces or similar, return the 11-digit identifier."""
+
+    # Each item is a (meta,series) pair.
+    meta,series_ = item
+    return meta['id'][:11]
+
 def comb_records(stream):
     global comb_log
     comb_log = open('log/comb.log','w')
 
-    for id11, record_set in itertools.groupby(stream, lambda (dict, series): dict['id'][:11]):
+    for id11, record_set in itertools.groupby(stream, get_id11):
         comb_log.write('%s\n' % id11)
         records = {}
         for (dict, series) in record_set:
@@ -534,11 +546,11 @@ def find_quintuples(new_sums, new_wgts, new_data,
                 else:
                     anom2 = rec_ann_anoms[index2]
                 if valid(anom1):
-                    sum1 = sum1 + anom1 + new_ann_mean
-                    count1 = count1 + 1
+                    sum1 += anom1 + new_ann_mean
+                    count1 += 1
                 if valid(anom2):
-                    sum2 = sum2 + anom2 + rec_ann_mean
-                    count2 = count2 + 1
+                    sum2 += anom2 + rec_ann_mean
+                    count2 += 1
         if count1 >= MIN_MID_YEARS and count2 >= MIN_MID_YEARS:
             pieces_log.write("overlap success: %s %s\n" % (new_id, rec_id))
             ov_success = 1
@@ -592,7 +604,7 @@ def comb_pieces(stream):
     pieces_log = open('log/pieces.log','w')
     helena_ds = read_config.get_helena_dict()
 
-    for id11, record_set in itertools.groupby(stream, lambda (dict, series): dict['id'][:11]):
+    for id11, record_set in itertools.groupby(stream, get_id11):
         pieces_log.write('%s\n' % id11)
         records = {}
         for (dict, series) in record_set:

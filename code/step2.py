@@ -4,7 +4,7 @@
 #
 # step2.py
 #
-# Clear Climate Code, 2010-01-15
+# Clear Climate Code, 2010-01-22
 
 """Python replacement for code/STEP2/*
 """
@@ -12,565 +12,176 @@ __docformat__ = "restructuredtext"
 
 
 import sys
-import os
-import array
 import math
 import itertools
+import read_config
 
-# Clear Climate Code
 import earth
 import fort
 import ccc_binary
 
-iyrbeg = 1880
-iyrend = 3001
-nrecpy = 12
-monm = nrecpy * (iyrend - iyrbeg + 1)
+BAD = 9999
 
-def invnt(fname):
-    """This scans Ts binary files and extracts station information.
-    The output is written to log/*.station.list
+def invalid(x):
+    """Test for invalid datum (equal to the BAD value).
     """
 
-    log = open('log/$s.station.list','w')
-    f = fort.open('work/%s' % fname, "rb")
-    header = ccc_binary.CCHeader(data=f.readline())
-    n1 = header.info[0]
-    n2 = header.info[8]
+    return x == BAD
 
-    if header.info[5] < iyrbeg:
-        sys.exit("Beginning year too late")
-    if header.info[3] > monm:
-        sys.exit("Too much data: %s > %s" % (header.info[3], monm))
-    mbad = header.info[6]
+def valid(x):
+    """Test for valid datum.  See invalid()."""
 
-    if header.info[0] == mbad:
-        # There is no data
-        return
+    # It's important that this obey Iverson's convention: in other words
+    # return 0 or 1 (or False or True, which it does).
+    return not invalid(x)
 
-    for s in f:
-        length = n2 - n1 + 1
-        rec = ccc_binary.CCRecord(length, data=s)
-        log.write("%s %9d %-30s lat,lon (.1deg)%5d%6d %s%s%s cc=%3s\n" % (
-                  fname, rec.ID, rec.name[:30], rec.Lat, rec.Lon,
-                  rec.name[31], rec.name[30], rec.name[32],
-                  rec.name[33:36],
-                  ))
-        n1 = rec.m1
-        n2 = rec.m2
+def read_text():
+    """ Reads the data file work/Ts.txt, output by step 1, and returns
+    an iterator of the contents.
+
+    Each item in the iterator is a pair (dict, series).  dict contains
+    station information, and series contains the temperature series,
+    as a list of monthly values.  Each value is an integer in tenths
+    of degrees C.
+
+    Logs to log/short.station.list and log/station.log as we go; these
+    files may not be necessary, and their formats are a little
+    awkward, but retained for now for testing against Fortran.
+    """
+
+    v2_inv = read_config.v2_get_info()
+    in_file = open("work/Ts.txt")
+    short_station_log = open('log/short.station.list', "w")
+    station_log = open('log/station.log', "w")
+    mult = 0
+    last_id11 = None
+    minimum_monthly_max = 20
+    min_year = 1880
+
+    for (station_line, lines) in itertools.groupby(in_file, lambda line: line[0] == ' '):
+        if station_line: # line beginning with a blank introduces a new station
+            lines = list(lines)
+            assert len(lines) == 1
+            line = lines[0]
+            id12 = line[10:22]
+            id11 = id12[:11]
+            if id11 == last_id11:
+                mult += 1
+            else:
+                mult = 0
+                last_id11 = id11
+            dict = v2_inv[id11].copy()
+            dict['id'] = id12
+        else: # lines consists of the temperature series
+            series = []
+            monthly_valid = [0] * 12
+            min_month = None
+            for line in lines:
+                data = map(int, line.split())
+                year = int(data[0])
+                if not dict.has_key('begin'):
+                    dict['begin'] = year
+                monthlies = data[1:]
+                for month in range(12):
+                    if valid(monthlies[month]):
+                        monthly_valid[month] += 1
+                        if min_month is None:
+                            min_month = month + 12*year
+                        max_month = month + 12*year
+                series.extend(monthlies)
+            mmax = max(monthly_valid)
+            station_log.write("%12d%12d%12d%12d%12d%12d\n" % (
+                    mult, int(dict['id'][3:]), mmax, minimum_monthly_max,
+                    min_month - min_year * 12 + 1,
+                    max_month - min_year * 12 + 1))
+            if mmax >= minimum_monthly_max:
+                dict['end'] = year
+                dict['years'] = dict['end'] - dict['begin'] + 1
+                dict['min_month'] = min_month
+                dict['max_month'] = max_month
+                yield (dict, series)
+            else:
+                short_station_log.write("%12d  %30s%c%c%c%3s dropped\n" %
+                                        (int(dict['id'][3:]), dict['name'],
+                                         dict['US-brightness'],
+                                         dict['pop'], dict['GHCN-brightness'],
+                                         dict['id'][:3]))
+
+def invnt(name, stream):
+    """Turns the data *stream* into a station list, in log/*name*.station.list,
+    while passing the stream through unchanged.  Probably unnecessary, as the
+    .station.list files are not used by any other code, but retained for now for
+    testing against Fortran.
+    """
+    
+    log = open('log/%s.station.list' % name,'w')
+    for (dict, series) in stream:
+        log.write("work/%s %9d %-30s lat,lon (.1deg)%5d%6d %s%s%s cc=%3s\n" % (
+                  name, int(dict['id'][3:12]), dict['name'],
+                  math.floor(dict['lat'] * 10.0 + 0.5),
+                  math.floor(dict['lon'] * 10.0 + 0.5),
+                  dict['pop'], dict['US-brightness'], dict['GHCN-brightness'], dict['id'][:3]))
+        yield (dict, series)
     log.close()
 
-
-def text_to_binary(lastyr):
-    """Python replacement for the code/STEP2/text_to_binary.f
-
-    This processes the input files:
-
-        work/Ts.txt
-            Output from the previous stage. This contains temperator records
-            for a set of monitoring stations.
-
-        input/v2.inv
-            An inventory file, used to provide extra infomation about the
-            temperature records in ``work/Ts.txt``.
-
-    WARNING: I may have got some details wrong below.
-
-    The output is ``work/Ts.bin``, where each record contains:
-
-        idata
-            One value per month, in units of 0.1 celcius. There a value for
-            each month starting from Jan 1880.
-        lat, long, ht
-            The monitoring station's position as latitutude, longitude and height.
-        id
-            <TODO: What is the ID?>
-        name
-            A name for the monitoring station.
-        mtot
-            The number of months in the record.
-
-    The program also puts writes to the following log files:
-
-        log/short.station.list
-            Lists the stations that were dropped from the output due to
-            insufficient data.
-        - log/station.log
-            A summary for all stations. <TODO: Expand and verify>.
+def toANNanom(stream):
+    """ Iterates over the station record *stream*, returning an
+    iterator giving an annual anomaly series for each station as
+    (dict, anoms).  The dict is passed through unchanged from the
+    station record.  The algorithm is as follows: compute monthly
+    averages, then monthly anomalies, then seasonal anomalies - means
+    of monthly anomalies for at least two months - then annual
+    anomalies - means of seasonal anomalies for at least three
+    seasons.
     """
-    iyear1, lim, multm, ibad = 1880, 20, 2, 9999
-    monthly, iok = [0]*12, [0]*12
-    lat, lon, id, ht, hto, mmax = 0, 0, [0]*(multm + 1), 0, 0, [0]*(multm + 1)
-    name, nameo, line, li, sid, sidi = "", "", "", "", "", ""
 
-    MTOT = 12 * (lastyr - iyear1 + 1)
-    idata = [array.array("i", [0] * MTOT) for i in range(multm + 1)]
-
-    header = ccc_binary.CCHeader()
-    header.title = 'GHCN V2 Temperatures (.1 C)'
-    header.info[0] = 1
-    header.info[1] = 1
-    header.info[2] = 6
-    header.info[3] = MTOT
-    header.info[4] = MTOT+15
-    header.info[5] = iyear1
-    header.info[6] = 9999
-    header.info[7] = -9999
-    header.info[8] = MTOT
-
-    inPath = "work/Ts.txt"
-    try:
-        f1 = open(inPath)
-    except IOError, exc:
-        sys.exit("Could not open %s for reading\n%s" % (inPath, exc))
-    f2 = fort.open('work/Ts.bin', "wb")
-    f3 = open('input/v2.inv')
-    f88 = open('log/short.station.list', "w")
-    f99 = open('log/station.log', "w")
-
-    f2.writeline(header.binary)
-
-    ict = 0
-    mult = 0
-    id1o = -99
-
-    line, sidi = f1.readline(), '           '
-    # 10    continue
-    rec = ccc_binary.CCRecord(MTOT)
-    while line:
-        ict = ict + 1
-        if ict % 1000 == 0:
-            print "%d processed so far" % ict
-        lat, lon, sid, ht, name = fort.unpackRecord(line, 2,
-                "i4,i5,a12,i4,a36")
-        while True:
-            if sidi == sid[:11]:
-                break
-            li = f3.readline()
-            if not li:
-                sys.stderr.write("Found no inventory entry for\n  %r\n" %
-                        line)
-                sys.exit("Inventory file %s is too short" % f3.name)
-            sidi = li[:11]
-        name = name[:30] + li[101] + li[67] + li[100] + li[:3] + name[35:]
-        idfull = int(sid[3:12])
-        id1 = int(sid[3:11])
-
-        if id1 == id1o:
-            mult = mult + 1
-            if mult > multm:
-                sys.exit("The 'multm' parameter needs to be larger then %d"
-                        % multm)
-        else:
-            if id1o >= 0:
-                for m in range(0, mult+1):
-                    if mmax[m] >= lim:
-                        writeRecord(f2, rec, idata[m], lato, lono, id[m],
-                                hto, nameo, MTOT)
-                    else:
-                        f88.write("%12d  %sdropped\n" % (id[m], nameo))
-
-            mult = 0
-            id1o = id1
-
-        id[mult] = idfull
-        idata[mult] = array.array("i", itertools.repeat(ibad, MTOT))
-        iok = [0] * 12
-        mmax[mult] = 0
-        monmin = MTOT+1
-        monmax = 0
-
-        # F: 20    continue
-        while True:
-            # ieof = 1
-            line = f1.readline()
-            if not line or line[0] == ' ':
-                # ieof = 0
-                break
-
-            iyr, monthly = fort.unpackRecord(line, 1, "i4, 12i5")
-            ix = (iyr - iyear1) * 12
+    for (dict, series) in stream:
+        av = []
+        for m in range(12):
+            month_data = filter(valid, series[m::12])
+            # neglect December of final year, as we do not use its season.
+            if m == 11 and valid(series[-1]):
+                month_data = month_data[:-1]
+            av.append(float(sum(month_data)) / len(month_data))
+        annual_anomalies = []
+        # Create groups of seasonal deviations from the month averages.
+        first = None
+        for y in range(len(series)/12):
+            total = [0.0] * 4
+            count = [0] * 4
+            # Could probably be smarter here by using range(-1,11)
             for m in range(12):
-                idatum = monthly[m]
-                if idatum != 9999:
-                    idata[mult][ix + m] = idatum
-                    iok[m - 1] = iok[m - 1] + 1
-                    mmax[mult] = max(mmax[mult], iok[m - 1])
-                    monmin = min(monmin, ix + m + 1)
-                    monmax = ix + m + 1
-
-            # F: goto 20
-        # F: 30    continue
-
-        f99.write("%12d%12d%12d%12d%12d%12d\n" % (
-                mult, id[mult], mmax[mult],lim, monmin, monmax))
-        lato = lat
-        lono = lon
-        hto = ht
-        nameo = name
-
-    if id1o >= 0:
-        for m in range(0, mult+1):
-            if mmax[m] >= lim:
-                writeRecord(f2, rec, idata[m], lato, lono, id[m],
-                        hto, nameo, MTOT)
+                if m == 11: # Take December value from the previous year
+                    year_index = y-1
+                else:
+                    year_index = y
+                if year_index >= 0:
+                    datum = series[year_index*12 + m]
+                    if valid(datum):
+                        season = (m+1) // 3 # season number 0-3
+                        if season == 4:
+                            season = 0
+                        total[season] += datum - av[m]
+                        count[season] += 1
+            season_anomalies = []
+            for s in range(4):
+                if count[s] > 1:
+                    season_anomalies.append(total[s]/count[s])
+            if len(season_anomalies) > 2:
+                v = (10.0 * sum(season_anomalies)) / len(season_anomalies)
+                annual_anomalies.append(int(round(v)))
+                if first is None:
+                    first = y
+                last = y
             else:
-                f88.write("%12d  %sdropped\n" % (id[m], nameo))
+                annual_anomalies.append(BAD)
+        
+        if first is not None:
+            dict['first'] = first + dict['begin']
+            dict['last'] = last + dict['begin']
+            yield (dict, annual_anomalies[first: last+1])
 
-    for f in (f1, f2, f3, f88, f99):
-        f.close()
-
-
-def writeRecord(f2, rec, idata, lato, lono, id, hto, nameo, MTOT):
-    rec.idata = list(idata)
-    rec.Lat = lato
-    rec.Lon = lono
-    rec.ID = id
-    rec.iht = hto
-    rec.name = nameo
-    rec.m1 = 1
-    rec.m2 = MTOT
-    f2.writeline(rec.binary)
-
-def trim_binary(input_name, output_name):
-    """Trims a binary file, by removing leading and trailing blocks of
-    month data, where ``abs(md) > 8000``. The reduced size records are
-    written to the output file.
-
-    Note:
-        This (currently) tries to closely follow the form of the original
-        fortran code in ``code/STEP2/trim_binary.f``. Hence it is too long, too
-        nested, etc compared to typical Python code.
-    """
-
-    f2 = fort.open(input_name, "rb")
-    f3 = ccc_binary.BufferedOutputRecordFile(output_name)
-
-    header = ccc_binary.CCHeader(f2.readline())
-    f3.writeRecord(header)
-
-    i4 = header.info[3]
-    inRec = ccc_binary.CCRecord(i4)
-    marker = header.info[6]
-
-    # TODO: What if m1 == m2 == marker. Should that be:
-    #
-    # - a fatal condition.
-    # - cause an empty record o be written.
-    # - cause no record to be written.
-
-    for recordCount, s in enumerate(f2):
-        inRec.setFromBinary(s)
-        md = inRec.idata[0:i4]
-        m1 = marker
-        m2 = marker
-        for m, v in enumerate(md):
-            if abs(v) > 8000:
-                md[m] = marker
-            else:
-                m2 = m  + 1
-                if m1 == marker:
-                    m1 = m + 1
-        rec = f3.lastRecord()
-        if recordCount == 0:
-            rec.info[0] = m1
-            rec.info[8] = m2
-        else:
-            rec.m1 = m1
-            rec.m2 = m2
-
-        # Add a new output record to the buffer.
-        outRec = ccc_binary.CCRecord(m2 - m1 + 1)
-        outRec.idata = md[m1 - 1: m2]
-        outRec.Lat = inRec.Lat
-        outRec.Lon = inRec.Lon
-        outRec.ID = inRec.ID
-        outRec.iht = inRec.iht
-        outRec.name = inRec.name
-        outRec.m1 = marker
-        outRec.m2 = marker
-        f3.writeRecord(outRec)
-
-iylast = 3000
-i4o = (iylast - 1701 + 1)
-i4 = i4o * 12
-
-def yearMonthEnumerate(monthData, m1):
-    """Enumerate months and years, with Dec=0 and Nov=11, year=Dec->Nov"""
-    yearBase, monthIdx = divmod(m1, 12)
-    yearIdx = yearBase
-    if m1 % 12 == 0:
-        yearBase -= 1
-    for d in monthData:
-        yield (yearIdx - yearBase, monthIdx), d
-        monthIdx += 1
-        if monthIdx > 11:
-            monthIdx = 0
-            yearIdx += 1
-
-
-def annav(mon, nyrs, iy1, ibad, m1, recordIdx, emuBug=False):
-    # Work out the average for each month of the year (Jan, Feb, ..., Dec).
-    # First group values for each month of the year.
-    if emuBug:
-        mon = mon[:-1]
-    av = [[] for m in range(12)]
-    t = []
-    for (yIdx, mIdx), v in yearMonthEnumerate(mon, m1):
-        if v != ibad:
-            av[mIdx].append(v)
-            t.append((yIdx + 1, mIdx + 1, v))
-    nYears = yIdx + 1
-
-    # Use the set of value for each month to get an average.
-    for m, monthData in enumerate(av):
-        if not monthData:
-            sys.exit("station too short - impossible, %s: %s" % (m, monthData))
-        av[m] = float(sum(monthData)) / len(monthData)
-
-    # Create groups of seasonal deviations from the month averages.
-    ss = [[ [], [], [], [] ] for y in range(nYears)]
-    for (yIdx, mIdx), v in yearMonthEnumerate(mon, m1):
-        if v != ibad:
-            sIdx = mIdx // 3
-            ss[yIdx][sIdx].append(v - av[mIdx])
-
-    # Average each season's deviation and then average those for each year.
-    for year in ss:
-        for i, s in enumerate(year):
-            year[i] = ibad
-            if len(s) > 1:
-                year[i] = sum(s) / len(s)
-
-    # Average for the seasons for each year.
-    iann = [[] for i in range(nYears)]
-    iy1n = iy2n = ibad
-    for yIdx, year in enumerate(ss):
-        data = [v for v in year if v != ibad]
-        iann[yIdx] = ibad
-        if len(data) > 2:
-            v = (10.0 * sum(data)) / len(data)
-            iann[yIdx] = int(round(v))
-
-            iy2n = iy1 + yIdx
-            if iy1n == ibad:
-                iy1n = iy2n
-
-    return iy1n, iy2n, iann
-    
-
-def toANNanom(input_name, output_name, count = None):
-    f2 = fort.open(input_name, "rb")
-    f3 = ccc_binary.BufferedOutputRecordFile(output_name)
-    header = ccc_binary.CCHeader(data=f2.readline())
-    ibad = header.info[7 - 1]
-    if header.info[1 - 1] == ibad:
-        sys.exit("no stations")
-
-    outHdr = header.copy()
-    outHdr.info[3 - 1] = 5                         # ann.means (6=mon.means)
-    outHdr.info[4 - 1] = header.info[4 - 1] / 12   # length of time series
-    outHdr.info[5 - 1] = outHdr.info[4 - 1] + header.info[5 - 1] - header.info[4 - 1]  # length of records
-    outHdr.title = "ANNUAL MEAN TEMPERATURE ANOMALIES (.01 C)".ljust(80)
-
-    m1 = header.info[0]
-    m2 = header.info[8]
-
-    f3.writeRecord(outHdr)
-    doneHeader = False
-
-    for recordCount, s in enumerate(f2):
-        nMonths = m2 - m1 + 1
-        inRec = ccc_binary.CCRecord(nMonths, data=s)
-    
-        iy1 = 1 + (m1 - 1) / 12
-        mon1 = 12 * (iy1 - 1)   #   =  december of year iy1 - 1
-        nyrs = (m2 + 11 - mon1) / 12
-        if nyrs - 1 + iy1 > i4o:
-            nyrs = i4o + 1 - iy1
-        if nyrs < 0:
-            sys.exit('no station records  -  impossible')
-
-        i1, i2, iann = annav(inRec.idata[0:nMonths], nyrs, iy1, ibad, m1, recordCount,
-                emuBug=(m2 % 12 == 0))
-        if count is not None and recordCount > count:
-            return
-        m1, m2 = inRec.m1, inRec.m2
-        if i1 == ibad:
-            continue
-        if not doneHeader:
-            outHdr.info[0] = i1
-            outHdr.info[8] = i2
-            doneHeader = True
-        else:
-            rec = f3.lastRecord()
-            rec.m1 = i1
-            rec.m2 = i2
-
-        nYears = i2 - i1 + 1
-        outRec = ccc_binary.CCRecord(nYears)
-        outRec.idata = iann[i1-iy1:i2-iy1+1]
-        outRec.Lat = inRec.Lat
-        outRec.Lon = inRec.Lon
-        outRec.ID = inRec.ID
-        outRec.iht = inRec.iht
-        outRec.name = inRec.name
-        outRec.m1 = ibad
-        outRec.m2 = ibad
-        f3.writeRecord(outRec)
-
-
-def readRec(f):
-    l = f.readline()
-    if not l:
-        return None, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-
-    (CCdStationID,slope_l,slope_r,knee,Yknee,slope,Ymid,RMS,RMSl,
-            rur_urb,ext_range,flag) = l.split()
-    cc, IDc = CCdStationID[:3], int(CCdStationID[3:])
-    sl1 = float(slope_l)
-    sl2 = float(slope_r)
-    knee = int(knee)
-    sl0 = float(slope)
-    iy1, iy2 = [int(v) for v in rur_urb.split("-")]
-    iy1e, iy2e = [int(v) for v in ext_range.split("-")]
-    flag = int(flag)
-    return cc, IDc, sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag
-
-def padjust():
-    log = open('log/padjust.log', 'w')
-    f1 = open("work/PApars.list")
-    header = f1.readline()
-    # Read the first adjustment record.
-    cc, IDc, sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag = readRec(f1)
-
-    inF = fort.open("work/Ts.GHCN.CL")
-    outF = fort.open("work/Ts.GHCN.CL.PA", "wb")
-
-    h = ccc_binary.CCHeader(inF.readline())
-    ibad = h.info[6]
-    if h.info[0] == ibad:
-        raise Exception("was break, but drj removed the while loop")
-    m1o, m2o = h.info[0], h.info[8]
-
-    # Loop until we find a station we do not want to skip. At that point,
-    # we start writing the current output file (i.w. write the header) and
-    # adjust the first record if necessary.
-    while True:
-        count = m2o - m1o + 1
-        s = data=inF.readline()
-        if not s:
-            break
-        rec_o = ccc_binary.CCRecord(count, data=s)
-        if rec_o.ID != IDc:
-            if rec_o.name[30:32] == " R" or rec_o.name[30] == "1":
-                outF.writeline(h.binary)
-                break
-            else: # skip the station
-                h.info[0] = rec_o.m1
-                h.info[8] = rec_o.m2
-                m1o, m2o = rec_o.m1, rec_o.m2
-                log.write(" station   %9s  %s skipped\n" % (
-                                  rec_o.ID, rec_o.name))
-                continue
-
-        else:
-            # Record needs adjusting. Do so and get the next adjustment
-            # entry.
-            a, b = adj(h, rec_o.idata, sl1, sl2, knee, sl0, iy1e, iy2e, iy1, iy2,
-                    flag, m1o, m2o)
-            log.write( " station   %9s  %s adjusted %s %s\n" % (
-                              rec_o.ID, rec_o.name, (m1o, m2o), (a, b)))
-            aa = a - m1o
-            bb = b - a + 1
-            log.write("ADJ-1 %s %s %s %s %s\n" % (rec_o.name, rec_o.count, len(rec_o.idata), aa, bb))
-            rec_o.idata[:] = rec_o.idata[aa:aa + bb]
-            rec_o.count = bb
-            log.write("%s %s\n" % (rec_o.count, len(rec_o.idata)))
-            m1o, m2o = a, b
-            h.info[0] = m1o
-            h.info[8] = m2o
-            outF.writeline(h.binary)
-            ddd = readRec(f1)
-            if ddd[0] is not None:
-                cc, IDc, sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag = ddd
-            break
-
-    # Now read further records.
-    while True:
-        s = data=inF.readline()
-        if not s:
-            outF.writeline(rec_o.binary)
-            log.write(" station   %9s  %s saved\n" % (rec_o.ID, rec_o.name))
-            break
-
-        rec = ccc_binary.CCRecord(rec_o.m2 - rec_o.m1 + 1, data=s)
-        if rec.ID != IDc:
-            if rec.name[30:32] == " R" or rec.name[30] == "1":
-                outF.writeline(rec_o.binary)
-                log.write(" station   %9s  %s saved\n" % (rec_o.ID, rec_o.name))
-            else:
-                rec_o.m1, rec_o.m2 = rec.m1, rec.m2
-                log.write(" station   %9s  %s skipped\n" % (rec.ID, rec.name))
-                continue
-
-        else:
-            a, b = adj(h, rec.idata, sl1, sl2, knee, sl0, iy1e, iy2e, iy1, iy2,
-                    flag, rec_o.m1, rec_o.m2)
-            log.write(" station   %9s  %s adjusted %s %s\n" % (
-                              rec.ID, rec.name, (rec_o.m1, rec_o.m2), (a, b)))
-            aa = a - rec_o.m1
-            bb = b - a + 1
-            log.write("ADJ-2 %s %s %s %s %s\n" %(rec.name, rec.count, len(rec.idata), aa, bb))
-            rec.idata[:] = rec.idata[aa:aa + bb]
-            rec.count = bb
-            log.write("%s %s\n" % (rec.count, len(rec.idata)))
-            rec_o.m1, rec_o.m2 = a, b
-            outF.writeline(rec_o.binary)
-            log.write(" station   %9s  %s saved\n" % (rec_o.ID, rec_o.name))
-            IDc = -9999
-            ddd = readRec(f1)
-            if ddd[0] is not None:
-                cc, IDc, sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag = ddd
-
-        rec_o = rec.copy()
-
-
-def adj(h, idata, sl1, sl2, knee, sl0, iy1, iy2, iy1a, iy2a, iflag, m1, m2):
-    if iflag not in (0, 100):
-        # Use linear approximation
-        sl1, sl2 = sl0, sl0
-
-    base = m1
-
-    miss = h.info[6]
-    m1o, m2o = m1, m2
-    m1 = -100
-    m0 = 12 * (iy1 - h.info[5])   # Dec of year iy1
-    for iy in xrange(iy1, iy2 + 1):
-        sl = sl1
-        if iy > knee:
-            sl = sl2
-        iya = iy
-        if iy < iy1a:
-            iya = iy1a
-        if iy > iy2a:
-            iya = iy2a
-        iadj = int(round((iya - knee) * sl - (iy2a - knee) * sl2))
-        for m in xrange(m0, m0 + 12):
-            mIdx = m - base
-            if mIdx < 0:
-                continue
-            if m >= m1o and m <= m2o and idata[mIdx] != miss:
-                if m1 < 0:
-                    m1 = m
-                idata[mIdx] = idata[mIdx] + iadj
-                m2 = m
-
-        m0 = m0 + 12
-
-    return m1, m2
-
+# PApars.
 
 class Struct(object):
     pass
@@ -605,12 +216,20 @@ g.xbad = 0.0
 g.rdata = []
 g.nuseid = []
 
+g.lshort = 7
+g.slplim = 1.0
+g.slpx = 0.5
+
 g.log = None
 
-def PApars(rngbrf, nlap):
+def PApars(rngbrf, nlap, anomaly_stream):
     g.log = open('log/PApars.GHCN.CL.1000.20.log','w')
     g.rngbrf = rngbrf
     g.nlap = nlap
+
+    g.nstat = g.sumch = g.nyrs = g.nstap = g.nyrsp = g.sumchp = 0
+    g.nsl1 = g.nsl2 = g.ndsl = g.nswitch = g.nsw0 = g.nok = g.nokx = g.nsta = 0
+    g.nshort = 0
 
     ts = [0.0] * 900
     f = [0.0] * 900
@@ -628,11 +247,6 @@ def PApars(rngbrf, nlap):
     g.isrData = []
     g.isuData = []
 
-    # Open the input and output files.
-    infile = fort.open("work/ANN.dTs.GHCN.CL")
-    f78 = open("work/PApars.pre-flags", "w")
-
-    #
     # Open output files for some extra logging
     #
     # Combination info
@@ -642,26 +256,15 @@ def PApars(rngbrf, nlap):
     # Isolated urban stations
     f79 = open("log/PApars.noadj.stations.list", "w")
 
-    # Read header of the input file.
-    header = ccc_binary.CCHeader(data=infile.readline())
-    kq = header.info[1]
-    if kq != 1:
-        sys.exit("program not ready for quantity %s" % kq)
+    # for debugging
+    f78 = open("work/PApars.pre-flags", "w")
 
-    # The Fortran version supports different inputs, but we support just the
-    # one - corresponding to KMO=1 in PApars.f.
-    if header.info[2] in [6, 7]:
-        sys.exit("input does not have correct value for info(3)")
-
-    ml = header.info[3]
-    iyrm = header.info[3]
-    nyrsin = header.info[3]
-    if g.iyrm0 < header.info[3]:
-        sys.exit("increase g.iyrm0 to at least %s" % header.info[3])
-    iyoff = header.info[5] - 1
-    g.mbad = header.info[6]
-    last = header.info[6]
-    g.xbad = float(g.mbad)
+    last_year = int(open('work/GHCN.last_year', 'r').read().strip())
+    iyoff = 1879
+    iyrm = last_year - iyoff
+    nyrsin = iyrm
+    g.mbad = 9999
+    g.xbad = float(9999)
 
     isu = 0
     isr = 0
@@ -671,29 +274,18 @@ def PApars(rngbrf, nlap):
     g.isuData = []
  
     idata = []
-    infile.seek(0)
-    header = ccc_binary.CCHeader(data=infile.readline())
-    mf = header.info[0]
-    ml = header.info[8]
+    for (dict, anomalies) in anomaly_stream:
+        idata.extend(anomalies)
 
-    recc = 0
-    for s in infile:
-        if i1snow + ml - mf > g.msize:
-            sys.exit('error: g.msize too small')
+        mfcur = dict['first'] - iyoff
+        length = len(anomalies)
 
-        nmonths = ml - mf + 1 
-        inrec = ccc_binary.CCRecord(nmonths, data=s)
-        idata.extend(inrec.idata)
-        recc += 1
-
-        mfcur = mf
-        length = ml - mf + 1
-        mf, ml = inrec.m1, inrec.m2
-        lat = 0.1 * inrec.Lat
-        lon = 0.1 * inrec.Lon
-
+        # throw away some precision in lat/lon for compatibility with Fortran
+        lat = 0.1 * math.floor(dict['lat']* 10 + 0.5)
+        lon = 0.1 * math.floor(dict['lon']* 10 + 0.5)
         # note isr = rural stations, isu = non-rural stations
-        if inrec.name[30:32] == " R" or inrec.name[30] == "1":
+        if ((dict['US-brightness'] == ' ' and dict['pop'] == 'R') or
+            dict['US-brightness'] == '1'):
             d = Struct()
             g.isrData.append(d)
             
@@ -704,7 +296,7 @@ def PApars(rngbrf, nlap):
             d.snlatr = math.sin(lat * g.pi180)
             d.cslonr = math.cos(lon * g.pi180)
             d.snlonr = math.sin(lon * g.pi180)
-            d.idr = inrec.ID
+            d.idr = int(dict['id'][3:])
         else:
             d = Struct()
             g.isuData.append(d)
@@ -716,8 +308,8 @@ def PApars(rngbrf, nlap):
             d.snlatu = math.sin(lat * g.pi180)
             d.cslonu = math.cos(lon * g.pi180)
             d.snlonu = math.sin(lon * g.pi180)
-            d.idu = inrec.ID
-            d.cc = inrec.name[33:36]
+            d.idu = int(dict['id'][3:])
+            d.cc = dict['id'][:3]
 
         i1snow = i1snow + length
 
@@ -830,14 +422,10 @@ def PApars(rngbrf, nlap):
                  if n1x < iyu1:
                      n1x = iyu1
                  n2x = iyu2
-           
-        # write out a table entry for the table of adjustment parameters
-        s = ("%3s%09d %8.3f %8.3f %4d %8.3f %8.3f %8.3f %8.3f %8.3f"
-                  " %4d-%4d %4d-%4d") % (
-                us.cc, us.idu, fpar[0], fpar[1], int(fpar[2] + g.x0),
-                fpar[3], fpar[4], fpar[5],
-                rmsp[0], rmsp[1], n3f + iyoff, n3l + iyoff, n1x, n2x)
-        f78.write("%s\n" % s)
+
+        flag = flags(fpar[0], fpar[1], int(fpar[2] + g.x0), fpar[4], n3f + iyoff, n3l + iyoff)
+        yield (us.cc, us.idu, fpar[0], fpar[1], int(fpar[2] + g.x0),
+                fpar[3], fpar[4], fpar[5], rmsp[0], rmsp[1], n3f + iyoff, n3l + iyoff, n1x, n2x, flag)
 
     nuse = 0
     tempRs = sorted(g.isrData, key=lambda s: s.index)
@@ -847,6 +435,7 @@ def PApars(rngbrf, nlap):
                 tempRs.idr, used))
             nuse += 1
     f77.write("%12d  rural stations were used\n" % (nuse))
+    log_stats()
 
 
 def getNeighbours(us, iyoff, full=False):
@@ -1008,6 +597,8 @@ def cmbine(avg, wt, iwt, dnew, nf1, nl1, wt1, id):
 
 
 def getfit(nxy, x, f, fpar, rmsp):
+    # Todo: return the fpar tuple. y0, yknee, and the rmsp values are not used by padjust().
+    # Todo: incorporate trend2 into this.
     nhalf = nxy / 2
     rmsmin = 1.e20
 
@@ -1035,6 +626,8 @@ def trend2(xc, a, dataLen, xmid, bad, min1, min2):
     # SL1,SL2 provided we have at least MIN1,MIN2 data.
     # Linear regression data are also computed (for emergencies)
 
+    # Todo: incorporate into getfit.
+    # Todo: rename variables, use += more.
     kount0 = kount1 = 0
     sx0 = sx1 = 0
     sxx0 = sxx1 = 0
@@ -1087,179 +680,237 @@ def trend2(xc, a, dataLen, xmid, bad, min1, min2):
 
     return sl1, sl2, ymid, rms, sl, y0, rms0
 
-# Constants
-g.lshort = 7
-g.slplim = 1.0
-g.slpx = 0.5
+def flags(sl1, sl2, knee, sl, iy1, iy2):
+    g.nsta += 1
+    g.sumch += sl * (iy2 - iy1 + 1)
+    g.nyrs += (iy2 - iy1 + 1)
+    if sl < 0.0:
+        g.nstap += 1
+        g.nyrsp += (iy2 - iy1 + 1)
+        g.sumchp += sl * (iy2 - iy1 + 1)
 
+    # classify : iflag: +1 for short legs etc
+    iflag = 0
+    if knee < iy1 + g.lshort or knee > iy2 - g.lshort:
+        iflag += 1
+    if knee < iy1 + g.lshort or knee > iy2 - g.lshort:
+        g.nshort += 1
+    if abs(sl1) > g.slplim:
+        iflag += 20
+    if abs(sl1) > g.slplim:
+        g.nsl1 += 1
+    if abs(sl2) > g.slplim:
+        iflag += 10
+    if abs(sl2) > g.slplim:
+        g.nsl2 += 1
+    if abs(sl2 - sl1) > g.slplim:
+        iflag += 100
+    if abs(sl2 - sl1) > g.slplim:
+        g.ndsl += 1
+    if abs(sl2 - sl1) > g.slpx:
+        iflag += 100
 
-def flags_readRec(f):
-    """Read a single record from the input file.
+    if iflag == 0:
+        g.nok += 1
+    if iflag == 100:
+        g.nokx += 1
+    if sl1 * sl2 < 0.0 and abs(sl1) > 0.2 and abs(sl2) > 0.2:
+        iflag += 1000
+    if iflag >= 1000:
+        g.nswitch += 1
+    if iflag == 1000:
+        g.nsw0 += 1
+    return iflag
 
-    The input file is text, line oriented, one record per line.
-
-    :Return:
-        A tuple of 15 values, as follows:
-
-        cc
-            **TBD**
-        IDc
-            **TBD**
-        sl1, sl2
-            **TBD**
-        knee
-            **TBD**
-        Yknee
-            **TBD**
-        sl0, Ymid
-            **TBD**
-        RMS,RMSl
-            **TBD**
-        iy1, iy2,
-            **TBD**
-        iy1e, iy2e
-            **TBD**
-        l
-            **TBD**
-
-    :Param f:
-        The open file to read from.
-
-    """
-    l = f.readline()
-    l = l.rstrip()
-    if not l:
-        return None, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-
-    (CCdStationID,slope_l,slope_r,knee,Yknee,slope,Ymid,RMS,RMSl,
-            rur_urb,ext_range) = l.split()
-    cc, IDc = CCdStationID[:3], int(CCdStationID[3:])
-    sl1 = float(slope_l)
-    sl2 = float(slope_r)
-    knee = int(knee)
-    sl0 = float(slope)
-    iy1, iy2 = [int(v) for v in rur_urb.split("-")]
-    iy1e, iy2e = [int(v) for v in ext_range.split("-")]
-    return (cc, IDc, sl1, sl2, knee, Yknee, sl0, Ymid,RMS,RMSl, iy1, iy2,
-            iy1e, iy2e, l)
-
-
-def flags():
-    """Python replacement for code/STEP2/flags.f
-
-    Input files:
-
-        work/PApars.pre-flags
-
-    Output files:
-        work/PApars.list
-
-    The input file is a text file, with a single record per line. This is created
-    by PApars(), which adds the flags value at the end of each record, based on
-    the record's contents.
-
-    """ 
-
-    f78 = open("work/PApars.pre-flags")
-    f2 = open("work/PApars.list", "w")
-    f2.write('CCdStationID  slope-l  slope-r knee    Yknee    slope     Ymid      RMS     RMSl 3-rur+urb ext.range flag\n')
-    nstat = sumch = nyrs = nstap = nyrsp = sumchp = 0
-    nsl1 = nsl2 = ndsl = nswitch = nsw0 = nok = nokx = nsta = 0
-    nshort = 0
-    while True:
-        data = flags_readRec(f78)
-        if data[0] is None:
-            break
-        cc,id,sl1,sl2,knee,yk,sl,ylin,rms,rms0,iy1,iy2,iy1e,iy2e,line = data
-        nsta += 1
-        sumch = sumch + sl * (iy2 - iy1 + 1)
-        nyrs = nyrs + (iy2 - iy1 + 1)
-        if sl < 0.0:
-            nstap += 1
-            nyrsp += (iy2 - iy1 + 1)
-            sumchp += sl * (iy2 - iy1 + 1)
-
-        # classify : iflag: +1 for short legs etc
-        iflag = 0
-        if knee < iy1 + g.lshort or knee > iy2 - g.lshort:
-            iflag += 1
-        if knee < iy1 + g.lshort or knee > iy2 - g.lshort:
-            nshort += 1
-        if abs(sl1) > g.slplim:
-            iflag += 20
-        if abs(sl1) > g.slplim:
-            nsl1 += 1
-        if abs(sl2) > g.slplim:
-            iflag += 10
-        if abs(sl2) > g.slplim:
-            nsl2 += 1
-        if abs(sl2 - sl1) > g.slplim:
-            iflag += 100
-        if abs(sl2 - sl1) > g.slplim:
-            ndsl += 1
-
-        # TODO: The small offset fixes a Fortran/Python rounding issue, but I
-        #       am not happy with it. PAO, Mon Feb 23 2009.
-        if abs(sl2 - sl1) + 0.00000001 > g.slpx:
-            iflag += 100
-       
-        if iflag == 0:
-            nok += 1
-        if iflag == 100:
-            nokx += 1
-        if sl1 * sl2 < 0.0 and abs(sl1) > 0.2 and abs(sl2) > 0.2:
-            iflag += 1000
-        if iflag >= 1000:
-            nswitch += 1
-        if iflag == 1000:
-            nsw0 += 1
-       
-        line += " %4d" % iflag
-        f2.write("%s\n" % line)
-
+def log_stats():
     g.log.write(" %-10s %4d %10.7f     %10.7f\n" % (
-                "all", nsta,-sumch/nsta,-10.*sumch/nyrs))
+                "all", g.nsta,-g.sumch/g.nsta,-10.*g.sumch/g.nyrs))
     g.log.write(" %-11s %8d  %10.7f    %10.7f\n" % (
-                "urb warm", nstap,-sumchp/nstap,-10.*sumchp/nyrsp))
+                "urb warm", g.nstap,-g.sumchp/g.nstap,-10.*g.sumchp/g.nyrsp))
     g.log.write(" %-11s %11d %11d %11d %11d %11d %11d\n" % (
-                "# short,sl1,sl2,dsl,ok", nshort,nsl1,nsl2,ndsl,nok,nokx))
-    g.log.write(" %-11s  %11d %11d\n" % ("switches: all , else ok", nswitch,nsw0))
+                "# short,sl1,sl2,dsl,ok", g.nshort,g.nsl1,g.nsl2,g.ndsl,g.nok,g.nokx))
+    g.log.write(" %-11s  %11d %11d\n" % ("switches: all , else ok", g.nswitch,g.nsw0))
 
+
+def padjust(stream, adjustments):
+    log = open('log/padjust.log', 'w')
+    first_year = 1880
+    adj_dict = {}
+    for adjustment in adjustments:
+        cc, IDc, sl1, sl2, knee, _, sl0, _, _, _, iy1, iy2, iy1e, iy2e, flag = adjustment
+        adj_dict['%3s%09d' % (cc, IDc)] = sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag 
+
+    for (dict, series) in stream:
+        report_name = "%s%c%c%c%3s" % (
+                      dict['name'], dict['US-brightness'],
+                      dict['pop'], dict['GHCN-brightness'], dict['id'][:3])
+        report_station = "station   %9d" % int(dict['id'][3:])
+        if adj_dict.has_key(dict['id']):
+            # adjust
+            m1 = dict['min_month'] - first_year * 12 + 1  # number of first valid month
+            m2 = dict['max_month'] - first_year * 12 + 1  # number of last valid month
+            offset = dict['min_month'] - dict['begin'] * 12 # index of first valid month
+            (sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag) = adj_dict[dict['id']]
+            a, b = adj(first_year, dict, series, sl1, sl2, knee, sl0, iy1e, iy2e, iy1, iy2, flag, m1, m2, offset)
+            # a and b are numbers of new first and last valid months
+            log.write(" %s  %s saved\n" % (report_station, report_name))
+            log.write(" %s  %s adjusted %s %s\n" % (report_station, report_name, (m1, m2), (a, b)))
+            aa = a - m1
+            bb = b - a + 1
+            log.write("ADJ %s %s %s %s %s\n" % (report_name, len(series), len(series), aa, bb))
+            series = series[aa + offset:aa + offset + bb]
+            dict['begin'] = ((a-1) / 12) + first_year
+            dict['first'] = dict['begin']
+            dict['min_month'] = a-1 + first_year * 12
+            dict['max_month'] = b-1 + first_year * 12
+            dict['end'] = ((b-1) / 12) + first_year
+            dict['last'] = dict['end']
+            log.write("%s %s\n" % (len(series), len(series)))
+            yield(dict, series)
+            log.write(" %s  %s saved\n" % (report_station, report_name))
+        else:
+            if ((dict['US-brightness'] == ' ' and dict['pop'] == 'R') or
+                dict['US-brightness'] == '1'):
+                # rural station: not adjusted
+                offset = dict['min_month'] - dict['begin'] * 12 # index of first valid month
+                length = dict['max_month'] - dict['min_month'] + 1
+                series = series[offset : offset + length]
+                dict['begin'] = dict['first']
+                dict['end'] = dict['last']
+                yield (dict, series)
+                log.write(" %s  %s saved\n" % (report_station, report_name))
+            else:
+                # unadjusted urban station: skip
+                log.write(" %s  %s skipped\n" % (report_station, report_name))
+
+def adj(first_year, dict, series, sl1, sl2, knee, sl0, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offset):
+    if iflag not in (0, 100):
+        # Use linear approximation
+        sl1, sl2 = sl0, sl0
+
+    base = m1
+
+    miss = 9999
+    m1o, m2o = m1, m2
+    m1 = -100
+    m0 = 12 * (iy1 - first_year)   # Dec of year iy1
+    for iy in range(iy1, iy2 + 1):
+        sl = sl1
+        if iy > knee:
+            sl = sl2
+        iya = iy
+        if iy < iy1a:
+            iya = iy1a
+        if iy > iy2a:
+            iya = iy2a
+        iadj = int(round((iya - knee) * sl - (iy2a - knee) * sl2))
+        for m in range(m0, m0 + 12):
+            mIdx = m - base
+            if mIdx < 0:
+                continue
+            if m >= m1o and m <= m2o and valid(series[mIdx + offset]):
+                if m1 < 0:
+                    m1 = m
+                series[mIdx+offset] = series[mIdx+offset] + iadj
+                m2 = m
+
+        m0 = m0 + 12
+
+    return m1, m2
+
+def results_to_text(input_name, output_name):
+    """ Useful for debugging.  Takes a trimmed data file
+    *input_name* and produces a text equivalent called *output_name*.
+    """
+
+    infile = fort.open(input_name, "rb")
+    outfile = open(output_name, 'w')
+
+    header = ccc_binary.CCHeader(infile.readline())
+    outfile.write("'%s' %s\n" % (header.title, header.info))
+
+    m1 = header.info[0]
+    m2 = header.info[8]
+
+    for s in infile:
+        nMonths = m2 - m1 + 1
+        rec = ccc_binary.CCRecord(nMonths, data=s)
+        outfile.write("id %d lat %d lon %d height %d name %s m1 %d m2 %d\n" % (
+                rec.ID, rec.Lat, rec.Lon, rec.iht, rec.name, rec.m1, rec.m2))
+        outfile.write("%s\n" % rec.idata)
+        m1 = rec.m1
+        m2 = rec.m2
+
+def write_results(stream, filename):
+    """ Takes a *stream* of step2 result records and writes them to
+    a Fortran-format binary file named *filename*.
+    """
+
+    first_year = 1880
+    last_year = int(open('work/GHCN.last_year', 'r').read().strip())
+    MTOT = 12 * (last_year - first_year + 1)
+    header = ccc_binary.CCHeader()
+    header.title = 'GHCN V2 Temperatures (.1 C)'
+    header.info[1] = 1
+    header.info[2] = 6
+    header.info[3] = MTOT
+    header.info[4] = MTOT+15
+    header.info[5] = 1880
+    header.info[6] = 9999
+    header.info[7] = -9999
+
+    outfile = fort.open(filename, "wb")
+
+    header_written = False
+
+    for (dict, series) in stream:
+        m1 = dict['min_month'] - first_year * 12 + 1
+        m2 = dict['max_month'] - first_year * 12 + 1
+        if header_written:
+            rec.m1 = m1
+            rec.m2 = m2
+            outfile.writeline(rec.binary)
+        else:
+            header.info[0] = m1
+            header.info[8] = m2
+            outfile.writeline(header.binary)
+            header_written = True
+        rec = ccc_binary.CCRecord(m2 - m1 + 1)
+        rec.idata = series
+        rec.Lat = math.floor(dict['lat'] * 10 + 0.5)
+        rec.Lon = math.floor(dict['lon'] * 10 + 0.5)
+        rec.iht = int(dict['elevs'])
+        rec.ID = int(dict['id'][3:])
+        rec.name = "%s%c%c%c%3s" % (dict['name'], dict['US-brightness'],
+                                    dict['pop'], dict['GHCN-brightness'], dict['id'][:3])
+
+    rec.m1 = 9999
+    rec.m2 = 9999
+    outfile.writeline(rec.binary)
+    
 def main(argv=None):
     if argv is None:
         argv = sys.argv
 
-    year = open('work/GHCN.last_year', 'r').read().strip()
-    print "... converting text to binary file, last year = %s" % year
-    text_to_binary(int(year))
-
-    # At this point we may need to reorder the Ts.bin/Ts.txt file so
-    # that all the stations between +60.1 and +90.0 comes first, then
-    # all the stations between +30.1 and +60.0 come next, and so on.
-    # Thus reflecting how they get re-ordered when they are split into 6
-    # files.
-    # Not doing the reordering makes a tiny amount of difference, see
-    # http://code.google.com/p/ccc-gistemp/issues/detail?id=25
-    # But if you feel like doing, you'll need to look at the, now
+    data = invnt('Ts.GHCN.CL', read_text())
+    # At this point we may need to reorder the data so that all the
+    # stations between +60.1 and +90.0 comes first, then all the
+    # stations between +30.1 and +60.0 come next, and so on.  Thus
+    # reflecting how GISTEMP re-orders them when they are split into 6
+    # files.  Doing the reordering makes a tiny amount of difference,
+    # see http://code.google.com/p/ccc-gistemp/issues/detail?id=25
+    #
+    # But if you feel like doing this, you'll need to look at the, now
     # deleted, split_binary.py program to see exactly how the split
     # happens.
 
-    print "... trimming Ts.bin"
-    trim_binary('work/Ts.bin', 'work/Ts.GHCN.CL')
+    (data_1, data_2) = itertools.tee(data, 2)
 
-    print "... Making station list"
-    invnt('Ts.GHCN.CL')
-
-    print "... Creating annual anomalies"
-    toANNanom('work/Ts.GHCN.CL', 'work/ANN.dTs.GHCN.CL')
-    PApars(1000.0, 20)
-    flags()
-
-    print "... Applying peri-urban adjustment"
-    padjust()
-
-    print "... Making station list"
-    invnt('Ts.GHCN.CL.PA')
+    anomalies = toANNanom(data_1)
+    adjustments = PApars(1000.0, 20, anomalies)
+    
+    adjusted = invnt('Ts.GHCN.CL.PA', padjust(data_2, adjustments))
+    write_results(adjusted, 'work/Ts.GHCN.CL.PA')
 
 if __name__ == '__main__':
     main()

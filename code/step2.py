@@ -256,9 +256,6 @@ def PApars(rngbrf, nlap, anomaly_stream):
     # Isolated urban stations
     f79 = open("log/PApars.noadj.stations.list", "w")
 
-    # for debugging
-    f78 = open("work/PApars.pre-flags", "w")
-
     last_year = int(open('work/GHCN.last_year', 'r').read().strip())
     iyoff = 1879
     iyrm = last_year - iyoff

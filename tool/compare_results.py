@@ -338,6 +338,19 @@ def compare(dirs, labels, o):
     fs = map(lambda d: open(os.path.join(d, box_file), 'r'), dirs)
     boxes = map(list, map(box_series, fs))
     diffs = list(difference(boxes, 0.01))
+    box_table = {}
+    for d in diffs:
+        box = d[0][0]
+        box_table[box] = box_table.get(box,[])
+        box_table[box].append(d[1])
+    box_std_devs = []
+    max_std_dev = 0.0
+    for (box, box_diffs) in box_table.items():
+        box_table[box] = stats(box_diffs)
+        std_dev = box_table[box][3]
+        max_std_dev = max(max_std_dev, std_dev)
+        box_std_devs.append((box, std_dev))
+    
     d = map(lambda a: a[1], diffs)
     print >>o, '<h3>Per-box monthly residue distribution</h3>'
     print >>o, '<img src="%s">' % escape(distribution_url(d))
@@ -348,6 +361,29 @@ def compare(dirs, labels, o):
     print >>o, '</ul>'
     top(diffs, 10, o,'Largest per-box monthly residues',
         lambda k, v: "Box %02d, %04d-%02d: %g" % (k[0], k[1], k[2] + 1, v))
+
+    top(box_std_devs, 10, o,'Largest per-box standard deviations',
+        lambda k, v: "Box %02d: %g" % (k, v))
+
+    print >>o, '<h3>Geographic distribution of per-box monthly residue statistics</h3>'
+    print >>o, '<table border=1 style="border-collapse:collapse; border-width:1px; border-color:#cccccc; border-style:solid; font-size:small">'
+    box = 0
+    for band in range(8):
+        print >>o, '<tr>'
+        boxes_in_band = 18 - 2 * (abs(7 - 2*band)) # silly hack to get 4,8,12,16,16,12,8,4
+        box_span = 48 / boxes_in_band
+        for i in range(boxes_in_band):
+            std_dev = box_table[box][3]
+            if std_dev == 0 or max_std_dev == 0:
+                gb_level = 0xff
+            else:
+                gb_level = 0xff - int(0x80 * std_dev / max_std_dev)
+            color = "#ff%02x%02x" % (gb_level, gb_level)
+            print >>o, '<td align="center" colspan="%d" bgcolor = "%s">' % (box_span, color)
+            print >>o, '%d%%<br/>%.2g</td>' % (100 * box_table[box][0]/box_table[box][1], box_table[box][3])
+            box += 1
+        print >>o, '</tr>'
+    print >>o, '</table>'
 
     print >>o, "</body>"
     print >>o, "</html>"

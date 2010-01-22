@@ -73,10 +73,10 @@ ccc-gistemp-0.2.0 uses input data in the subdirectory input/.  This
 input data includes large files of temperature records from GHCN,
 USHCN, and sea surface data, and small files of additional temperature
 records and records and station tables from GISS.  ccc-gistemp-0.2.0
-includes code (preflight.py) to fetch this data from the originating
-organisations over the internet.  It will not download a file if it is
-already present in the input/ directory, so if you wish to run
-ccc-gistemp with updated input data, you can delete the input
+includes code (tool/preflight.py) to fetch this data from the
+originating organisations over the internet.  It will not download a
+file if it is already present in the input/ directory, so if you wish
+to run ccc-gistemp with updated input data, you can delete the input
 directory before you start.
 
 
@@ -84,11 +84,11 @@ directory before you start.
 
 To run CCC-GISTEMP:
 
-python code/run.py
+python tool/run.py
 
 To run only one step (0-5), give a -s <step> argument.  For instance:
 
-python code/run.py -s 1
+python tool/run.py -s 1
 
 We use this directory structure:
 
@@ -97,13 +97,13 @@ ccc-gistemp-x.x.x/code/     Source code only
                  /doc/      Internal developer documentation
                  /input/    Input data files
                  /log/      Log files
-                 /tool/     Tools - sources other than ccc-gistemp
+                 /tool/     Tools - sources other than the core of ccc-gistemp
                  /work/     Intermediate data files
                  /result/   Final result files
 
 Running the code should write to the input/ directory when fetching
 input data, but subsequently only write to the work/ log/ and result/
-directories.  Before running code/run.py, these directories can all be
+directories.  Before running tool/run.py, these directories can all be
 deleted (if you wish, for example, to have a clean run).
 
 
@@ -133,6 +133,7 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
+2010-01-22 NB  Updated to reflect some code moving to tool/.
 2010-01-11 NB  Updated to describe preflight better.
 2010-01-06 DRJ Updated for our all-Python status.
 2009-12-03 NB  Updated for transfer to GoogleCode project.

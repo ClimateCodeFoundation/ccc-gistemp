@@ -22,6 +22,9 @@ import os
 # http://www.python.org/doc/2.4.4/lib/module-sys.html
 import sys
 
+# Clear Climate Code
+sys.path.append(os.path.join(os.getcwd(),'code'))
+
 class Fatal(Exception):
     def __init__(self, msg):
         self.msg = msg

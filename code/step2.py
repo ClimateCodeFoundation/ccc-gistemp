@@ -234,13 +234,9 @@ def PApars(rngbrf, nlap, anomaly_stream):
     g.nsl1 = g.nsl2 = g.ndsl = g.nswitch = g.nsw0 = g.nok = g.nokx = g.nsta = 0
     g.nshort = 0
 
-    ts = [0.0] * 900
     f = [0.0] * 900
     x = [0.0] * 900
     w = [0.0] * 900
-    yr = [0.0] * 900
-    fpar = [0.0] * 20
-    rmsp = [0.0] * 20
 
     g.rngbrh = g.rngbrf / 2
     g.rbyrcf = earth.radius / g.rngbrf
@@ -351,7 +347,7 @@ def PApars(rngbrf, nlap, anomaly_stream):
                 f66.write("year dTs-urban dTs-rural StnID=%s\n" % (
                     us.id))
             tmean, n3l, nxy, n3, n3f, nxy3, tm3 = func3(
-                iy1, iyrm, avg, urb, iwt, ts, f, iyoff, yr, x, w, f66)
+                iy1, iyrm, avg, urb, iwt, f, iyoff, x, w, f66)
 
             if n3 < g.ncrit:
                 if usingFullRadius:
@@ -385,7 +381,7 @@ def PApars(rngbrf, nlap, anomaly_stream):
         #===  c subtract urban station and call a curve fitting program
         tmean = tm3 / nxy3
         nxy = nxy3
-        getfit(nxy, x, f, fpar, rmsp)
+        fit = getfit(nxy, x, f)
         # find extended range
         iyxtnd = int(round(n3 / g.xcrit)) - (n3l - n3f + 1)
         g.log.write(" possible range increase %11d %11d %11d\n" % (
@@ -404,9 +400,8 @@ def PApars(rngbrf, nlap, anomaly_stream):
                      n1x = iyu1
                  n2x = iyu2
 
-        flag = flags(fpar[0], fpar[1], int(fpar[2] + g.x0), fpar[4], n3f + iyoff, n3l + iyoff)
-        yield (us.id, fpar[0], fpar[1], int(fpar[2] + g.x0),
-                fpar[3], fpar[4], fpar[5], rmsp[0], rmsp[1], n3f + iyoff, n3l + iyoff, n1x, n2x, flag)
+        flag = flags(fit, n3f + iyoff, n3l + iyoff)
+        yield (us.id, fit, n3f + iyoff, n3l + iyoff, n1x, n2x, flag)
 
     nuse = 0
     tempRs = sorted(g.rural_stations, key=lambda s: s.index)
@@ -482,7 +477,6 @@ def func2(us, iyrm, is0, iyoff, rngbr, combined):
     for m in xrange(rs.first_index - 1, rs.last_index):
         if rdata[m] < xbad:
             wt[m + ioff] = wti
-        if rdata[m] < xbad:
             iwt[m + ioff] = 1
     g.log.write("longest rur range:%5d-%4d%6d%s\n" % (
                 rs.first_month + iyoff, rs.last_index + ioff + iyoff, comb.lenis, rs.id))
@@ -510,7 +504,7 @@ def func2(us, iyrm, is0, iyoff, rngbr, combined):
     return wt, iwt, urb, avg
 
 
-def func3(iy1, iyrm, avg, urb, iwt, ts, f, iyoff, yr, x, w, f66):
+def func3(iy1, iyrm, avg, urb, iwt, f, iyoff, x, w, f66):
     tmean = nxx = n3l = nxy = n3 = n3f = nxy3 = tm3 = 0
 
     for iy in xrange(iy1 - 1, iyrm):
@@ -525,11 +519,9 @@ def func3(iy1, iyrm, avg, urb, iwt, ts, f, iyoff, yr, x, w, f66):
             if n3 <= 0:
                 continue
 
-            ts[nxy] = avg[iy] - urb[iy]
-            f[nxy] = ts[nxy]
+            f[nxy] = avg[iy] - urb[iy]
             tmean = tmean + f[nxy]
-            yr[nxy] = iy + iyoff + 1
-            x[nxy] = yr[nxy] - g.x0
+            x[nxy] = iy + iyoff + 1 - g.x0
             w[nxy] = 1.
             nxy += 1
             if iwt[iy] >= g.nrurm:
@@ -577,46 +569,35 @@ def cmbine(avg, wt, iwt, dnew, nf1, nl1, wt1):
     return nsm, ncom
 
 
-def getfit(nxy, x, f, fpar, rmsp):
-    # Todo: return the fpar tuple. y0, yknee, and the rmsp values are not used by padjust().
+def getfit(nxy, x, f):
     # Todo: incorporate trend2 into this.
     nhalf = nxy / 2
     rmsmin = 1.e20
 
     for n in xrange(6, nxy - 5 + 1):
         xknee = x[n - 1]
-        sl1, sl2, yknee, rms, sl, y0, rms0 = trend2(
-                x, f, nxy, xknee, 9999., 2, 2)
+        sl1, sl2, rms, sl = trend2(x, f, nxy, xknee, 9999., 2)
         
         if rms < rmsmin:
              rmsmin = rms
              xmin = xknee + g.x0
-             fpar[0] = sl1
-             fpar[1] = sl2
-             fpar[2] = xknee
-             fpar[3] = yknee
-             fpar[4] = sl
-             fpar[5] = y0
-             rmsp[0] = rms / nxy
-             rmsp[1] = rms0 / nxy
+             fit = (sl1, sl2, xmin, sl)
+
+    return fit
 
 
-def trend2(xc, a, dataLen, xmid, bad, min1, min2):
+def trend2(xc, a, dataLen, xmid, bad, min):
     # finds a fit using regression analysis by a line
     # with a break in slope at Xmid. Returned are the 2 slopes
-    # SL1,SL2 provided we have at least MIN1,MIN2 data.
-    # Linear regression data are also computed (for emergencies)
+    # SL1,SL2 provided we have at least MIN data on each side.
+    # Linear regression data are also computed.
 
     # Todo: incorporate into getfit.
-    # Todo: rename variables, use += more.
-    kount0 = kount1 = 0
+    count0 = count1 = 0
     sx0 = sx1 = 0
     sxx0 = sxx1 = 0
     sxa0 = sxa1 = 0
 
-    sl1 = bad
-    sl2 = bad
-    ymid = bad
     sa = 0.0
     saa = 0.0
 
@@ -625,43 +606,50 @@ def trend2(xc, a, dataLen, xmid, bad, min1, min2):
             continue
         x = xc[n] - xmid
         v_a = a[n]
-        sa = sa + v_a
-        saa = saa + v_a ** 2
+        sa += v_a
+        saa += v_a ** 2
         if x > 0.0:
-            kount1 += 1
+            count1 += 1
             sx1 += x
             sxx1 += x ** 2
             sxa1 += x * v_a
         else:
-            kount0 += 1
+            count0 += 1
             sx0 += x
             sxx0 += x ** 2
             sxa0 += x * v_a
 
-    ntot = kount0 + kount1
-    denom = ntot * sxx0 * sxx1 - sxx0 * sx1 ** 2 - sxx1 * sx0 ** 2
-    xnum1 = sx0 * (sx1 * sxa1 - sxx1 * sa) + sxa0 * (ntot * sxx1 - sx1 ** 2)
-    xnum2 = sx1 * (sx0 * sxa0 - sxx0 * sa) + sxa1 * (ntot * sxx0 - sx0 ** 2)
+    if count0 < min or count1 < min:
+        return bad, bad, bad, bad
 
-    if kount0 < min1 or kount1 < min2:
-        return sl1, sl2, ymid, rms, sl, y0, rms0
+    count = count0 + count1
+    denom = (count * sxx0 * sxx1
+             - sxx0 * sx1 ** 2
+             - sxx1 * sx0 ** 2)
+    sl1 = (sx0 * (sx1 * sxa1 - sxx1 * sa)
+           + sxa0 * (count * sxx1 - sx1 ** 2)) / denom
+    sl2 = (sx1 * (sx0 * sxa0 - sxx0 * sa)
+           + sxa1 * (count * sxx0 - sx0 ** 2)) / denom
 
-    sl1 = xnum1 / denom
-    sl2 = xnum2 / denom
-    ymid = (sa - sl1 * sx0 - sl2 * sx1) / ntot
-    rms = ntot * ymid ** 2 + saa - 2 * ymid * (sa - sl1 * sx0 - sl2 * sx1) + sl1 * sl1 * sxx0 + sl2 * sl2 * sxx1 - 2 * sl1 * sxa0 - 2 * sl2 * sxa1
+    ymid = (sa - sl1 * sx0 - sl2 * sx1) / count
+    rms = (count * ymid ** 2
+           + saa
+           - 2 * ymid * (sa - sl1 * sx0 - sl2 * sx1)
+           + sl1 * sl1 * sxx0
+           + sl2 * sl2 * sxx1
+           - 2 * sl1 * sxa0
+           - 2 * sl2 * sxa1)
 
     # linear regression
-    sx0 = sx0 + sx1
-    sxx0 = sxx0 + sxx1
-    sxa0 = sxa0 + sxa1
-    sl = (ntot * sxa0 - sa * sx0) / (ntot * sxx0 - sx0 ** 2)
-    y0 = (sa - sl * sx0) / ntot
-    rms0 = ntot * y0 ** 2 + saa + sl * sl * sxx0 - 2 * y0 * (sa - sl * sx0) - 2 * sl * sxa0
+    sx = sx0 + sx1
+    sxx = sxx0 + sxx1
+    sxa = sxa0 + sxa1
+    sl = (count * sxa - sa * sx) / (count * sxx - sx ** 2)
 
-    return sl1, sl2, ymid, rms, sl, y0, rms0
+    return sl1, sl2, rms, sl
 
-def flags(sl1, sl2, knee, sl, iy1, iy2):
+def flags(fit, iy1, iy2):
+    (sl1, sl2, knee, sl) = fit
     g.nsta += 1
     g.sumch += sl * (iy2 - iy1 + 1)
     g.nyrs += (iy2 - iy1 + 1)
@@ -718,8 +706,8 @@ def padjust(stream, adjustments):
     first_year = 1880
     adj_dict = {}
     for adjustment in adjustments:
-        id, sl1, sl2, knee, _, sl0, _, _, _, iy1, iy2, iy1e, iy2e, flag = adjustment
-        adj_dict[id] = sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag 
+        id = adjustment[0]
+        adj_dict[id] = adjustment
 
     for (dict, series) in stream:
         report_name = "%s%c%c%c%3s" % (
@@ -731,8 +719,8 @@ def padjust(stream, adjustments):
             m1 = dict['min_month'] - first_year * 12 + 1  # number of first valid month
             m2 = dict['max_month'] - first_year * 12 + 1  # number of last valid month
             offset = dict['min_month'] - dict['begin'] * 12 # index of first valid month
-            (sl1, sl2, knee, sl0, iy1, iy2, iy1e, iy2e, flag) = adj_dict[dict['id']]
-            a, b = adj(first_year, dict, series, sl1, sl2, knee, sl0, iy1e, iy2e, iy1, iy2, flag, m1, m2, offset)
+            (_, fit, iy1, iy2, iy1e, iy2e, flag) = adj_dict[dict['id']]
+            a, b = adj(first_year, dict, series, fit, iy1e, iy2e, iy1, iy2, flag, m1, m2, offset)
             # a and b are numbers of new first and last valid months
             log.write(" %s  %s saved\n" % (report_station, report_name))
             log.write(" %s  %s adjusted %s %s\n" % (report_station, report_name, (m1, m2), (a, b)))
@@ -763,7 +751,8 @@ def padjust(stream, adjustments):
                 # unadjusted urban station: skip
                 log.write(" %s  %s skipped\n" % (report_station, report_name))
 
-def adj(first_year, dict, series, sl1, sl2, knee, sl0, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offset):
+def adj(first_year, dict, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offset):
+    (sl1, sl2, knee, sl0) = fit
     if iflag not in (0, 100):
         # Use linear approximation
         sl1, sl2 = sl0, sl0

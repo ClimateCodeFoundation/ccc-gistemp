@@ -73,8 +73,12 @@ def fetch(files, prefix='input/', output=sys.stdout):
     ftp://data.giss.nasa.gov/pub/gistemp/SBBX.HadR2
     """.split()
 
+    giss_test = """
+    http://ccc-gistemp.googlecode.com/files/ccc-gistemp-test-2009-12-28.tar.gz
+    """.split()
+
     # This is all the inputs that are simple URLs
-    all = noaa + giss
+    all = noaa + giss + giss_test
 
     # *place* is a dictionary that maps from short name to URL or some
     # other indicator of location.

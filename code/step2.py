@@ -518,7 +518,7 @@ def func2(us, iyrm, is0, iyoff, rngbr, combined):
         nf1 = rs.mfsr
         nl1 = rs.ilsr + ioff
         #****       shift new data, then combine them with current mean
-        nsm, ncom = cmbine(avg, wt, iwt, dnew, nf1, nl1, comb.wti, rs.idr)
+        nsm, ncom = cmbine(avg, wt, iwt, dnew, nf1, nl1, comb.wti)
         g.log.write(" data added:  %11d  overlap: %11d  years\n" % (nsm, ncom))
         if nsm != 0:
             g.nuseid[is_ - 1] += 1
@@ -558,7 +558,7 @@ def func3(iy1, iyrm, avg, urb, iwt, ts, f, iyoff, yr, x, w, f66):
     return tmean, n3l, nxy, n3, n3f, nxy3, tm3
 
     
-def cmbine(avg, wt, iwt, dnew, nf1, nl1, wt1, id):
+def cmbine(avg, wt, iwt, dnew, nf1, nl1, wt1):
     # bias of new data is removed by subtracting the difference
     # over the common domain. then the new data are averaged in.
 

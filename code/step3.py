@@ -349,6 +349,81 @@ def sort(l, cmp):
         l[n] = t
     return
 
+
+# Equivalent of the Fortran subroutine CMBINE
+# Parameters as per Fortran except that km is bound lexically, and
+# nsm is returned directly.
+def combine(km, XBAD, bias, avg, wt, dnew, nf1, nl1, wt1, wtm, id,
+        NOVRLP=20):
+    """Run the GISTEMP combining algorithm.  This combines the data
+    in the dnew array into the avg array.
+
+    Each of the argument avg, wt, dnew is a linear array that is
+    divided into "years" by considering each contiguous segment of
+    km elements a year.  Only data for years in range(nf1, nl1) are
+    considered and combined.  Note that range(nf1, nl1) includes nf1
+    but excludes nl1 (and that this differs from the Fortran
+    convention).
+    
+    Each month (or other subdivision, such as season, according to
+    km) of the year is considered separately.  For the set of times
+    where both avg and dnew have data the mean difference (a bias)
+    is computed.  If there are fewer than NOVRLP years in common the
+    data (for that month of the year) are not combined.  The bias is
+    subtracted from the dnew record and it is point-wise combined
+    into avg according to the station weight, wt1, and the exist
+    weight for avg.
+
+    id is an identifier used only when diagnostics are issued
+    (when combining stations it expected to be the station ID).
+    """
+
+    from itertools import izip
+
+    # See to.SBBXgrid.f lines 519 and following
+
+    # The Fortran code handles the arrays by just assuming them to
+    # be 2D arrays of shape (*,KM).  Sadly Python array handling
+    # just isn't that convenient, so look out for repeated uses of
+    # "[k+km*n]" instead.
+
+    nsm = 0
+    missed = km
+    missing = [True]*km
+    for k in range(km):
+        sumn = 0    # Sum of data in dnew
+        sum = 0     # Sum of data in avg
+        ncom = 0    # Number of years where both dnew and avg are valid
+        for a,n in izip(avg[nf1*km+k: nl1*km: km],
+                       dnew[nf1*km+k: nl1*km: km]):
+            if a >= XBAD or n >= XBAD:
+                continue
+            ncom += 1
+            sum += a
+            sumn += n
+        if ncom < NOVRLP:
+            continue
+        biask = float(sum-sumn)/ncom
+        # Find mean bias
+        wtmnew = wtm[k]+wt1
+        # Note: bias is lexically captured
+        bias[k] = float(wtm[k]*bias[k]+wt1*biask)/wtmnew
+        wtm[k]=wtmnew
+        # Update period of valid data, averages and weights
+        for kn in range(nf1*km+k, nl1*km, km):
+            if dnew[kn] >= XBAD:
+                continue
+            wtnew = wt[kn] + wt1
+            avg[kn] = float(wt[kn]*avg[kn] + wt1*(dnew[kn]+biask))/wtnew
+            wt[kn] = wtnew
+            nsm += 1
+        missed -= 1
+        missing[k] = False
+    if False and missed > 0:
+        print "Unused data - ID/SUBBOX,WT", id, wt1, missing
+    return nsm
+
+
 def subbox_grid(infile,
         subbox_out, box_out, station_use_out, radius=1200,
         year_begin=1880, base_year=(1951,1980), audit=None,
@@ -373,78 +448,6 @@ def subbox_grid(infile,
 
     # Helper functions (rather big ones).  These are separate in the
     # Fortran.
-
-    # Equivalent of the Fortran subroutine CMBINE
-    # Parameters as per Fortran except that km is bound lexically, and
-    # nsm is returned directly.
-    def combine(avg, wt, dnew, nf1, nl1, wt1, wtm, id, NOVRLP=20):
-        """Run the GISTEMP combining algorithm.  This combines the data
-        in the dnew array into the avg array.
-
-        Each of the argument avg, wt, dnew is a linear array that is
-        divided into "years" by considering each contiguous segment of
-        km elements a year.  Only data for years in range(nf1, nl1) are
-        considered and combined.  Note that range(nf1, nl1) includes nf1
-        but excludes nl1 (and that this differs from the Fortran
-        convention).
-        
-        Each month (or other subdivision, such as season, according to
-        km) of the year is considered separately.  For the set of times
-        where both avg and dnew have data the mean difference (a bias)
-        is computed.  If there are fewer than NOVRLP years in common the
-        data (for that month of the year) are not combined.  The bias is
-        subtracted from the dnew record and it is point-wise combined
-        into avg according to the station weight, wt1, and the exist
-        weight for avg.
-
-        id is an identifier used only when diagnostics are issued
-        (when combining stations it expected to be the station ID).
-        """
-
-        from itertools import izip
-
-        # See to.SBBXgrid.f lines 519 and following
-
-        # The Fortran code handles the arrays by just assuming them to
-        # be 2D arrays of shape (*,KM).  Sadly Python array handling
-        # just isn't that convenient, so look out for repeated uses of
-        # "[k+km*n]" instead.
-
-        nsm = 0
-        missed = km
-        missing = [True]*km
-        for k in range(km):
-            sumn = 0    # Sum of data in dnew
-            sum = 0     # Sum of data in avg
-            ncom = 0    # Number of years where both dnew and avg are valid
-            for a,n in izip(avg[nf1*km+k: nl1*km: km],
-                           dnew[nf1*km+k: nl1*km: km]):
-                if a >= XBAD or n >= XBAD:
-                    continue
-                ncom += 1
-                sum += a
-                sumn += n
-            if ncom < NOVRLP:
-                continue
-            biask = float(sum-sumn)/ncom
-            # Find mean bias
-            wtmnew = wtm[k]+wt1
-            # Note: bias is lexically captured
-            bias[k] = float(wtm[k]*bias[k]+wt1*biask)/wtmnew
-            wtm[k]=wtmnew
-            # Update period of valid data, averages and weights
-            for kn in range(nf1*km+k, nl1*km, km):
-                if dnew[kn] >= XBAD:
-                    continue
-                wtnew = wt[kn] + wt1
-                avg[kn] = float(wt[kn]*avg[kn] + wt1*(dnew[kn]+biask))/wtnew
-                wt[kn] = wtnew
-                nsm += 1
-            missed -= 1
-            missing[k] = False
-        if False and missed > 0:
-            print "Unused data - ID/SUBBOX,WT", id, wt1, missing
-        return nsm
 
     # Equivalent to Fortran subroutine TAVG.
     # See to.SBBXgrid.f lines 563 and following.
@@ -736,7 +739,8 @@ def subbox_grid(infile,
                 nl1 = 1 + (station[i].dataend-1) // km
                 if audit:
                     print "ADD %s %r" % (station[i].id, wti[i])
-                nsm = combine(avg, wt, dnew, nf1, nl1, wti[i], wtm, station[i].id)
+                nsm = combine(km, XBAD, bias, avg, wt, dnew, nf1, nl1,
+                        wti[i], wtm, station[i].id)
                 nstmns += nsm
                 if nsm == 0:
                     continue

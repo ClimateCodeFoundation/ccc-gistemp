@@ -283,7 +283,7 @@ def PApars(rngbrf, nlap, anomaly_stream):
         d.id = dict['id']
         d.first_index = current_index
         d.last_index = current_index + length - 1
-        d.first_month = dict['first'] - iyoff
+        d.first_year = dict['first'] - iyoff
         if is_rural(dict):
             g.rural_stations.append(d)
         else:
@@ -424,7 +424,7 @@ def getNeighbours(us, iyoff, full=False):
 
     is0 = 0
     for rs in g.rural_stations:
-        iyu1 = us.first_month + iyoff - 1           # subtract 1 for a possible partial yr
+        iyu1 = us.first_year + iyoff - 1           # subtract 1 for a possible partial yr
         iyu2 = iyu1 + us.last_index - us.first_index + 2  # add 1 for partial year
 
         csdbyr = (rs.snlat * us.snlat + rs.cslat * us.cslat *
@@ -454,19 +454,19 @@ def func2(us, iyrm, is0, iyoff, rngbr, combined):
     iwt = [0] * iyrm
     urb = [xbad] * iyrm
     avg = [xbad] * iyrm
-    ioff = us.first_month - us.first_index
+    ioff = us.first_year - us.first_index
     rdata = g.rdata
 
     if us.last_index + ioff > g.iyrm0:
         sys.exit("stop 231")
     urb[us.first_index - 1 + ioff:us.last_index + ioff] = rdata[us.first_index - 1:us.last_index]
     g.log.write("urb stnID:%s # rur:%4d ranges:%5d%5d%8.0f.\n" % (
-                us.id, is0, us.first_month + iyoff, us.last_index + ioff + iyoff, rngbr))
+                us.id, is0, us.first_year + iyoff, us.last_index + ioff + iyoff, rngbr))
 
     #****   start with the station with the longest time record
     comb = combined[0]
     rs = comb.rs
-    ioff = rs.first_month - rs.first_index
+    ioff = rs.first_year - rs.first_index
     g.nuseid[comb.isofi - 1] += 1
 
     if rs.last_index + 1 + ioff > g.iyrm0:
@@ -479,21 +479,21 @@ def func2(us, iyrm, is0, iyoff, rngbr, combined):
             wt[m + ioff] = wti
             iwt[m + ioff] = 1
     g.log.write("longest rur range:%5d-%4d%6d%s\n" % (
-                rs.first_month + iyoff, rs.last_index + ioff + iyoff, comb.lenis, rs.id))
+                rs.first_year + iyoff, rs.last_index + ioff + iyoff, comb.lenis, rs.id))
 
     #****   add in the remaining stations
     for i, comb in enumerate(combined[1:is0]):
         is_ = comb.isofi
         rs = comb.rs
-        ioff = rs.first_month - rs.first_index
+        ioff = rs.first_year - rs.first_index
         g.log.write("add stn%5d range:%5d-%4d %5d %s\n" % (
-                    i + 2, rs.first_month + iyoff, rs.last_index + ioff + iyoff, comb.lenis,
+                    i + 2, rs.first_year + iyoff, rs.last_index + ioff + iyoff, comb.lenis,
                     rs.id))
         #****       extend the new data into a full series
         dnew = [xbad] * iyrm
         a, b = rs.first_index - 1, rs.last_index
         dnew[a + ioff: b + ioff] = rdata[a:b]
-        nf1 = rs.first_month
+        nf1 = rs.first_year
         nl1 = rs.last_index + ioff
         #****       shift new data, then combine them with current mean
         nsm, ncom = cmbine(avg, wt, iwt, dnew, nf1, nl1, comb.wti)

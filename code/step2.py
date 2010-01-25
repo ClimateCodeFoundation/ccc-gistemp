@@ -197,20 +197,12 @@ g = Struct()
 g.iyrm0 = 3000 - 1880 + 1
 
 # lower overlap limit, min.coverage of approx.range
-g.ncrit = 20
 g.nrurm = 3
 g.xcrit = 2.0 / 3.0
 
-g.pi180 = math.pi / 180.0
 g.x0 = 1950
 
-g.rngbrf = 0.0
 g.nlap = 0
-g.rngbrh = 0.0
-g.rbyrcf = 0.0
-g.rbyrch = 0.0
-g.cscrif = 0.0
-g.cscrih = 0.0
 g.nuseid = []
 
 g.lshort = 7
@@ -219,10 +211,11 @@ g.slpx = 0.5
 
 g.log = None
 
-def PApars(rngbrf, nlap, anomaly_stream):
+def urban_adjustments(full_radius, nlap, anomaly_stream):
     g.log = open('log/PApars.GHCN.CL.1000.20.log','w')
-    g.rngbrf = rngbrf
     g.nlap = nlap
+
+    g.ncrit = 20
 
     g.nstat = g.sumch = g.nyrs = g.nstap = g.nyrsp = g.sumchp = 0
     g.nsl1 = g.nsl2 = g.ndsl = g.nswitch = g.nsw0 = g.nok = g.nokx = g.nsta = 0
@@ -231,14 +224,6 @@ def PApars(rngbrf, nlap, anomaly_stream):
     f = [0.0] * 900
     x = [0.0] * 900
     w = [0.0] * 900
-
-    g.rngbrh = g.rngbrf / 2
-    g.rbyrcf = earth.radius / g.rngbrf
-    g.rbyrch = earth.radius / g.rngbrh
-    g.cscrif = math.cos(g.rngbrf / earth.radius)
-    g.cscrih = math.cos(g.rngbrh / earth.radius)
-    g.rural_stations = []
-    g.urban_stations = []
 
     # Open output files for some extra logging
     #
@@ -253,9 +238,11 @@ def PApars(rngbrf, nlap, anomaly_stream):
     iyoff = 1879
     iyrm = last_year - iyoff
 
-    g.rural_stations = []
-    g.urban_stations = []
+    rural_stations = []
+    urban_stations = []
  
+    pi180 = math.pi / 180.0
+
     for (dict, anomalies) in anomaly_stream:
         length = len(anomalies)
         # convert anomalies back from int to float;
@@ -270,44 +257,44 @@ def PApars(rngbrf, nlap, anomaly_stream):
 
         d = Struct()
         d.anomalies = anomalies
-        d.cslat = math.cos(lat * g.pi180)
-        d.snlat = math.sin(lat * g.pi180)
-        d.cslon = math.cos(lon * g.pi180)
-        d.snlon = math.sin(lon * g.pi180)
+        d.cslat = math.cos(lat * pi180)
+        d.snlat = math.sin(lat * pi180)
+        d.cslon = math.cos(lon * pi180)
+        d.snlon = math.sin(lon * pi180)
         d.id = dict['id']
         d.first_year = dict['first'] - iyoff
         d.last_year = d.first_year + length - 1
+        d.uses = 0
         if is_rural(dict):
-            g.rural_stations.append(d)
+            rural_stations.append(d)
         else:
-            g.urban_stations.append(d)
+            urban_stations.append(d)
 
-    nstau = len(g.urban_stations)        # total number of bright / urban or dim / sm.town stations
-    nstar = len(g.rural_stations)        # total number of dark / rural stations
+    nstau = len(urban_stations)        # total number of bright / urban or dim / sm.town stations
+    nstar = len(rural_stations)        # total number of dark / rural stations
     g.log.write(" number of rural/urban stations %11d %11d\n" % (nstar, nstau))
 
     # Sort the rural stations according to the length of the time record
     # (ignoring gaps).
-    for i, station in enumerate(g.rural_stations):
+    for i, station in enumerate(rural_stations):
         station.recLen = len([v for v in station.anomalies if valid(v)])
         station.index = i
         g.log.write(" rural station: %11d  id: %s  #ok %11d\n" % (
                     i + 1, station.id, station.recLen))
-    g.rural_stations.sort(key=lambda s:s.recLen)
-    g.rural_stations.reverse()
-    for i, station in enumerate(g.rural_stations):
+    rural_stations.sort(key=lambda s:s.recLen)
+    rural_stations.reverse()
+    for i, station in enumerate(rural_stations):
         g.log.write(" rural station: %11d  id: %s  #ok %11d\n" % (
                     i + 1, station.id, station.recLen))
 
     # Combine time series for rural stations around each urban station
-    g.nuseid = [0] * nstar
-    for us in g.urban_stations:
+    for us in urban_stations:
         usingFullRadius = False
         dropStation = False
         needNewNeighbours = True
         while True:
             if needNewNeighbours:
-                data = getNeighbours(us, iyoff, full=usingFullRadius)
+                data = getNeighbours(us, rural_stations, iyoff, full_radius, full=usingFullRadius)
                 count, combined, rngbr, iyu1, iyu2 = data
                 if count == 0:
                     if usingFullRadius:
@@ -384,33 +371,35 @@ def PApars(rngbrf, nlap, anomaly_stream):
         yield (us.id, fit, n3f + iyoff, n3l + iyoff, n1x, n2x, flag)
 
     nuse = 0
-    tempRs = sorted(g.rural_stations, key=lambda s: s.index)
-    for (used, tempRs) in itertools.izip(g.nuseid, tempRs):
-        if used > 0:
+    for rs in rural_stations:
+        if rs.uses > 0:
             f77.write(" used station  %s %11d  times\n" % (
-                tempRs.id, used))
+                rs.id, rs.uses))
             nuse += 1
     f77.write("%12d  rural stations were used\n" % (nuse))
     log_stats()
 
 
-def getNeighbours(us, iyoff, full=False):
+def getNeighbours(us, rural_stations, iyoff, full_radius, full=False):
     combined = []
     if full:
-        cscrit, rbyrc, rngbr = g.cscrif, g.rbyrcf, g.rngbrf
-        g.log.write(" trying full radius %s\n" % fort.formatFloat(rngbr))
+        radius = full_radius
+        g.log.write(" trying full radius %f\n" % full_radius)
     else:
-        cscrit, rbyrc, rngbr = g.cscrih, g.rbyrch, g.rngbrh
+        radius = full_radius / 2
+    
+    cos_crit = math.cos(radius / earth.radius)
+    rbyrc = earth.radius / radius
 
     count = 0
     iyu1 = us.first_year + iyoff - 1           # subtract 1 for a possible partial yr
     iyu2 = us.last_year + iyoff + 1            # add 1 for partial year
 
-    for rs in g.rural_stations:
+    for rs in rural_stations:
         csdbyr = (rs.snlat * us.snlat + rs.cslat * us.cslat *
                      (rs.cslon * us.cslon  + rs.snlon * us.snlon))
 
-        if csdbyr <= cscrit:
+        if csdbyr <= cos_crit:
             continue
         dbyrc = 0
         if csdbyr < 1.0:
@@ -419,7 +408,7 @@ def getNeighbours(us, iyoff, full=False):
         rs.wti = 1.0 - dbyrc
         combined.append(rs)
 
-    return count, combined, rngbr, iyu1, iyu2
+    return count, combined, radius, iyu1, iyu2
 
 
 def func2(us, iyrm, count, iyoff, rngbr, combined):
@@ -436,7 +425,7 @@ def func2(us, iyrm, count, iyoff, rngbr, combined):
 
     #****   start with the station with the longest time record
     rs = combined[0]
-    g.nuseid[rs.index] += 1
+    rs.uses += 1
 
     wti = rs.wti
     avg[rs.first_year - 1:rs.last_year] = rs.anomalies
@@ -461,7 +450,7 @@ def func2(us, iyrm, count, iyoff, rngbr, combined):
         nsm, ncom = cmbine(avg, wt, iwt, dnew, nf1, nl1, rs.wti)
         g.log.write(" data added:  %11d  overlap: %11d  years\n" % (nsm, ncom))
         if nsm != 0:
-            g.nuseid[rs.index] += 1
+            rs.uses += 1
 
     return wt, iwt, urb, avg
 
@@ -662,7 +651,7 @@ def log_stats():
     g.log.write(" %-11s  %11d %11d\n" % ("switches: all , else ok", g.nswitch,g.nsw0))
 
 
-def padjust(stream, adjustments):
+def apply_adjustments(stream, adjustments):
     log = open('log/padjust.log', 'w')
     first_year = 1880
     adj_dict = {}
@@ -836,9 +825,9 @@ def main(argv=None):
     (data_1, data_2) = itertools.tee(data, 2)
 
     anomalies = toANNanom(data_1)
-    adjustments = PApars(1000.0, 20, anomalies)
+    adjustments = urban_adjustments(1000.0, 20, anomalies)
     
-    adjusted = invnt('Ts.GHCN.CL.PA', padjust(data_2, adjustments))
+    adjusted = invnt('Ts.GHCN.CL.PA', apply_adjustments(data_2, adjustments))
     write_results(adjusted, 'work/Ts.GHCN.CL.PA')
 
 if __name__ == '__main__':

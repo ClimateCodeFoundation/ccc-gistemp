@@ -182,16 +182,15 @@ def annual_anomalies(stream):
             yield (dict, annual_anoms[first: last+1])
 
 def is_rural(dict):
-    return (dict['US-brightness'] == ' ' and dict['pop'] == 'R') or dict['US-brightness'] == '1'
+    """Test whether the station described by *dict* is rural.
+    """
+    return dict['US-brightness'] == '1' or (dict['US-brightness'] == ' ' and dict['pop'] == 'R')
 
 class Struct(object):
     pass
 
-# "Global" data
+# "Global" parameters of the urban_adjustments phase.
 g = Struct()
-
-# Input parameters (# of input files, time period)
-g.nrurm = 3
 g.xcrit = 2.0 / 3.0
 g.x0 = 1950
 g.lshort = 7
@@ -228,6 +227,7 @@ def urban_adjustments(anomaly_stream):
 
     full_radius = 1000.0
     minimum_overlap = 20
+    minimum_rural_neighbors = 3
 
     g.ncrit = 20
 
@@ -237,7 +237,6 @@ def urban_adjustments(anomaly_stream):
 
     f = [0.0] * 900
     x = [0.0] * 900
-    w = [0.0] * 900
 
     # Open output files for some extra logging
     #
@@ -303,14 +302,20 @@ def urban_adjustments(anomaly_stream):
 
     # Combine time series for rural stations around each urban station
     for us in urban_stations:
+        iyu1 = us.first_year + iyoff - 1           # subtract 1 for a possible partial yr
+        iyu2 = us.last_year + iyoff + 1            # add 1 for partial year
+
         usingFullRadius = False
         dropStation = False
         needNewNeighbours = True
         while True:
             if needNewNeighbours:
-                data = getNeighbours(us, rural_stations, iyoff, full_radius, full=usingFullRadius)
-                count, combined, rngbr, iyu1, iyu2 = data
-                if count == 0:
+                if usingFullRadius:
+                    radius = full_radius
+                else:
+                    radius = full_radius / 2
+                neighbors = get_neighbours(us, rural_stations, radius)
+                if not neighbors:
                     if usingFullRadius:
                         dropStation = True
                         g.log.write(' no rural neighbors for %s\n' % us.id)
@@ -320,29 +325,29 @@ def urban_adjustments(anomaly_stream):
                     needNewNeighbours = True
                     continue
 
-                wt, iwt, urb, avg = func2(us, iyrm, count, iyoff, rngbr, combined, minimum_overlap)
+                counts, urban_series, combined = combine_neighbors(us, iyrm, iyoff, neighbors, minimum_overlap)
                 iy1 = 1
                 needNewNeighbours = False
 
             if iy1 == 1:
                 f66.write("year dTs-urban dTs-rural StnID=%s\n" % (
                     us.id))
-            tmean, n3l, nxy, n3, n3f, nxy3, tm3 = func3(
-                iy1, iyrm, avg, urb, iwt, f, iyoff, x, w, f66)
+            quorate_count, first, last, quorate_period_total, length = prepare_series(
+                iy1, iyrm, combined, urban_series, counts, f, iyoff, x, minimum_rural_neighbors)
 
-            if n3 < g.ncrit:
+            if quorate_count < g.ncrit:
                 if usingFullRadius:
                     f79.write("%s  good years: %4d   total years: %4d"
                               " too little rural-neighbors-overlap"
                               " - drop station 9999\n" % (
-                        us.id, n3, n3l - n3f + 1))
+                        us.id, quorate_count, last - first + 1))
                     dropStation = True
                     break
                 usingFullRadius = True
                 needNewNeighbours = True
                 continue
 
-            if float(n3) >= g.xcrit * (n3l - n3f + 1. - .1):
+            if float(quorate_count) >= g.xcrit * (last - first + 1. - .1):
                 break
 
             # not enough good years for the given range (<66%)
@@ -350,9 +355,9 @@ def urban_adjustments(anomaly_stream):
             # due to hardware rounding or compiler behaviour.
             # nick barnes, ravenbrook limited, 2008 - 09 - 10
             # try to save cases in which the gaps are in the early part:
-            iy1 = int(n3l - (n3 - 1) / g.xcrit)
-            if iy1 < n3f + 1:
-                iy1 = n3f + 1                  # avoid infinite loop
+            iy1 = int(last - (quorate_count - 1) / g.xcrit)
+            if iy1 < first + 1:
+                iy1 = first + 1                  # avoid infinite loop
             f79.write("%s drop early years %4d-%4d\n" % (
                     us.id, 1 + iyoff, iy1 - 1 + iyoff))
 
@@ -360,19 +365,17 @@ def urban_adjustments(anomaly_stream):
             continue
 
         #===  c subtract urban station and call a curve fitting program
-        tmean = tm3 / nxy3
-        nxy = nxy3
-        fit = getfit(nxy, x, f)
+        fit = getfit(length, x, f)
         # find extended range
-        iyxtnd = int(round(n3 / g.xcrit)) - (n3l - n3f + 1)
+        iyxtnd = int(round(quorate_count / g.xcrit)) - (last - first + 1)
         g.log.write(" possible range increase %11d %11d %11d\n" % (
-                    iyxtnd, n3, n3l - n3f + 1))
-        n1x = n3f + iyoff
-        n2x = n3l + iyoff
+                    iyxtnd, quorate_count, last - first + 1))
+        n1x = first + iyoff
+        n2x = last + iyoff
         if iyxtnd < 0:
             sys.exit('impossible')
         if iyxtnd > 0:
-            lxend = iyu2 - (n3l + iyoff)
+            lxend = iyu2 - (last + iyoff)
             if iyxtnd <= lxend:
                  n2x = n2x + lxend
             else:
@@ -381,8 +384,8 @@ def urban_adjustments(anomaly_stream):
                      n1x = iyu1
                  n2x = iyu2
 
-        flag = flags(fit, n3f + iyoff, n3l + iyoff)
-        yield (us.id, fit, n3f + iyoff, n3l + iyoff, n1x, n2x, flag)
+        flag = flags(fit, first + iyoff, last + iyoff)
+        yield (us.id, fit, first + iyoff, last + iyoff, n1x, n2x, flag)
 
     nuse = 0
     for rs in rural_stations:
@@ -391,23 +394,26 @@ def urban_adjustments(anomaly_stream):
                 rs.id, rs.uses))
             nuse += 1
     f77.write("%12d  rural stations were used\n" % (nuse))
-    log_stats()
+    g.log.write(" %-10s %4d %10.7f     %10.7f\n" % (
+                "all", g.nsta,-g.sumch/g.nsta,-10.*g.sumch/g.nyrs))
+    g.log.write(" %-11s %8d  %10.7f    %10.7f\n" % (
+                "urb warm", g.nstap,-g.sumchp/g.nstap,-10.*g.sumchp/g.nyrsp))
+    g.log.write(" %-11s %11d %11d %11d %11d %11d %11d\n" % (
+                "# short,sl1,sl2,dsl,ok", g.nshort,g.nsl1,g.nsl2,g.ndsl,g.nok,g.nokx))
+    g.log.write(" %-11s  %11d %11d\n" % ("switches: all , else ok", g.nswitch,g.nsw0))
 
 
-def getNeighbours(us, rural_stations, iyoff, full_radius, full=False):
-    combined = []
-    if full:
-        radius = full_radius
-        g.log.write(" trying full radius %f\n" % full_radius)
-    else:
-        radius = full_radius / 2
+
+def get_neighbours(us, rural_stations, radius):
+    """Returns a list of the stations in *rural_stations* which are
+    within distance *radius* of the urban station *us*.  Each rural
+    station returned is given a 'weight' slot representing its
+    distance fromn the urban station.
+    """
+    neighbors = []
     
     cos_crit = math.cos(radius / earth.radius)
     rbyrc = earth.radius / radius
-
-    count = 0
-    iyu1 = us.first_year + iyoff - 1           # subtract 1 for a possible partial yr
-    iyu2 = us.last_year + iyoff + 1            # add 1 for partial year
 
     for rs in rural_stations:
         csdbyr = (rs.snlat * us.snlat + rs.cslat * us.cslat *
@@ -418,129 +424,158 @@ def getNeighbours(us, rural_stations, iyoff, full_radius, full=False):
         dbyrc = 0
         if csdbyr < 1.0:
             dbyrc = rbyrc * math.sqrt(2.0 * (1.0 - csdbyr))
-        count += 1
-        rs.wti = 1.0 - dbyrc
-        combined.append(rs)
+        rs.weight = 1.0 - dbyrc
+        neighbors.append(rs)
 
-    return count, combined, radius, iyu1, iyu2
+    return neighbors
 
 
-def func2(us, iyrm, count, iyoff, rngbr, combined, minimum_overlap):
-    # TODO: Should probably make next 4 arrays a struct (at least as a
-    #       stepping stone)
-    wt = [0.0] * iyrm
-    iwt = [0] * iyrm
-    urb = [BAD] * iyrm
-    avg = [BAD] * iyrm
+def combine_neighbors(us, iyrm, iyoff, neighbors, minimum_overlap):
+    """Combines the neighbor stations *neighbors*, weighted according
+    to their distances from the urban station *us*, to give a combined
+    annual anomaly series.  Returns a tuple: (*counts*,
+    *urban_series*, *combined*), where *counts* is a per-year list of
+    the number of stations combined, *urban_series* is the series from
+    the urban station, re-based at *iyoff*, and *combined* is the
+    combined neighbor series, based at *iyoff*.
+    """
 
-    urb[us.first_year - 1:us.last_year] = us.anomalies
-    g.log.write("urb stnID:%s # rur:%4d ranges:%5d%5d%8.0f.\n" % (
-                us.id, count, us.first_year + iyoff, us.last_year + iyoff, rngbr))
+    weights = [0.0] * iyrm
+    counts = [0] * iyrm
+    urban_series = [BAD] * iyrm
+    combined = [BAD] * iyrm
 
-    #****   start with the station with the longest time record
-    rs = combined[0]
+    urban_series[us.first_year - 1:us.last_year] = us.anomalies
+    g.log.write("urb stnID:%s # rur:%4d ranges:%5d%5d.\n" % (
+                us.id, len(neighbors), us.first_year + iyoff, us.last_year + iyoff))
+
+    # start with the neighbor with the longest time record
+    rs = neighbors[0]
     rs.uses += 1
 
-    wti = rs.wti
-    avg[rs.first_year - 1:rs.last_year] = rs.anomalies
+    combined[rs.first_year - 1:rs.last_year] = rs.anomalies
     for m in range(len(rs.anomalies)):
         if valid(rs.anomalies[m]):
-            wt[m + rs.first_year - 1] = rs.wti
-            iwt[m + rs.first_year - 1] = 1
+            weights[m + rs.first_year - 1] = rs.weight
+            counts[m + rs.first_year - 1] = 1
     g.log.write("longest rur range:%5d-%4d%6d%s\n" % (
                 rs.first_year + iyoff, rs.last_year + iyoff, rs.recLen, rs.id))
 
-    #****   add in the remaining stations
-    for i, rs in enumerate(combined[1:]):
+    # add in the remaining stations
+    for i, rs in enumerate(neighbors[1:]):
         g.log.write("add stn%5d range:%5d-%4d %5d %s\n" % (
                     i + 2, rs.first_year + iyoff, rs.last_year + iyoff, rs.recLen,
                     rs.id))
-        #****       extend the new data into a full series
         dnew = [BAD] * iyrm
         dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
-        nf1 = rs.first_year
-        nl1 = rs.last_year
-        #****       shift new data, then combine them with current mean
-        nsm, ncom = cmbine(avg, wt, iwt, dnew, nf1, nl1, rs.wti, minimum_overlap)
+        nsm, ncom = cmbine(combined, weights, counts, dnew, rs.first_year, rs.last_year, rs.weight, minimum_overlap)
         g.log.write(" data added:  %11d  overlap: %11d  years\n" % (nsm, ncom))
         if nsm != 0:
             rs.uses += 1
 
-    return wt, iwt, urb, avg
+    return counts, urban_series, combined
 
 
-def func3(iy1, iyrm, avg, urb, iwt, f, iyoff, x, w, f66):
-    tmean = nxx = n3l = nxy = n3 = n3f = nxy3 = tm3 = 0
+def prepare_series(iy1, iyrm, combined, urban_series, counts, f, iyoff, x, minimum_rural_neighbors):
+    """Prepares for the linearity fitting by populating the arrays *f*
+    and *x* with coordinates.  *x* gets a year number (based at
+    *g.x0*), and *f* gets the difference between the combined rural
+    station anomaly series *combined* and the urban station series
+    *urban_series*.  The arrays are only populated with valid years,
+    from the first quorate year onwards.  A valid year is one in which
+    each the urban station and the combined rural series has a valid
+    datum.  A quorate year is a year in which there are at least
+    *minimum_rural_neighbors* contributing (obtained from the *counts*
+    series).
+
+    Also returns a 5-tuple: (*c*, *f*, *l*, *t*, *v*). *c* is a count
+    of the valid quorate years.  *f* is the first such year.  *l* is
+    the last such year.  *t* is the total of the *f* series between
+    those two years inclusive.  *v* is the number of entries in the
+    *f* and *x* series between those two years inclusive.
+    """
+    total = first = last = i = quorate_count = length = quorate_period_total = 0
 
     for iy in xrange(iy1 - 1, iyrm):
-        if valid(avg[iy]) or valid(urb[iy]):
-            nxx = nxx + 1
-        if not (invalid(avg[iy]) or invalid(urb[iy])):
-            if iwt[iy] >= g.nrurm:
-                n3l = iy + 1
-                n3 = n3 + 1
-                if n3f == 0:
-                    n3f = iy + 1
-            if n3 <= 0:
+        if valid(combined[iy]) and valid(urban_series[iy]):
+            if counts[iy] >= minimum_rural_neighbors:
+                last = iy + 1
+                quorate_count += 1
+                if first == 0:
+                    first = iy + 1
+            if quorate_count <= 0:
                 continue
 
-            f[nxy] = avg[iy] - urb[iy]
-            tmean = tmean + f[nxy]
-            x[nxy] = iy + iyoff + 1 - g.x0
-            w[nxy] = 1.
-            nxy += 1
-            if iwt[iy] >= g.nrurm:
-                 nxy3 = nxy
-                 tm3 = tmean
+            f[i] = combined[iy] - urban_series[iy]
+            total += f[i]
+            x[i] = iy + iyoff + 1 - g.x0
+            i += 1
+            if counts[iy] >= minimum_rural_neighbors:
+                 length = i
+                 quorate_period_total = total
 
-        if nxx > 0 and iy1 == 1:
-            f66.write("%4d %9.2f %9.2f\n" % (iy + iyoff + 1, urb[iy], avg[iy]))
-
-    return tmean, n3l, nxy, n3, n3f, nxy3, tm3
+    return quorate_count, first, last, quorate_period_total, length
 
     
-def cmbine(avg, wt, iwt, dnew, nf1, nl1, wt1, minimum_overlap):
-    # bias of new data is removed by subtracting the difference
-    # over the common domain. then the new data are averaged in.
+def cmbine(combined, weights, counts, data, first, last, weight, minimum_overlap):
+    """Adds the array *data* with weight *weight* into the array of
+    weighted averages *combined*, with total weights *weights* and
+    combined counts *counts* (that is, entry *combined[i]* is the
+    result of combining *counts[i]* values with total weights
+    *weights[i]*).  Adds the computed bias between *combined* and
+    *data* before combining.
 
-    # loop over years
-    # find means over common domain to compute bias
+    Only combines in the range [*first*, *last*); only combines valid
+    values from *data*, and if there are fewer than *minimum_overlap*
+    entries valid in both arrays then it doesn't combine at all.
+
+    Returns (*n*,*c*), where *n* is the number of entries combined and
+    *c* was the number of values valid in both arrays.
+
+    Note: if *data[i]* is valid and *combined[i]* is not, the weighted
+    average code runs and still produces the right answer, because
+    *weights[i]* will be zero.
+    """
     nsm = sumn = ncom = 0
     avg_sum = 0.0
-    a, b = nf1 - 1, nl1
-    for v_avg, v_dnew in itertools.izip(avg[a:b], dnew[a:b]):
-        if invalid(v_avg) or invalid(v_dnew):
+    a, b = first - 1, last
+    for v_avg, v_new in itertools.izip(combined[a:b], data[a:b]):
+        if invalid(v_avg) or invalid(v_new):
             continue
         ncom = ncom + 1
         avg_sum += v_avg
-        sumn += v_dnew
+        sumn += v_new
 
     if ncom < minimum_overlap:
         return nsm, ncom
     bias = (avg_sum - sumn) / float(ncom)
 
     # update period of valid data, averages and weights
-    for n in xrange(nf1 - 1, nl1):
-        v_dnew = dnew[n]
-        if invalid(v_dnew):
+    for n in xrange(first - 1, last):
+        v_new = data[n]
+        if invalid(v_new):
             continue
-        wtnew = wt[n] + wt1
-        v_wt, wt[n] = wt[n], wtnew
-        avg[n] = (v_wt * avg[n] + wt1 * (v_dnew + bias)) / wtnew
-        iwt[n] += 1
+        wtnew = weights[n] + weight
+        old_wt, weights[n] = weights[n], wtnew
+        combined[n] = (old_wt * combined[n] + weight * (v_new + bias)) / wtnew
+        counts[n] += 1
         nsm += 1
 
     return nsm, ncom
 
 
-def getfit(nxy, x, f):
+def getfit(length, x, f):
+    """ Finds the best two-part linear fit between *x* and *f*, and
+    returns the fit parameters.
+    """
+
     # Todo: incorporate trend2 into this.
-    nhalf = nxy / 2
+    nhalf = length / 2
     rmsmin = 1.e20
 
-    for n in xrange(6, nxy - 5 + 1):
+    for n in xrange(6, length - 5 + 1):
         xknee = x[n - 1]
-        sl1, sl2, rms, sl = trend2(x, f, nxy, xknee, 2)
+        sl1, sl2, rms, sl = trend2(x, f, length, xknee, 2)
         
         if rms < rmsmin:
              rmsmin = rms
@@ -551,10 +586,11 @@ def getfit(nxy, x, f):
 
 
 def trend2(xc, a, dataLen, xmid, min):
-    # finds a fit using regression analysis by a line
-    # with a break in slope at Xmid. Returned are the 2 slopes
-    # SL1,SL2 provided we have at least MIN data on each side.
-    # Linear regression data are also computed.
+    """Finds a fit to the data *xc[]*, *a[]*, using regression
+    analysis, by a line with a change in slope at *xmid*. Returned is
+    a 4-tuple (*sl1*, *sl2*, *rms*, *sl*): the left-hand slope, the
+    right-hand slope, the RMS error, and the slope of an overall linear fit.
+    """
 
     # Todo: incorporate into getfit.
     count0 = count1 = 0
@@ -613,6 +649,12 @@ def trend2(xc, a, dataLen, xmid, min):
     return sl1, sl2, rms, sl
 
 def flags(fit, iy1, iy2):
+    """Calculates flags concerning a two-part linear fit.  Also
+    accumulate statistics.  Not well documented or understood, but
+    note that in adj(), below, the two-part fit will be disregarded if 
+    the flag value is not either 0 or 100.
+    """
+
     (sl1, sl2, knee, sl) = fit
     g.nsta += 1
     g.sumch += sl * (iy2 - iy1 + 1)
@@ -626,19 +668,15 @@ def flags(fit, iy1, iy2):
     iflag = 0
     if knee < iy1 + g.lshort or knee > iy2 - g.lshort:
         iflag += 1
-    if knee < iy1 + g.lshort or knee > iy2 - g.lshort:
         g.nshort += 1
     if abs(sl1) > g.slplim:
         iflag += 20
-    if abs(sl1) > g.slplim:
         g.nsl1 += 1
     if abs(sl2) > g.slplim:
         iflag += 10
-    if abs(sl2) > g.slplim:
         g.nsl2 += 1
     if abs(sl2 - sl1) > g.slplim:
         iflag += 100
-    if abs(sl2 - sl1) > g.slplim:
         g.ndsl += 1
     if abs(sl2 - sl1) > g.slpx:
         iflag += 100
@@ -649,21 +687,10 @@ def flags(fit, iy1, iy2):
         g.nokx += 1
     if sl1 * sl2 < 0.0 and abs(sl1) > 0.2 and abs(sl2) > 0.2:
         iflag += 1000
-    if iflag >= 1000:
         g.nswitch += 1
     if iflag == 1000:
         g.nsw0 += 1
     return iflag
-
-def log_stats():
-    g.log.write(" %-10s %4d %10.7f     %10.7f\n" % (
-                "all", g.nsta,-g.sumch/g.nsta,-10.*g.sumch/g.nyrs))
-    g.log.write(" %-11s %8d  %10.7f    %10.7f\n" % (
-                "urb warm", g.nstap,-g.sumchp/g.nstap,-10.*g.sumchp/g.nyrsp))
-    g.log.write(" %-11s %11d %11d %11d %11d %11d %11d\n" % (
-                "# short,sl1,sl2,dsl,ok", g.nshort,g.nsl1,g.nsl2,g.ndsl,g.nok,g.nokx))
-    g.log.write(" %-11s  %11d %11d\n" % ("switches: all , else ok", g.nswitch,g.nsw0))
-
 
 def apply_adjustments(stream, adjustments):
     """Applies the urban adjustment records from the iterator

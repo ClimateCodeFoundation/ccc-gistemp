@@ -23,10 +23,11 @@ import ccc_binary
 BAD = 9999
 
 def invalid(x):
-    """Test for invalid datum (equal to the BAD value).
+    """Test for invalid datum ("equal" to the BAD value, for some
+    definition of "equal").
     """
 
-    return x == BAD
+    return abs(x - BAD) < 0.1
 
 def valid(x):
     """Test for valid datum.  See invalid()."""
@@ -210,8 +211,6 @@ g.rbyrcf = 0.0
 g.rbyrch = 0.0
 g.cscrif = 0.0
 g.cscrih = 0.0
-g.mbad = 0
-g.xbad = 0.0
 g.nuseid = []
 
 g.lshort = 7
@@ -253,8 +252,6 @@ def PApars(rngbrf, nlap, anomaly_stream):
     last_year = int(open('work/GHCN.last_year', 'r').read().strip())
     iyoff = 1879
     iyrm = last_year - iyoff
-    g.mbad = 9999
-    g.xbad = float(9999)
 
     g.rural_stations = []
     g.urban_stations = []
@@ -264,9 +261,7 @@ def PApars(rngbrf, nlap, anomaly_stream):
         # convert anomalies back from int to float;
         # TODO: preserve as float between toANNanom and here.
         for i in range(length):
-            if anomalies[i] == g.mbad:
-                anomalies[i] = g.xbad
-            else:
+            if valid(anomalies[i]):
                 anomalies[i] *= 0.1
 
         # throw away some precision in lat/lon for compatibility with Fortran
@@ -294,7 +289,7 @@ def PApars(rngbrf, nlap, anomaly_stream):
     # Sort the rural stations according to the length of the time record
     # (ignoring gaps).
     for i, station in enumerate(g.rural_stations):
-        station.recLen = len([v for v in station.anomalies if v != g.xbad])
+        station.recLen = len([v for v in station.anomalies if valid(v)])
         station.index = i
         g.log.write(" rural station: %11d  id: %s  #ok %11d\n" % (
                     i + 1, station.id, station.recLen))
@@ -408,10 +403,10 @@ def getNeighbours(us, iyoff, full=False):
         cscrit, rbyrc, rngbr = g.cscrih, g.rbyrch, g.rngbrh
 
     count = 0
-    for rs in g.rural_stations:
-        iyu1 = us.first_year + iyoff - 1           # subtract 1 for a possible partial yr
-        iyu2 = us.last_year + iyoff + 1            # add 1 for partial year
+    iyu1 = us.first_year + iyoff - 1           # subtract 1 for a possible partial yr
+    iyu2 = us.last_year + iyoff + 1            # add 1 for partial year
 
+    for rs in g.rural_stations:
         csdbyr = (rs.snlat * us.snlat + rs.cslat * us.cslat *
                      (rs.cslon * us.cslon  + rs.snlon * us.snlon))
 
@@ -430,11 +425,10 @@ def getNeighbours(us, iyoff, full=False):
 def func2(us, iyrm, count, iyoff, rngbr, combined):
     # TODO: Should probably make next 4 arrays a struct (at least as a
     #       stepping stone)
-    xbad = g.xbad
     wt = [0.0] * iyrm
     iwt = [0] * iyrm
-    urb = [xbad] * iyrm
-    avg = [xbad] * iyrm
+    urb = [BAD] * iyrm
+    avg = [BAD] * iyrm
 
     urb[us.first_year - 1:us.last_year] = us.anomalies
     g.log.write("urb stnID:%s # rur:%4d ranges:%5d%5d%8.0f.\n" % (
@@ -447,8 +441,8 @@ def func2(us, iyrm, count, iyoff, rngbr, combined):
     wti = rs.wti
     avg[rs.first_year - 1:rs.last_year] = rs.anomalies
     for m in range(len(rs.anomalies)):
-        if rs.anomalies[m] < xbad:
-            wt[m + rs.first_year - 1] = wti
+        if valid(rs.anomalies[m]):
+            wt[m + rs.first_year - 1] = rs.wti
             iwt[m + rs.first_year - 1] = 1
     g.log.write("longest rur range:%5d-%4d%6d%s\n" % (
                 rs.first_year + iyoff, rs.last_year + iyoff, rs.recLen, rs.id))
@@ -459,7 +453,7 @@ def func2(us, iyrm, count, iyoff, rngbr, combined):
                     i + 2, rs.first_year + iyoff, rs.last_year + iyoff, rs.recLen,
                     rs.id))
         #****       extend the new data into a full series
-        dnew = [xbad] * iyrm
+        dnew = [BAD] * iyrm
         dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
         nf1 = rs.first_year
         nl1 = rs.last_year
@@ -476,9 +470,9 @@ def func3(iy1, iyrm, avg, urb, iwt, f, iyoff, x, w, f66):
     tmean = nxx = n3l = nxy = n3 = n3f = nxy3 = tm3 = 0
 
     for iy in xrange(iy1 - 1, iyrm):
-        if avg[iy] != g.xbad or urb[iy] != g.xbad:
+        if valid(avg[iy]) or valid(urb[iy]):
             nxx = nxx + 1
-        if not (avg[iy] == g.xbad or urb[iy] == g.xbad):
+        if not (invalid(avg[iy]) or invalid(urb[iy])):
             if iwt[iy] >= g.nrurm:
                 n3l = iy + 1
                 n3 = n3 + 1
@@ -510,10 +504,9 @@ def cmbine(avg, wt, iwt, dnew, nf1, nl1, wt1):
     # find means over common domain to compute bias
     nsm = sumn = ncom = 0
     avg_sum = 0.0
-    xbad = g.xbad
     a, b = nf1 - 1, nl1
     for v_avg, v_dnew in itertools.izip(avg[a:b], dnew[a:b]):
-        if v_avg >= xbad or v_dnew >= xbad:
+        if invalid(v_avg) or invalid(v_dnew):
             continue
         ncom = ncom + 1
         avg_sum += v_avg
@@ -526,7 +519,7 @@ def cmbine(avg, wt, iwt, dnew, nf1, nl1, wt1):
     # update period of valid data, averages and weights
     for n in xrange(nf1 - 1, nl1):
         v_dnew = dnew[n]
-        if v_dnew >= xbad:
+        if invalid(v_dnew):
             continue
         wtnew = wt[n] + wt1
         v_wt, wt[n] = wt[n], wtnew
@@ -544,7 +537,7 @@ def getfit(nxy, x, f):
 
     for n in xrange(6, nxy - 5 + 1):
         xknee = x[n - 1]
-        sl1, sl2, rms, sl = trend2(x, f, nxy, xknee, 9999., 2)
+        sl1, sl2, rms, sl = trend2(x, f, nxy, xknee, 2)
         
         if rms < rmsmin:
              rmsmin = rms
@@ -554,7 +547,7 @@ def getfit(nxy, x, f):
     return fit
 
 
-def trend2(xc, a, dataLen, xmid, bad, min):
+def trend2(xc, a, dataLen, xmid, min):
     # finds a fit using regression analysis by a line
     # with a break in slope at Xmid. Returned are the 2 slopes
     # SL1,SL2 provided we have at least MIN data on each side.
@@ -570,7 +563,7 @@ def trend2(xc, a, dataLen, xmid, bad, min):
     saa = 0.0
 
     for n in xrange(dataLen):
-        if a[n] == bad:
+        if invalid(a[n]):
             continue
         x = xc[n] - xmid
         v_a = a[n]
@@ -587,8 +580,8 @@ def trend2(xc, a, dataLen, xmid, bad, min):
             sxx0 += x ** 2
             sxa0 += x * v_a
 
-    if count0 < min or count1 < min:
-        return bad, bad, bad, bad
+    if count0 < min or count1 < min: 
+       return BAD, BAD, BAD, BAD
 
     count = count0 + count1
     denom = (count * sxx0 * sxx1
@@ -727,7 +720,6 @@ def adj(first_year, dict, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offs
 
     base = m1
 
-    miss = 9999
     m1o, m2o = m1, m2
     m1 = -100
     m0 = 12 * (iy1 - first_year)   # Dec of year iy1

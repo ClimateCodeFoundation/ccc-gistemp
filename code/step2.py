@@ -125,29 +125,28 @@ def invnt(name, stream):
         yield (dict, series)
     log.close()
 
-def toANNanom(stream):
-    """ Iterates over the station record *stream*, returning an
+def annual_anomalies(stream):
+    """Iterates over the station record *stream*, returning an
     iterator giving an annual anomaly series for each station as
-    (dict, anoms).  The dict is passed through unchanged from the
-    station record.  The algorithm is as follows: compute monthly
-    averages, then monthly anomalies, then seasonal anomalies - means
-    of monthly anomalies for at least two months - then annual
-    anomalies - means of seasonal anomalies for at least three
-    seasons.
+    (dict, anoms).  The algorithm is as follows: compute monthly
+    averages, then monthly anomalies, then seasonal anomalies (means
+    of monthly anomalies for at least two months) then annual
+    anomalies (means of seasonal anomalies for at least three
+    seasons).
     """
 
     for (dict, series) in stream:
-        av = []
+        monthly_means = []
         for m in range(12):
             month_data = filter(valid, series[m::12])
             # neglect December of final year, as we do not use its season.
             if m == 11 and valid(series[-1]):
                 month_data = month_data[:-1]
-            av.append(float(sum(month_data)) / len(month_data))
-        annual_anomalies = []
-        # Create groups of seasonal deviations from the month averages.
+            monthly_means.append(float(sum(month_data)) / len(month_data))
+        annual_anoms = []
         first = None
         for y in range(len(series)/12):
+            # Create groups of seasonal deviations from the month averages.
             total = [0.0] * 4
             count = [0] * 4
             # Could probably be smarter here by using range(-1,11)
@@ -162,7 +161,7 @@ def toANNanom(stream):
                         season = (m+1) // 3 # season number 0-3
                         if season == 4:
                             season = 0
-                        total[season] += datum - av[m]
+                        total[season] += datum - monthly_means[m]
                         count[season] += 1
             season_anomalies = []
             for s in range(4):
@@ -170,19 +169,17 @@ def toANNanom(stream):
                     season_anomalies.append(total[s]/count[s])
             if len(season_anomalies) > 2:
                 v = (10.0 * sum(season_anomalies)) / len(season_anomalies)
-                annual_anomalies.append(int(round(v)))
+                annual_anoms.append(int(round(v)))
                 if first is None:
                     first = y
                 last = y
             else:
-                annual_anomalies.append(BAD)
+                annual_anoms.append(BAD)
         
         if first is not None:
             dict['first'] = first + dict['begin']
             dict['last'] = last + dict['begin']
-            yield (dict, annual_anomalies[first: last+1])
-
-# PApars.
+            yield (dict, annual_anoms[first: last+1])
 
 def is_rural(dict):
     return (dict['US-brightness'] == ' ' and dict['pop'] == 'R') or dict['US-brightness'] == '1'
@@ -190,30 +187,47 @@ def is_rural(dict):
 class Struct(object):
     pass
 
-# Global data
+# "Global" data
 g = Struct()
 
 # Input parameters (# of input files, time period)
-g.iyrm0 = 3000 - 1880 + 1
-
-# lower overlap limit, min.coverage of approx.range
 g.nrurm = 3
 g.xcrit = 2.0 / 3.0
-
 g.x0 = 1950
-
-g.nlap = 0
-g.nuseid = []
-
 g.lshort = 7
 g.slplim = 1.0
 g.slpx = 0.5
 
 g.log = None
 
-def urban_adjustments(full_radius, nlap, anomaly_stream):
+def urban_adjustments(anomaly_stream):
+    """Takes an iterator of station annual anomaly records (*dict*,
+    *series*) and produces an iterator of urban adjustment parameters
+    records.  The urban adjustment parameters describe a two-part
+    linear fit to the difference in annual anomalies between an urban
+    station and the set of nearby rural stations.
+
+    The algorithm is essentially as follows:
+
+    For each urban station:
+        1. Find all the rural stations within a fixed radius;
+        2. Combine the annual anomaly series for those rural stations, in
+           order of valid-data count;
+        3. Calculate a two-part linear fit for the difference between
+           the urban annual anomalies and this combined rural annual anomaly;
+        4. Yield the parameters of this linear fit.
+
+        If there are not enough rural stations, or the combined rural
+        record does not have enough overlap with the urban record, try
+        a second time for this urban station, with a larger radius.
+        If there is still not enough data, do not produce an
+        adjustment record.
+     """
+
     g.log = open('log/PApars.GHCN.CL.1000.20.log','w')
-    g.nlap = nlap
+
+    full_radius = 1000.0
+    minimum_overlap = 20
 
     g.ncrit = 20
 
@@ -246,7 +260,7 @@ def urban_adjustments(full_radius, nlap, anomaly_stream):
     for (dict, anomalies) in anomaly_stream:
         length = len(anomalies)
         # convert anomalies back from int to float;
-        # TODO: preserve as float between toANNanom and here.
+        # TODO: preserve as float between annual_anomalies and here.
         for i in range(length):
             if valid(anomalies[i]):
                 anomalies[i] *= 0.1
@@ -306,7 +320,7 @@ def urban_adjustments(full_radius, nlap, anomaly_stream):
                     needNewNeighbours = True
                     continue
 
-                wt, iwt, urb, avg = func2(us, iyrm, count, iyoff, rngbr, combined)
+                wt, iwt, urb, avg = func2(us, iyrm, count, iyoff, rngbr, combined, minimum_overlap)
                 iy1 = 1
                 needNewNeighbours = False
 
@@ -411,7 +425,7 @@ def getNeighbours(us, rural_stations, iyoff, full_radius, full=False):
     return count, combined, radius, iyu1, iyu2
 
 
-def func2(us, iyrm, count, iyoff, rngbr, combined):
+def func2(us, iyrm, count, iyoff, rngbr, combined, minimum_overlap):
     # TODO: Should probably make next 4 arrays a struct (at least as a
     #       stepping stone)
     wt = [0.0] * iyrm
@@ -447,7 +461,7 @@ def func2(us, iyrm, count, iyoff, rngbr, combined):
         nf1 = rs.first_year
         nl1 = rs.last_year
         #****       shift new data, then combine them with current mean
-        nsm, ncom = cmbine(avg, wt, iwt, dnew, nf1, nl1, rs.wti)
+        nsm, ncom = cmbine(avg, wt, iwt, dnew, nf1, nl1, rs.wti, minimum_overlap)
         g.log.write(" data added:  %11d  overlap: %11d  years\n" % (nsm, ncom))
         if nsm != 0:
             rs.uses += 1
@@ -485,7 +499,7 @@ def func3(iy1, iyrm, avg, urb, iwt, f, iyoff, x, w, f66):
     return tmean, n3l, nxy, n3, n3f, nxy3, tm3
 
     
-def cmbine(avg, wt, iwt, dnew, nf1, nl1, wt1):
+def cmbine(avg, wt, iwt, dnew, nf1, nl1, wt1, minimum_overlap):
     # bias of new data is removed by subtracting the difference
     # over the common domain. then the new data are averaged in.
 
@@ -501,7 +515,7 @@ def cmbine(avg, wt, iwt, dnew, nf1, nl1, wt1):
         avg_sum += v_avg
         sumn += v_dnew
 
-    if ncom < g.nlap:
+    if ncom < minimum_overlap:
         return nsm, ncom
     bias = (avg_sum - sumn) / float(ncom)
 
@@ -652,6 +666,24 @@ def log_stats():
 
 
 def apply_adjustments(stream, adjustments):
+    """Applies the urban adjustment records from the iterator
+    *adjustments* to the station records in *stream*.  Returns an
+    iterator of adjusted station records.
+
+    Rural stations are passed unchanged.  Urban stations without an
+    adjustment record are discarded.  Urban stations with an
+    adjustment record are adjusted accordingly, to remove the modelled
+    urban-heat-island effect.
+
+    An urban adjustment record describes linear and two-part linear
+    fits to the difference between an urban station annual anomaly
+    series and the combination of annual anomaly series for nearby
+    rural stations.  The linear fit is to allow for a linear urban
+    heat-island effect at the urban station.  The two-part linear fit
+    is to allow for a model of urbanization starting at some point
+    during the time series.
+    """
+
     log = open('log/padjust.log', 'w')
     first_year = 1880
     adj_dict = {}
@@ -824,8 +856,8 @@ def main(argv=None):
 
     (data_1, data_2) = itertools.tee(data, 2)
 
-    anomalies = toANNanom(data_1)
-    adjustments = urban_adjustments(1000.0, 20, anomalies)
+    anomalies = annual_anomalies(data_1)
+    adjustments = urban_adjustments(anomalies)
     
     adjusted = invnt('Ts.GHCN.CL.PA', apply_adjustments(data_2, adjustments))
     write_results(adjusted, 'work/Ts.GHCN.CL.PA')

@@ -116,12 +116,7 @@ this file:
     result/google-chart.url
 
 contains the URL of a chart showing the global annual mean surface
-temperature anomaly, and if a network connexion can be made then this
-file:
-
-    result/GLB.Ts.ho2.GHCN.CL.PA.png
-
-contains the PNG image downloaded from that URL.
+temperature anomaly.
 
 
 A. REFERENCES
@@ -133,6 +128,7 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
+2010-01-25 DRJ Removed PNG result.
 2010-01-22 NB  Updated to reflect some code moving to tool/.
 2010-01-11 NB  Updated to describe preflight better.
 2010-01-06 DRJ Updated for our all-Python status.

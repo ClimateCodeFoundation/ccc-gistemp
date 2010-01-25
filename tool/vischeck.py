@@ -130,10 +130,6 @@ def chartsingle(l):
 def chartit(fs, offset):
     """Convert the list of files *fs* to a Google Chart API url and print it
     on standard output.
-    
-    If the list is exactly one element long then a PNG file received
-    from the URL is written to a file 'foo.png' where its name is
-    derived from the input file.
 
     *offset* specifies the inter-chart offset, as per the -o option (see
     module docstring).
@@ -144,29 +140,6 @@ def chartit(fs, offset):
 
     url = asgooglechartURL(map(asann, fs), offset=offset)
     print url
-    uf = urllib.urlopen(url)
-    if len(fs) != 1:
-        return
-    f = fs[0]
-
-    def name(f):
-        """Return the "name" of a file object.  Works with genuine
-        objects and objects return from urllib.urlopen.
-        """
-
-        try:
-            return f.name
-        except:
-            return f.geturl()
-    # Open a PNG output file with a name based on the input.
-    # 'foo.txt' -> 'foo.png' ; '<stdin>' -> '<stdin>.png'
-    o = open(re.sub('(\.[^.]*|)$', '.png', name(f)), 'wb')
-    while True:
-        x = uf.read(1000)
-        if x == '':
-            break
-        o.write(x)
-    o.close()
 
 import sys
 

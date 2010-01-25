@@ -200,10 +200,6 @@ g.ncrit = 20
 g.nrurm = 3
 g.xcrit = 2.0 / 3.0
 
-# Work array sizes
-g.nstam = 8000
-g.msize = 700000
-
 g.pi180 = math.pi / 180.0
 g.x0 = 1950
 
@@ -216,7 +212,6 @@ g.cscrif = 0.0
 g.cscrih = 0.0
 g.mbad = 0
 g.xbad = 0.0
-g.rdata = []
 g.nuseid = []
 
 g.lshort = 7
@@ -258,59 +253,49 @@ def PApars(rngbrf, nlap, anomaly_stream):
     last_year = int(open('work/GHCN.last_year', 'r').read().strip())
     iyoff = 1879
     iyrm = last_year - iyoff
-    nyrsin = iyrm
     g.mbad = 9999
     g.xbad = float(9999)
-    current_index = 1
 
     g.rural_stations = []
     g.urban_stations = []
  
-    idata = []
     for (dict, anomalies) in anomaly_stream:
-        idata.extend(anomalies)
         length = len(anomalies)
+        # convert anomalies back from int to float;
+        # TODO: preserve as float between toANNanom and here.
+        for i in range(length):
+            if anomalies[i] == g.mbad:
+                anomalies[i] = g.xbad
+            else:
+                anomalies[i] *= 0.1
 
         # throw away some precision in lat/lon for compatibility with Fortran
         lat = 0.1 * math.floor(dict['lat']* 10 + 0.5)
         lon = 0.1 * math.floor(dict['lon']* 10 + 0.5)
 
         d = Struct()
+        d.anomalies = anomalies
         d.cslat = math.cos(lat * g.pi180)
         d.snlat = math.sin(lat * g.pi180)
         d.cslon = math.cos(lon * g.pi180)
         d.snlon = math.sin(lon * g.pi180)
         d.id = dict['id']
-        d.first_index = current_index
-        d.last_index = current_index + length - 1
         d.first_year = dict['first'] - iyoff
+        d.last_year = d.first_year + length - 1
         if is_rural(dict):
             g.rural_stations.append(d)
         else:
             g.urban_stations.append(d)
 
-        current_index += length
-
     nstau = len(g.urban_stations)        # total number of bright / urban or dim / sm.town stations
     nstar = len(g.rural_stations)        # total number of dark / rural stations
     g.log.write(" number of rural/urban stations %11d %11d\n" % (nstar, nstau))
 
-    # Convert data to real numbers (ann avgs were multiplied by 10)
-    g.rdata = []
-    for v in idata:
-        if v == g.mbad:
-            g.rdata.append(g.xbad)
-        else:
-            g.rdata.append(0.1 * v)
-
     # Sort the rural stations according to the length of the time record
     # (ignoring gaps).
-    lengths = []
     for i, station in enumerate(g.rural_stations):
-        a, b = station.first_index - 1, station.last_index
-        station.recLen = len([v for v in idata[a:b] if v != g.mbad])
+        station.recLen = len([v for v in station.anomalies if v != g.xbad])
         station.index = i
-    for i, station in enumerate(g.rural_stations):
         g.log.write(" rural station: %11d  id: %s  #ok %11d\n" % (
                     i + 1, station.id, station.recLen))
     g.rural_stations.sort(key=lambda s:s.recLen)
@@ -328,8 +313,8 @@ def PApars(rngbrf, nlap, anomaly_stream):
         while True:
             if needNewNeighbours:
                 data = getNeighbours(us, iyoff, full=usingFullRadius)
-                is0, combined, rngbr,    iyu1, iyu2, rbyrc = data
-                if is0 == 0:
+                count, combined, rngbr, iyu1, iyu2 = data
+                if count == 0:
                     if usingFullRadius:
                         dropStation = True
                         g.log.write(' no rural neighbors for %s\n' % us.id)
@@ -339,7 +324,7 @@ def PApars(rngbrf, nlap, anomaly_stream):
                     needNewNeighbours = True
                     continue
 
-                wt, iwt, urb, avg = func2(us, iyrm, is0, iyoff, rngbr, combined)
+                wt, iwt, urb, avg = func2(us, iyrm, count, iyoff, rngbr, combined)
                 iy1 = 1
                 needNewNeighbours = False
 
@@ -422,10 +407,10 @@ def getNeighbours(us, iyoff, full=False):
     else:
         cscrit, rbyrc, rngbr = g.cscrih, g.rbyrch, g.rngbrh
 
-    is0 = 0
+    count = 0
     for rs in g.rural_stations:
         iyu1 = us.first_year + iyoff - 1           # subtract 1 for a possible partial yr
-        iyu2 = iyu1 + us.last_index - us.first_index + 2  # add 1 for partial year
+        iyu2 = us.last_year + iyoff + 1            # add 1 for partial year
 
         csdbyr = (rs.snlat * us.snlat + rs.cslat * us.cslat *
                      (rs.cslon * us.cslon  + rs.snlon * us.snlon))
@@ -435,18 +420,14 @@ def getNeighbours(us, iyoff, full=False):
         dbyrc = 0
         if csdbyr < 1.0:
             dbyrc = rbyrc * math.sqrt(2.0 * (1.0 - csdbyr))
-        is0 += 1
-        comb = Struct()
-        combined.append(comb)
-        comb.wti = 1.0 - dbyrc
-        comb.isofi = rs.index + 1
-        comb.lenis = rs.recLen
-        comb.rs = rs
+        count += 1
+        rs.wti = 1.0 - dbyrc
+        combined.append(rs)
 
-    return is0, combined, rngbr,     iyu1, iyu2, rbyrc
+    return count, combined, rngbr, iyu1, iyu2
 
 
-def func2(us, iyrm, is0, iyoff, rngbr, combined):
+def func2(us, iyrm, count, iyoff, rngbr, combined):
     # TODO: Should probably make next 4 arrays a struct (at least as a
     #       stepping stone)
     xbad = g.xbad
@@ -454,52 +435,39 @@ def func2(us, iyrm, is0, iyoff, rngbr, combined):
     iwt = [0] * iyrm
     urb = [xbad] * iyrm
     avg = [xbad] * iyrm
-    ioff = us.first_year - us.first_index
-    rdata = g.rdata
 
-    if us.last_index + ioff > g.iyrm0:
-        sys.exit("stop 231")
-    urb[us.first_index - 1 + ioff:us.last_index + ioff] = rdata[us.first_index - 1:us.last_index]
+    urb[us.first_year - 1:us.last_year] = us.anomalies
     g.log.write("urb stnID:%s # rur:%4d ranges:%5d%5d%8.0f.\n" % (
-                us.id, is0, us.first_year + iyoff, us.last_index + ioff + iyoff, rngbr))
+                us.id, count, us.first_year + iyoff, us.last_year + iyoff, rngbr))
 
     #****   start with the station with the longest time record
-    comb = combined[0]
-    rs = comb.rs
-    ioff = rs.first_year - rs.first_index
-    g.nuseid[comb.isofi - 1] += 1
+    rs = combined[0]
+    g.nuseid[rs.index] += 1
 
-    if rs.last_index + 1 + ioff > g.iyrm0:
-        sys.exit("stop 244")
-
-    wti = comb.wti
-    avg[rs.first_index + ioff - 1:rs.last_index + ioff] = rdata[rs.first_index - 1:rs.last_index]
-    for m in xrange(rs.first_index - 1, rs.last_index):
-        if rdata[m] < xbad:
-            wt[m + ioff] = wti
-            iwt[m + ioff] = 1
+    wti = rs.wti
+    avg[rs.first_year - 1:rs.last_year] = rs.anomalies
+    for m in range(len(rs.anomalies)):
+        if rs.anomalies[m] < xbad:
+            wt[m + rs.first_year - 1] = wti
+            iwt[m + rs.first_year - 1] = 1
     g.log.write("longest rur range:%5d-%4d%6d%s\n" % (
-                rs.first_year + iyoff, rs.last_index + ioff + iyoff, comb.lenis, rs.id))
+                rs.first_year + iyoff, rs.last_year + iyoff, rs.recLen, rs.id))
 
     #****   add in the remaining stations
-    for i, comb in enumerate(combined[1:is0]):
-        is_ = comb.isofi
-        rs = comb.rs
-        ioff = rs.first_year - rs.first_index
+    for i, rs in enumerate(combined[1:]):
         g.log.write("add stn%5d range:%5d-%4d %5d %s\n" % (
-                    i + 2, rs.first_year + iyoff, rs.last_index + ioff + iyoff, comb.lenis,
+                    i + 2, rs.first_year + iyoff, rs.last_year + iyoff, rs.recLen,
                     rs.id))
         #****       extend the new data into a full series
         dnew = [xbad] * iyrm
-        a, b = rs.first_index - 1, rs.last_index
-        dnew[a + ioff: b + ioff] = rdata[a:b]
+        dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
         nf1 = rs.first_year
-        nl1 = rs.last_index + ioff
+        nl1 = rs.last_year
         #****       shift new data, then combine them with current mean
-        nsm, ncom = cmbine(avg, wt, iwt, dnew, nf1, nl1, comb.wti)
+        nsm, ncom = cmbine(avg, wt, iwt, dnew, nf1, nl1, rs.wti)
         g.log.write(" data added:  %11d  overlap: %11d  years\n" % (nsm, ncom))
         if nsm != 0:
-            g.nuseid[is_ - 1] += 1
+            g.nuseid[rs.index] += 1
 
     return wt, iwt, urb, avg
 

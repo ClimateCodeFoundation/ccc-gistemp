@@ -240,8 +240,6 @@ def urban_adjustments(anomaly_stream):
 
     # Open output files for some extra logging
     #
-    # Combination info
-    f66 = open("log/PApars.statn.log.GHCN.CL.1000.20", "w")
     # Station usage stats
     f77 = open("log/PApars.statn.use.GHCN.CL.1000.20", "w")
     # Isolated urban stations
@@ -329,9 +327,6 @@ def urban_adjustments(anomaly_stream):
                 iy1 = 1
                 needNewNeighbours = False
 
-            if iy1 == 1:
-                f66.write("year dTs-urban dTs-rural StnID=%s\n" % (
-                    us.id))
             quorate_count, first, last, quorate_period_total, length = prepare_series(
                 iy1, iyrm, combined, urban_series, counts, f, iyoff, x, minimum_rural_neighbors)
 
@@ -483,8 +478,8 @@ def prepare_series(iy1, iyrm, combined, urban_series, counts, f, iyoff, x, minim
     station anomaly series *combined* and the urban station series
     *urban_series*.  The arrays are only populated with valid years,
     from the first quorate year onwards.  A valid year is one in which
-    each the urban station and the combined rural series has a valid
-    datum.  A quorate year is a year in which there are at least
+    both the urban station and the combined rural series have valid
+    data.  A quorate year is a year in which there are at least
     *minimum_rural_neighbors* contributing (obtained from the *counts*
     series).
 

@@ -146,27 +146,23 @@ def annual_anomalies(stream):
         annual_anoms = []
         first = None
         for y in range(len(series)/12):
-            # Create groups of seasonal deviations from the month averages.
-            total = [0.0] * 4
-            count = [0] * 4
-            # Could probably be smarter here by using range(-1,11)
-            for m in range(12):
-                if m == 11: # Take December value from the previous year
-                    year_index = y-1
-                else:
-                    year_index = y
-                if year_index >= 0:
-                    datum = series[year_index*12 + m]
+            # Seasons are Dec-Feb, Mar-May, Jun-Aug, Sep-Nov.  Dec from previous year.
+            total = [0.0] * 4 # total monthly anomaly for each season
+            count = [0] * 4   # number of valid months in each season
+            for m in range(-1, 11):
+                index = y * 12 + m
+                if index >= 0: # no Dec value in year -1
+                    datum = series[index]
                     if valid(datum):
                         season = (m+1) // 3 # season number 0-3
-                        if season == 4:
-                            season = 0
-                        total[season] += datum - monthly_means[m]
+                        total[season] += datum - monthly_means[(m + 12) % 12]
                         count[season] += 1
-            season_anomalies = []
+            season_anomalies = [] # list of valid seasonal anomalies
             for s in range(4):
+                # valid seasonal anomaly requires at least 2 valid months
                 if count[s] > 1:
                     season_anomalies.append(total[s]/count[s])
+            # valid annual anomaly requires at least 3 valid seasons
             if len(season_anomalies) > 2:
                 v = (10.0 * sum(season_anomalies)) / len(season_anomalies)
                 annual_anoms.append(int(round(v)))

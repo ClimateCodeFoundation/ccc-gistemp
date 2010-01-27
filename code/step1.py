@@ -758,14 +758,31 @@ if __name__ == '__main__':
 
 # Notes:
 #
-# 1. read_v2() reads work/v2.mean_comb
+# 1. read_v2() reads work/v2.mean_comb, produced by step 0.
 #
-# 2. comb_records() is a filter
+# 2. comb_records() is a filter, combining several separate "scribal"
+# station records into a single record, based on a minimum overlap
+# (number of years with both stations valid) between pairs of records,
+# attempting to make single coherent records.
 #
-# 3. comb_pieces() is a filter
-#
-# 4. drop_strange() is a filter
-#
-# 5. alter_discont() is a filter
+# 3. comb_pieces() is another filter, which further attempts to
+# combine the records produced by comb_records() - which therefore
+# have shorter overlaps - by comparing the annual anomalies of the
+# years in which they do overlap, and finding ones for which the
+# temperatures (in years which they do have in common) are on average
+# closer together than the standard deviation of the combined record.
+# I think.
+# 
+# Before performing this combination, comb_pieces also makes
+# discontinuity adjustments to particular records, under control of a
+# configuration file.  In fact, the configuration file specifies a
+# single adjustment to a single record (St Helena).
+# 
+# 4. drop_strange() is another filter, which discards some station
+# records, or parts of records, under control of a configuration file.
+# 
+# 5. alter_discont() makes discontinuity adjustments to records under
+# control of a configuration file.  Yes, this is very similar to the
+# St Helena behaviour of comb_pieces().
 #
 # 6. write_to_file() writes the results to work/Ts.txt

@@ -1,4 +1,4 @@
-CLEAR CLIMATE CODE RELEASE NOTES FOR RELEASE 0.2.0
+CLEAR CLIMATE CODE RELEASE NOTES FOR RELEASE 0.3.0
 
 Nick Barnes, Ravenbrook Limited
 
@@ -8,15 +8,15 @@ $Date$
 CONTENTS
 
   1. Introduction
-  2. Supported configurations
-  3. Getting help
-  4. What's fixed
-     4.1.   What's fixed in release 0.2.0
-     4.2.   What was fixed in release 0.1.0
-     4.3.   What was fixed in release 0.0.3
-     4.4.   What was fixed in release 0.0.2
-     4.5.   What was fixed in release 0.0.1
-     4.6.   What was fixed in release 0.0.0
+  2. Getting help
+  3. What's fixed
+     3.1.   What's fixed in release 0.3.0
+     3.2.   What was fixed in release 0.2.0
+     3.3.   What was fixed in release 0.1.0
+     3.4.   What was fixed in release 0.0.3
+     3.5.   What was fixed in release 0.0.2
+     3.6.   What was fixed in release 0.0.1
+     3.7.   What was fixed in release 0.0.0
   A. References
   B. Document history
   C. Copyright and license
@@ -24,42 +24,154 @@ CONTENTS
 
 1. INTRODUCTION
 
-These are the release notes for release 0.2.0 of the Clear Climate
-Code GISTEMP project (CCC-GISTEMP).
+These are the release notes for release 0.3.0 of the Clear Climate
+Code GISTEMP project (ccc-gistemp).
 
 Clear Climate Code is reimplementing GISTEMP (the GISS surface
-temperature analysis system) in Python, to make it clearer.
+temperature analysis system), to make it clearer.
 
-For instructions on installing and running the CCC GISTEMP, see the
+For instructions on installing and running ccc-gistemp, see the
 product readme (readme.txt).
 
-For up-to-date information about releases of CCC GISTEMP see the
-project home page <http://clearclimatecode.org/>.  From there you
-will find links to the latest releases, including reports of defects
-found.
+For up-to-date information about releases of ccc-gistemp see the
+project home page <http://clearclimatecode.org/>.  From there you will
+find links to the latest releases, including reports of defects found.
 
 
-2. SUPPORTED CONFIGURATIONS
-
-No support for CCC GISTEMP is provided.
-
-
-3. GETTING HELP
+2. GETTING HELP
 
 If you have problems with CCC, please feel free to contact
 support@clearclimatecode.org.
 
 
-4. WHAT'S FIXED
+3. WHAT'S FIXED
 
 This section lists defects that have been fixed.
 
-4.1. WHAT'S FIXED IN RELEASE 0.2.0
+3.1. WHAT'S FIXED IN RELEASE 0.3.0
 
-Since moving CCC-GISTEMP from Ravenbrook's own internal servers to
-GoogleCode, we haven't yet written the necessary scripts to generate
-lists of fixed defects from GoogleCode, so this section is incomplete.
-Here are the major defects we have fixed.
+
+Issue 24: Doesn't work with Python 2.4
+
+The Python 2.4 tarfile library doesn't support some tarfiles,
+apparently including those produced by the tar program used by some
+scientists.  So fetching GISTEMP station tables breaks.  We added a
+fixed tarfile library to the tool/ directory to work around this.
+
+
+Issue 26: fetch.py failure with Python 2.5.1
+
+Python 2.5.1, which is shipped with Mac OS X 10.5 so is widely used,
+has a defect in the tarfile library which broke our code for fetching
+NCAR Antarctic data and GISTEMP station tables.  We added a workaround.
+
+
+Issue 25: Step 2 pointlessly splits station record data into 6 zonal files.
+
+code/split_binary.py was called to split Ts.bin into 6 zonal files,
+each of which was then processed in turn by all the programs in step
+2.  step 3 then expected these 6 files as input.
+
+This emulated the GISS GISTEMP code and was presumably once necessary
+in order to do the analysis with very little RAM.  That is no longer a
+concern.  It reduced clarity and added complexity to the run
+environment ("What are all these files?").
+
+
+Issue 30: Step 2 uses several intermediate files      
+
+Step 2 created several files to pass data between phases within the
+step.  Even after the resolution of issue 25, there were still 5 files
+created and consumed solely within this step: Ts.bin, Ts.GHCN.CL,
+ANN.dTs.GHCN.CL, PApars.pre-flags, PApars.list.  Some of these were in
+Fortran binary format, others in plain text.  There was quite a bit of
+code for writing and reading these files.
+
+All of the data flow between phases in this step is now by Python
+iterator instead, which firstly reduces code complexity and secondly
+causes the code to be automatically pipelined.
+
+
+Issue 29: step 1 uses BSD db intermediate files
+
+step1.py generated a number of intermediate files in the BSD database
+format.  This added complexity to the code and to the run environment,
+and caused a dependency on the bsddb module (which will be removed in
+some future Python).  All data-flow between phases within the step now
+takes place via Python iterators, which removes the complexity and
+also causes the code to be naturally and transparently pipelined.
+
+
+Issue 32: step 1 includes overly complex object class       
+
+step1.py was partly cut-and-paste from Python already in GISTEMP.  It
+included an object class called StationString, which largely existed
+to serialize and deserialize station temperature records for storage
+in database files (see issue 29 ).  This has be replaced by a simple
+dictionary of metadata and a list-of-arrays data series.
+
+
+Issue 33: step 1's simple phases clarified         
+
+Step 1 consists of four phases, comb_records(), comb_pieces(),
+drop_strange() and alter_discont().  The latter two phases are much
+simpler than the former, and have been greatly clarified and somewhat
+documented.  Progress has also been made on the first two phases, but
+they are still somewhat mysterious.
+
+
+Issue 34: step 2 was opaque and confusing         
+
+STEP 2 of the GISTEMP algorithm performs an adjustment to compensate for
+the urban heat island effect.  The code to do this was quite opaque and
+confusing: masses of arithmetic, poorly named functions and variables, huge
+shared arrays, complex control flow, some obscure data dependencies, and
+hardly any comments.
+
+All the STEP 2 code, now consolidated into step2.py, is clarified and
+documented.  Control flow has been greatly simplified in several places. 
+Almost all variables and functions have been renamed.  Every function has
+accompanying documentation.  There is hardly any global data or shared
+lists or arrays.
+
+
+Issue 31: Result comparison should give much more detail           
+
+The compare_results script was improved in numerous ways:
+- x-axis labelling was sometimes broken;
+- very small values were reported as zero;
+- bar charts were not useful when all the values were small;
+- the sizes of datasets were not reported;
+- the numbers of zero residues were not reported;
+- per-box standard deviations were not reported.
+
+The improved script fixes all of these, and even draws a crude coloured map
+to indicated the distribution of residual standard deviations.
+
+
+Issue 35: No regression test against NASA GISTEMP           
+
+There was no way to perform a regression test against NASA's GISTEMP. 
+Happily Dr Reto Ruedy of GISS has provided us with input data and result
+files from a live run of GISTEMP, and we have already developed a good
+script for graphical and statistical comparison of result files (see  issue
+31 ), so we were able to write a regression test which fetches these input
+files, runs ccc-gistemp on them, and compares the results with NASA's.
+
+
+Issue 23: Cannot use --steps 3
+
+An omission in run.py prevented the standalone running of step 3 of
+the algorithm.
+
+
+Issue 28: vischeck complains when given a single URL
+
+An internal program to generate Google Chart URLs broke under some
+circumstances.
+
+
+3.2. WHAT WAS FIXED IN RELEASE 0.2.0
 
 Issue 19: STEP2 is in Fortran
 
@@ -100,7 +212,7 @@ the annual global temperature anomalies from two sets of result data
 compare_results.py, which generates a more detailed report comparing
 two sets of results.
 
-4.2. WHAT WAS FIXED IN RELEASE 0.1.0
+3.3. WHAT WAS FIXED IN RELEASE 0.1.0
 
 ESSENTIAL
 
@@ -160,7 +272,7 @@ separate step driver scripts.  Executables live adjacent to the source
 code. It's all a bit of a mess.
 
 
-4.3. WHAT WAS FIXED IN RELEASE 0.0.3
+3.4. WHAT WAS FIXED IN RELEASE 0.0.3
 
 
 ESSENTIAL
@@ -179,7 +291,7 @@ GISTEMP STEP2/PApars.f has quite a lot of old FORTRAN code which is
 obscure.  The large header comment is also incorrect in places.
 
 
-4.4. WHAT WAS FIXED IN RELEASE 0.0.2
+3.5. WHAT WAS FIXED IN RELEASE 0.0.2
 
 
 ESSENTIAL
@@ -195,7 +307,7 @@ diagnosing a difference between the output of the FORTRAN STEP0 and
 Python step0.py.
 
 
-4.5. WHAT WAS FIXED IN RELEASE 0.0.1
+3.6. WHAT WAS FIXED IN RELEASE 0.0.1
 
 
 ESSENTIAL
@@ -223,7 +335,7 @@ path to Python in the "shebang" #! first line of the file.  This is not
 very portable to say the least.
 
 
-4.6. WHAT WAS FIXED IN RELEASE 0.0.0
+3.7. WHAT WAS FIXED IN RELEASE 0.0.0
 
 
 Nothing.  Release 0.0.0 is just GISTEMP as released on 2007-10-10,
@@ -239,6 +351,7 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
+2010-01-26 NB  Updated for 0.3.0.
 2010-01-11 NB  Updated for 0.2.0.
 2009-12-03 NB  Updated for GoogleCode project.
 2008-09-14 NB  Updated for 0.1.0

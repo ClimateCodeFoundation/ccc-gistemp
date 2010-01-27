@@ -90,7 +90,7 @@ def get_helena_dict():
     helena_ds = {}
     for line in open('config/combine_pieces_helena.in', 'r'):
         id, _, year, month, summand = line.split()
-        helena_ds[id[:-1]] = (id, int(year), int(month), float(summand))
+        helena_ds[id] = (int(year), int(month), float(summand))
     return helena_ds
 
 

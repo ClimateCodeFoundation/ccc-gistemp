@@ -541,6 +541,29 @@ def comb_records(stream):
             if not ids:
                 break
 
+
+def adjust_helena(stream):
+    """Modifies records as specified in config/combine_pieces_helena.in,
+    by adding the delta to every datum for that station prior to the
+    specified month.  Returns an iterator.
+    """
+    helena_ds = read_config.get_helena_dict()
+    for (dict, series) in stream:
+        id = dict['id']
+        if helena_ds.has_key(id):
+            this_year, month, summand = helena_ds[id]
+            begin = dict['begin']
+            # Index of month specified by helena_ds
+            M = (this_year - begin)*12 + month
+            # All valid data up to and including M get adjusted
+            for i in range(M+1):
+                datum = series[i]
+                if invalid(datum):
+                    continue
+                series[i] += summand
+            del helena_ds[id]
+        yield (dict, series)
+
 MIN_MID_YEARS = 5            # MIN_MID_YEARS years closest to ymid
 BUCKET_RADIUS = 10
 pieces_log = None
@@ -705,7 +728,6 @@ def get_longest(records):
 def comb_pieces(stream):
     global pieces_log
     pieces_log = open('log/pieces.log','w')
-    helena_ds = read_config.get_helena_dict()
 
     for id11, record_set in itertools.groupby(stream, get_id11):
         pieces_log.write('%s\n' % id11)
@@ -718,26 +740,6 @@ def comb_pieces(stream):
                 yield records[ids[0]]
                 break
             record_dict, begin, end = make_record_dict(records, ids)
-
-            if helena_ds.has_key(id11):
-                id1, this_year, month, summand = helena_ds[id11]
-                dict = record_dict[id1]['dict']
-                data = record_dict[id1]['data']
-                begin = dict['begin']
-                years = record_dict[id1]['years']
-                # Index of month specified by helena_ds
-                M = (this_year - begin)*12 + month
-                # All valid data up to and including M get adjusted
-                for i in range(M+1):
-                    datum = data[i]
-                    if invalid(datum):
-                        continue
-                    data[i] += summand
-                del helena_ds[id11]
-                ann_mean, ann_anoms = monthly_annual(data)
-                record_dict[id1]['ann_anoms'] = ann_anoms
-                record_dict[id1]['ann_mean'] = ann_mean
-
             record, rec_id = get_longest(record_dict)
             years = end - begin + 1
             rec_dict = record['dict']
@@ -839,7 +841,8 @@ def write_to_file(data, file):
 def results():
     data = read_v2()
     records = comb_records(data)
-    combined_pieces = comb_pieces(records)
+    helena_adjusted = adjust_helena(records)
+    combined_pieces = comb_pieces(helena_adjusted)
     without_strange = drop_strange(combined_pieces)
     return alter_discont(without_strange)
 
@@ -851,31 +854,31 @@ if __name__ == '__main__':
 
 # Notes:
 #
-# 1. read_v2() reads work/v2.mean_comb, produced by step 0.
+# - read_v2() reads work/v2.mean_comb, produced by step 0.
 #
-# 2. comb_records() is a filter, combining several separate "scribal"
+# - comb_records() is a filter, combining several separate "scribal"
 # station records into a single record, based on a minimum overlap
 # (number of years with both stations valid) between pairs of records,
 # attempting to make single coherent records.
 #
-# 3. comb_pieces() is another filter, which further attempts to
-# combine the records produced by comb_records() - which therefore
-# have shorter overlaps - by comparing the annual anomalies of the
-# years in which they do overlap, and finding ones for which the
-# temperatures (in years which they do have in common) are on average
-# closer together than the standard deviation of the combined record.
-# I think.
+# - adjust_helena() makes discontinuity adjustments to particular
+# records, under control of a configuration file.  In fact, the
+# configuration file specifies a single adjustment to a single record
+# (St Helena).
+#
+# - comb_pieces() is another filter, which further attempts to combine
+# the records produced by comb_records() - which therefore have
+# shorter overlaps - by comparing the annual anomalies of the years in
+# which they do overlap, and finding ones for which the temperatures
+# (in years which they do have in common) are on average closer
+# together than the standard deviation of the combined record.  I
+# think.
 # 
-# Before performing this combination, comb_pieces also makes
-# discontinuity adjustments to particular records, under control of a
-# configuration file.  In fact, the configuration file specifies a
-# single adjustment to a single record (St Helena).
-# 
-# 4. drop_strange() is another filter, which discards some station
+# - drop_strange() is another filter, which discards some station
 # records, or parts of records, under control of a configuration file.
 # 
-# 5. alter_discont() makes discontinuity adjustments to records under
+# - alter_discont() makes discontinuity adjustments to records under
 # control of a configuration file.  Yes, this is very similar to the
 # St Helena behaviour of comb_pieces().
 #
-# 6. write_to_file() writes the results to work/Ts.txt
+# - write_to_file() writes the results to work/Ts.txt

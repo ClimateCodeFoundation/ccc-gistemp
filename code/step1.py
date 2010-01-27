@@ -42,15 +42,38 @@ import itertools
 
 import read_config
 
-BAD = 9999 / 10.0
-BAD = 0.1 * int(BAD * 10.0)
+def round_series(series):
+    """Round every element in *series*, in-place, to the nearest 0.1.
+    Returns *series*.
+    """
+
+    for i in range(len(series)):
+        series[i] = float(math.floor(series[i] * 10.0 + 0.5)) * 0.1
+    return series
+
+# BAD is a value used when the datum is not valid.  It is approximately
+# 999.9 (9999 in tenths of degree C).  The BAD value only originates in
+# data from two places.  The function from_lines inserts into the data
+# where it detects data marked as invalid in the input (which uses a
+# different invalid marker); the function round_series rounds all data
+# (including any BAD value) to the nearest 0.1.  If we can ensure that
+# the BAD value remains unchanged when passing through round_series then
+# the invalid() test, below, can use an exact equality test.
+# Defining BAD like this makes it insensitive to the exact definition of
+# round_series.
+BAD = round_series([999.9])[0]
+assert round_series([BAD]) == [BAD]
 
 def invalid(x):
     """Test for invalid datum ("equal" to the BAD value, for some
     definition of "equal").
     """
 
-    return abs(x - BAD) < 0.1
+    # If you're feeling spooky about the BAD value, re-enable this:
+    # if abs(x-BAD) < 0.1:
+    #     assert x == BAD
+
+    return x == BAD
 
 def valid(x):
     """Test for valid datum.  See invalid()."""
@@ -114,8 +137,7 @@ def from_lines(lines):
     the first year for which there is data for the station.
 
     Invalid data are marked in the input file with -9999 but are
-    translated in the data arrays to 9999*0.1 (which is not quite
-    999.9).
+    translated in the data arrays to BAD.
     """
 
     begin = None
@@ -145,16 +167,17 @@ def from_lines(lines):
         # immediately followed by "1486284000001990", missing out 1989.
         # Extend with blank data.
         while prev and prev < year-1:
-            series.extend([9999*0.1]*12)
+            series.extend([BAD]*12)
             prev += 1
         prev = year
         prevline = line
         for m in range(12):
             datum = int(line[16+5*m:21+5*m])
             if datum == -9999:
-                datum = 9999
-            # Convert to floating point and degrees C.
-            datum *= 0.1
+                datum = BAD
+            else:
+                # Convert to floating point and degrees C.
+                datum *= 0.1
             series.append(datum)
     return (series, begin)
 
@@ -263,15 +286,6 @@ def read_v2():
         dict['source'] = sources.get(id, 'UNKNOWN')
         dict['id' ] = id
         yield (dict, round_series(series))
-
-def round_series(series):
-    """Round every element in *series*, in-place, to the nearest 0.1.
-    Returns *series*.
-    """
-
-    for i in range(len(series)):
-        series[i] = float(math.floor(series[i] * 10.0 + 0.5)) * 0.1
-    return series
 
 MIN_OVERLAP = 4
 comb_log = None
@@ -574,6 +588,7 @@ def pieces_get_longest_overlap(sums, wgts, begin, years, records):
         best_record = record
     return best_record, best_id
 
+# :todo: unify with code in final_average
 def get_actual_endpoints(wgts, begin, years):
     assert len(wgts) == 12*years
     y_min = 9999

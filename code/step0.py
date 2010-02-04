@@ -45,25 +45,24 @@ import re
 def open_or_uncompress(filename):
     """Opens the text file `filename` for reading.  If this fails then
     it attempts to find a compressed version of the file by appending
-    '.Z' or '.gz' to the name and opening that (uncompressing it on
+    '.zip' or '.gz' to the name and opening that (uncompressing it on
     the fly).
     """
 
     try:
         return open(filename)
     except IOError:
-        # When none of filename, filename.Z, nor filename.gz exists we
+        # When none of filename, filename.zip, nor filename.gz exists we
         # want to pretend that the exception comes from the original
         # call to open, above.  Otherwise the user can be confused by
-        # claims that "foo.Z" does not exist when they tried to open
+        # claims that "foo.zip" does not exist when they tried to open
         # "foo".  In order to maintain this pretence, we have to get
         # the exception info and save it. See
         # http://blog.ianbicking.org/2007/09/12/re-raising-exceptions/
         import sys
         exception = sys.exc_info()
         try:
-            import uncompress
-            return uncompress.Zfile(filename + '.Z')
+            return zipopen(filename + '.zip')
         except IOError:
             try:
                 import gzip
@@ -71,6 +70,19 @@ def open_or_uncompress(filename):
             except IOError:
                 pass
         raise exception[0], exception[1], exception[2]
+
+# Should probably be moved elsewhere
+def zipopen(filename):
+    """Open the zip file `filename` and return a file object for its
+    first member.  This is only really intended to be used to
+    `v2.mean.zip` which is the single file v2.mean packed into a zip
+    archive."""
+
+    import zipfile
+    z = zipfile.ZipFile(filename, 'r')
+    name = z.namelist()
+    f = z.open(name[0], 'rU')
+    return f
 
 def read_antarc_station_ids(filename):
     """Reads a SCAR station ID file and returns a dictionary

@@ -28,15 +28,15 @@ def checkit(log):
 
         log.write('MISSING: config/%s\n' % name)
 
-    def missing_files(list):
-        """Check list (of names) and return mising ones.  Compression
-        extensions (.Z and .gz) are also tried if supplied name is not found.
+    def missing_files(names):
+        """Check list of names and return mising ones.  Compression
+        extensions (.gz, .zip) are also tried if supplied name is not found.
         """
 
         missing = []
-        for name in list:
+        for name in names:
             gotit = False
-            for suffix in ['','.Z','.gz']:
+            for suffix in ['', '.gz', '.zip']:
                 if input_ok(name+suffix):
                     gotit = True
                     break

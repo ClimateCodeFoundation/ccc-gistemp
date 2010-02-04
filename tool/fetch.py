@@ -62,7 +62,7 @@ def fetch(files, prefix='input/', output=sys.stdout):
     # (9641C_200907_F52.avg.gz).  It does no harm to remember how to
     # fetch the older file.
     noaa = """
-    ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.mean.Z
+    ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/zipd/v2.mean.zip
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.temperature.inv
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/hcn_doe_mean_data.Z
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_200907_F52.avg.gz
@@ -136,17 +136,19 @@ def fetch(files, prefix='input/', output=sys.stdout):
     # Now make the *place* dictionary have short names both with and
     # without the compression suffix.
     def removeZ(d):
-        """For every short name that ends in '.Z' or '.gz' (case
-        insensitive), then add a short name with the extension removed.
-        So we can ask for either the compressed or uncompressed version
-        (but in either case, the compressed version is fetched).
+	"""Ensure that we can ask for either the compressed or
+	uncompressed version of a file.  To do this we add a short name
+        with the extension removed when the extension is
+        '.Z', '.gz', or '.zip'.
+
+        Ultimately, it is the compressed version that is fetched.
         """
         # *name* is a dictionary that maps from short name, with and
         # without compression suffix, to the URL.
         name = {}
         for short, long in d.items():
             split = short.split('.')
-            if split[-1].lower() in ['z','gz']:
+            if split[-1].lower() in ['z','gz','zip']:
                 yield '.'.join(split[:-1]), (long, short)
             yield short, (long, short)
     place = dict(removeZ(place))

@@ -1,41 +1,47 @@
 #! /usr/bin/env python
-#
 # step0.py
-# $Id: //info.ravenbrook.com/project/ccc/master/code/step0.py#10 $
-# Copyright (C) 2008 Ravenbrook Limited.  See end of file for license.
-# 
-# Python code for the STEP0 part of the GISTEMP algorithm.
+# $URL$
+# $Rev$
+#
 # Nick Barnes, Ravenbrook Limited, 2008-09-17
 #
-# To run:
-# $ code/step0.py
-# $ sort < work/v2.mean_comb.unsorted > work/v2.mean_comb
-# $
-#
-# Requires the following files in directory input/:
-#
-# From GISTEMP/STEP0/input_files, Antarctic/Australasian data:
-#   antarc1.list
-#   antarc1.txt
-#   antarc2.list
-#   antarc2.txt
-#   antarc3.list
-#   antarc3.txt
-#
-# From GISTEMP/STEP0/input_files, Hohenpeissenberg station data:
-#   t_hohenpeissenberg_200306.txt_as_received_July17_2003
-#
-# From GISTEMP/STEP0/input_files, USHCN/GHCN station table:
-#   ushcn2.tbl
-#   ushcnV2_cmb.tbl
-#
-# From import/2008-07-14/ghcn, GHCN data:
-# (from ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.mean.Z)
-#   v2.mean.Z
-#
-# From import/2007-10-11/ushcn, USHCN data:
-# (from ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_200907_F52.avg.gz)
-#   9641C_200907_F52.avg.gz
+# Copyright (C) 2008-2010 Ravenbrook Limited.  See end of file for license.
+
+"""
+Python code for the STEP0 part of the GISTEMP algorithm.
+
+To run:
+$ code/step0.py
+$
+
+(however, usually run with "python tool/run.py -s 0")
+
+Requires the following files in directory input/:
+(tool/fetch.py should know how to get all of these files)
+
+Antarctic/Australasian data:
+  antarc1.list
+  antarc1.txt
+  antarc2.list
+  antarc2.txt
+  antarc3.list
+  antarc3.txt
+
+Hohenpeissenberg station data:
+  t_hohenpeissenberg_200306.txt_as_received_July17_2003
+
+USHCN/GHCN station table:
+  ushcn2.tbl
+  ushcnV2_cmb.tbl
+
+GHCN data:
+(from ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.mean.Z)
+  v2.mean.Z
+
+USHCN data:
+(from ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_200907_F52.avg.gz)
+  9641C_200907_F52.avg.gz
+"""
 
 import itertools
 import math

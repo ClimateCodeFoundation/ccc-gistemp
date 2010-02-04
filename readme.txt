@@ -8,7 +8,12 @@ $Date$
 CONTENTS
 
   1. Introduction
-  2. Installation
+  2. Dependencies
+  3. Installation
+  4. Input Data
+  5. Running
+  6. Results
+  7. Regression Testing
   A. References
   B. Document history
   C. Copyright and license

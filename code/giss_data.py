@@ -22,8 +22,6 @@ import sys
 import copy
 import math
 
-import props
-
 #: The base year for time series data. Data before this time is not
 #: used in calculations.
 BASE_YEAR = 1880
@@ -128,6 +126,7 @@ def clear_cache(func):
         self._tenths = None
         self._celcius = None
         self._ngood = None
+        self._ngood_ann_anoms = None
         return func(self, *args, **kwargs)
 
     return f
@@ -276,22 +275,22 @@ class Station(object):
         self.US_brightness = US_brightness
         self.idontknow = idontknow
 
-    @props.intelliprop
+    @property
     def lat_fixed_1(self):
         """The latitude rounded to 1 decimal place."""
         return 0.1 * math.floor(self.lat * 10 + 0.5)
 
-    @props.intelliprop
+    @property
     def lon_fixed_1(self):
         """The longitude rounded to 1 decimal place."""
         return 0.1 * math.floor(self.lon * 10 + 0.5)
 
-    @props.intelliprop
+    @property
     def lat_as_tenths(self):
         """The latitude as a integer number of 0.1 degrees."""
         return int(math.floor(self.lat * 10 + 0.5))
 
-    @props.intelliprop
+    @property
     def lon_as_tenths(self):
         """The longitude as a integer number of 0.1 degrees."""
         return int(math.floor(self.lon * 10 + 0.5))
@@ -363,17 +362,18 @@ class MonthlyTemperatureRecord(object):
         self._celcius = None
         self._tenths = None
         self._ngood = None
+        self._ngood_ann_anoms = None
 
-    @staticmethod
-    def valid(v):
-        return not self.invalid(v)
+    @classmethod
+    def valid(cls, v):
+        return not cls.invalid(v)
 
-    @props.intelliprop
+    @property
     def n(self):
         """The length of the series."""
         return len(self._series)
 
-    @props.intelliprop
+    @property
     def last_month(self):
         """The number of the last months in the data series.
 
@@ -382,77 +382,77 @@ class MonthlyTemperatureRecord(object):
         """
         return (self.first_month + len(self._series) - 1)
 
-    @props.intelliprop
+    @property
     def first_year(self):
         """The year of the first value in the series."""
         return (self.first_month - 1) // 12
 
-    @props.intelliprop
+    @property
     def last_year(self):
         """The year of the last value in the series."""
         return (self.last_month - 1) // 12
 
-    @props.intelliprop
+    @property
     def first_good_year(self):
         """The year of the first good value in the series."""
         return (self.first_good_month - 1) // 12
 
-    @props.intelliprop
+    @property
     def last_good_year(self):
         """The year of the last good value in the series."""
         return (self.last_good_month - 1) // 12
 
-    @props.intelliprop
+    @property
     def first_good_month(self):
         """TODO"""
         return self.first_month + self.good_start_idx
 
-    @props.intelliprop
+    @property
     def last_good_month(self):
         """TODO"""
         return self.first_month + self.good_end_idx - 1
 
-    @props.intelliprop
+    @property
     def rel_first_year(self):
         """The `first_year` relative to `BASE_YEAR`."""
         return self.first_year - BASE_YEAR
 
-    @props.intelliprop
+    @property
     def rel_last_year(self):
         """The `last_year` relative to `BASE_YEAR`."""
         return self.last_year - BASE_YEAR
 
-    @props.intelliprop
+    @property
     def rel_first_good_year(self):
         """The `first_good_year` relative to `BASE_YEAR`."""
         return self.first_good_year - BASE_YEAR
 
-    @props.intelliprop
+    @property
     def rel_last_good_year(self):
         """The `last_good_year` relative to `BASE_YEAR`."""
         return self.last_good_year - BASE_YEAR
 
-    @props.intelliprop
+    @property
     def rel_first_month(self):
         """The `first_month` relative to `BASE_YEAR`."""
         return self.first_month - BASE_YEAR * 12
 
-    @props.intelliprop
+    @property
     def rel_last_month(self):
         """The `last_month` relative to `BASE_YEAR`."""
         return self.last_month - BASE_YEAR * 12
 
-    @props.intelliprop
+    @property
     def rel_first_good_month(self):
         """The `first_good_month` relative to `BASE_YEAR`."""
         return self.first_good_month - BASE_YEAR * 12
 
-    @props.intelliprop
+    @property
     def rel_last_good_month(self):
         """The `last_good_month` relative to `BASE_YEAR`."""
         return self.last_good_month - BASE_YEAR * 12
 
-    @props.intelliprop
+    @property
     def ngood(self):
         """The number of good values in the data."""
         # TODO: Rename or remove or something. Also handle magic No.
@@ -494,6 +494,13 @@ class MonthlyTemperatureRecord(object):
 
     @clear_cache
     def _add_year_of_data(self, year, data, missing, convert=lambda x:x):
+        if self.first_month != sys.maxint:
+            # We have data already, so we may need to pad with missing months
+            # TODO: This is not fully correct because it assumes the series is
+            #       already a whole number of years.
+            gap = year - self.last_year - 1
+            if gap > 0:
+                self._series.extend([missing] * gap * 12)
         start_month = year * 12 + 1
         self.first_month = min(self.first_month, start_month)
         for m, in_value in enumerate(data):
@@ -527,12 +534,13 @@ class StationRecord(MonthlyTemperatureRecord):
     def __init__(self, uid, **kwargs):
         super(StationRecord, self).__init__()
         self.uid = uid
+        self.ann_anoms = []
 
-    @staticmethod
-    def invalid(v):
-        return v == MISSING
+    @classmethod
+    def invalid(cls, v):
+        return v in (MISSING, -MISSING)
 
-    @props.intelliprop
+    @property
     def series(self):
         """The series of values in celsius."""
         if self._celcius is None:
@@ -545,12 +553,12 @@ class StationRecord(MonthlyTemperatureRecord):
             self._celcius = c
         return self._celcius
 
-    @props.intelliprop
+    @property
     def series_as_tenths(self):
         """Return the time series in 0.1 celcius, integer units."""
         return self._series
 
-    @props.intelliprop
+    @property
     def station(self):
         """The corresponding `Station` instance."""
         st = stations().get(self.station_uid)
@@ -558,12 +566,16 @@ class StationRecord(MonthlyTemperatureRecord):
             print "BUM!", self.uid, self.station_uid
         return st
 
-    @props.intelliprop
+    @property
     def station_uid(self):
         """The unique ID of the corresponding station."""
-        return self.uid[:-1]
+        try:
+            return self.uid[:-1]
+        except:
+            print ">>>", self, self.uid
+            raise
 
-    @props.intelliprop
+    @property
     def short_id(self):
         """The shortened form of the record's uinique ID.
 
@@ -578,6 +590,26 @@ class StationRecord(MonthlyTemperatureRecord):
 
     def set_series_from_tenths(self, first_month, series):
         self._set_series(first_month, series, MISSING)
+
+    def set_ann_anoms(self, ann_anoms):
+        self.ann_anoms[:] = ann_anoms
+
+    @property
+    def ngood_ann_annoms(self):
+        """Number of good values in the annual anomolies"""
+        # TODO: Rename or remove or something. Also handle magic No.
+        if self._ngood_ann_anoms is None:
+            bad = 0
+            for v in self.ann_anoms:
+                bad += v > 9998.99 # TODO: Fix this!
+            self._ngood_ann_anoms = len(self.ann_anoms) - bad
+        return self._ngood_ann_anoms
+
+
+    def copy(self):
+        r = StationRecord(self.uid)
+        r.set_series_from_tenths(self.first_month, self.series_as_tenths)
+        return r
 
     def pretty(self):
         """Format prettily."""
@@ -718,11 +750,11 @@ class SubboxRecord(MonthlyTemperatureRecord):
         self.set_series(series)
         #assert self.station_months == self.ngood
 
-    @staticmethod
-    def invalid(v):
+    @classmethod
+    def invalid(cls, v):
         return abs(v - XMISSING) < 0.1
 
-    @props.intelliprop
+    @property
     def series(self):
         """The series of values in celsius."""
         return self._series

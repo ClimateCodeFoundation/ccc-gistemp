@@ -128,7 +128,7 @@ def plot(arg, inp, out):
 
     limyear = maxyear + 1
     # Bounds of the box that displays data.  In SVG viewBox format.
-    databox = (minyear, lowest-1, limyear-minyear, highest-lowest+2)
+    databox = (minyear, lowest, limyear-minyear, highest-lowest)
     plotwidth = databox[2]
     plotheight = databox[3]
 
@@ -152,12 +152,11 @@ def plot(arg, inp, out):
     # push chart down and right to give a bit of a border
     out.write("<g transform='translate(4,4)'>\n")
     # Transform so that (0,0) on chart is lower left
-    out.write("<g transform='translate(0, %d)'>\n" % (databox[3]))
+    out.write("<g transform='translate(0, %.1f)'>\n" % (databox[3]))
     # In this section 0,0 should coincide with bottom left of chart, but
     # oriented as per SVG default.  +ve y is down.
     out.write("<g id='axes'>\n")
     w = limyear - minyear
-    out.write("<path d='M0 0l%d 0' />\n" % w)
     # Ticks.
     s = (-minyear)%10
     # Where we want ticks, in years offset from the earliest year.
@@ -180,9 +179,9 @@ def plot(arg, inp, out):
     # Transform so that up (on data chart) is +ve.
     out.write("<g transform='scale(1, -1)'>\n")
     # Transform so that databox lower left ends up at 0,0
-    out.write("<g transform='translate(%d, %d)'>\n" %
+    out.write("<g transform='translate(%d, %.1f)'>\n" %
       (-databox[0], -databox[1]))
-    out.write("""<rect x='%d' y='%d' width='%d' height='%d'
+    out.write("""<rect x='%d' y='%.1f' width='%d' height='%.1f'
       stroke='pink' fill='none' opacity='0.30' />\n""" % databox)
 
     for id12,lines in table.items():

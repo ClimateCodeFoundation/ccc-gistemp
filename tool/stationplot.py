@@ -134,7 +134,7 @@ def plot(arg, inp, out):
 
     out.write("""<svg width='1000px' height='750px' viewBox='0 0 %d %d'
       xmlns="http://www.w3.org/2000/svg" version="1.1">\n""" %
-      (plotwidth+8, plotheight+10))
+      (plotwidth+12, plotheight+20))
 
     # Style
     out.write("""<defs>
@@ -150,7 +150,7 @@ def plot(arg, inp, out):
     out.write("  </style>\n</defs>\n")
 
     # push chart down and right to give a bit of a border
-    out.write("<g transform='translate(4,4)'>\n")
+    out.write("<g transform='translate(12,4)'>\n")
     # Transform so that (0,0) on chart is lower left
     out.write("<g transform='translate(0, %.1f)'>\n" % (databox[3]))
     # In this section 0,0 should coincide with bottom left of chart, but
@@ -159,7 +159,7 @@ def plot(arg, inp, out):
     # Start of "axes" group.
     out.write("<g id='axes'>\n")
     w = limyear - minyear
-    # Ticks.
+    # Ticks on the horizontal axis.
     s = (-minyear)%10
     # Where we want ticks, in years offset from the earliest year.
     # We have ticks every decade.
@@ -178,6 +178,17 @@ def plot(arg, inp, out):
         out.write("  <text text-anchor='middle'"
           " font-size='%.1f' x='%d' y='4'>%d</text>\n" %
           (fs, x, minyear+x))
+    # Ticks on the vertical axis.
+    s = (-lowest) % 5
+    tickat = map(lambda x: x+s, range(0, int(highest+.1-lowest-s), 5))
+    out.write("  <path d='" +
+      ''.join(map(lambda x: 'M0 %.1fl-2 0' % -x, tickat)) +
+      "' />\n")
+    for y in tickat:
+        # Note: "%.0f' % 4.999 == '5'
+        out.write("  <text text-anchor='end'"
+          " font-size='%.1f' x='-2' y='%.1f'>%.0f</text>\n" %
+          (fs, -y, y+lowest))
     # End of "axes" group.
     out.write("</g>\n")
 

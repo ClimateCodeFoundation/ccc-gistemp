@@ -141,7 +141,7 @@ def plot(arg, inp, out):
   <style type="text/css">
     path { stroke-width: 0.1; fill: none }
     path.singleton { stroke-width: 0.2; stroke-linecap: round }
-    g#axes path { stroke-width:0.2; fill:none; stroke: black }
+    g#axes path { stroke-width:0.1; fill:none; stroke: #888 }
     g#axes text { fill: black; font-family: Verdana }
 """)
     assert len(table) <= len(colour_list)
@@ -155,6 +155,8 @@ def plot(arg, inp, out):
     out.write("<g transform='translate(0, %.1f)'>\n" % (databox[3]))
     # In this section 0,0 should coincide with bottom left of chart, but
     # oriented as per SVG default.  +ve y is down.
+
+    # Start of "axes" group.
     out.write("<g id='axes'>\n")
     w = limyear - minyear
     # Ticks.
@@ -162,8 +164,11 @@ def plot(arg, inp, out):
     # Where we want ticks, in years offset from the earliest year.
     # We have ticks every decade.
     tickat = range(s, w+1, 10)
+    # Amount by which tick shoots out at the bottom.
+    overshoot = 2
     out.write("  <path d='" +
-      ''.join(map(lambda x: 'M%d 0l0 2' % x, tickat)) +
+      ''.join(map(lambda x: 'M%d %.1fl0 %.1f' %
+      (x, overshoot, -(plotheight+overshoot)), tickat)) +
       "' />\n")
     # Labels.
     # Font size.  Couldn't get this to work in the style element, so it's

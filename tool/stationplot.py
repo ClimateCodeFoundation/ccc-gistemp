@@ -134,22 +134,20 @@ def plot(arg, inp, out):
     plotheight = databox[3]
 
     out.write("""<svg width='1000px' height='750px' viewBox='0 0 %d %d'
-      xmlns="http://www.w3.org/2000/svg" version="1.1">
-      """ % (plotwidth+8, plotheight+10))
+      xmlns="http://www.w3.org/2000/svg" version="1.1">\n""" %
+      (plotwidth+8, plotheight+10))
 
     # Style
     out.write("""<defs>
-      <style type="text/css">
-        path { stroke-width: 0.1; fill: none }
-        g#axes path { stroke-width:0.2; fill:none; stroke: black }
-      """)
+  <style type="text/css">
+    path { stroke-width: 0.1; fill: none }
+    path.singleton { stroke-width: 0.2; stroke-linecap: round }
+    g#axes path { stroke-width:0.2; fill:none; stroke: black }
+""")
     assert len(table) <= len(colour_list)
     for id12,colour in zip(table, colour_list):
-        out.write("g#record%s { stroke: %s }\n" % (id12, colour))
-    out.write("""
-      </style>
-    </defs>
-      """)
+        out.write("    g#record%s { stroke: %s }\n" % (id12, colour))
+    out.write("  </style>\n</defs>\n")
 
     # push chart down and right to give a bit of a border
     out.write("<g transform='translate(4,4)'>\n")
@@ -173,32 +171,37 @@ def plot(arg, inp, out):
     out.write("<g transform='translate(%d, %d)'>\n" %
       (-databox[0], -databox[1]))
     out.write("""<rect x='%d' y='%d' width='%d' height='%d'
-      stroke='pink' fill='none' opacity='0.30' />
-      """ % databox)
+      stroke='pink' fill='none' opacity='0.30' />\n""" % databox)
 
     for id12,lines in table.items():
         out.write("<g id='record%s'>\n" % id12)
         for segment in aplot(lines):
             out.write(aspath(segment)+'\n')
         out.write("</g>\n")
-    out.write("""
-    </g>
-    </g>
-    </g>
-    </g>
-    </svg>
-    """)
+    out.write("</g>\n" * 4)
+    out.write("</svg>\n")
 
 def aspath(l):
     """Encode a list of data points as an SVG path element.  The element
     is returned as a string."""
+
+    assert len(l) > 0
 
     # Format an (x,y) tuple.
     def fmt(t):
         return "%.3f %.1f" % (t[0], t[1]/10.0)
 
     d = 'M'+fmt(l[0])+'L'+' '.join(map(fmt, l[1:]))
-    return "<path d='%s' />" % d
+    decorate = ''
+    if len(l) == 1:
+        # For singletons we:
+        # - draw a length 0 segment to force a real stroke;
+        # - add a class attribute so that they can be styled with larger
+        # blobs.
+        assert d[-1] == 'L'
+        d = d[:-1] + 'l 0 0'
+        decorate = "class='singleton' "
+    return "<path %sd='%s' />" % (decorate, d)
         
 
 def asdict(arg, inp):

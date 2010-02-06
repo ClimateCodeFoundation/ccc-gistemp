@@ -81,11 +81,10 @@ def aplot(rows):
             year = float(row[12:16])
             if prev:
                 assert year > prev
-                while prev+1 < year:
-                    # Entire missing year in record, pad with BAD
-                    prev += 1
-                    for i in range(12):
-                        yield point(prev, i, BAD)
+                if prev+1 < year:
+                    # Entire missing year in record, we only need one
+                    # BAD datam to force a break.
+                    yield point(prev, 0, BAD)
             prev = year
             for i,datum in enumerate(struct.unpack('5s'*12, row[16:-1])):
                 yield point(year, i, datum)
@@ -143,6 +142,7 @@ def plot(arg, inp, out):
     path { stroke-width: 0.1; fill: none }
     path.singleton { stroke-width: 0.2; stroke-linecap: round }
     g#axes path { stroke-width:0.2; fill:none; stroke: black }
+    g#axes text { fill: black; font-family: Verdana }
 """)
     assert len(table) <= len(colour_list)
     for id12,colour in zip(table, colour_list):
@@ -158,11 +158,23 @@ def plot(arg, inp, out):
     out.write("<g id='axes'>\n")
     w = limyear - minyear
     out.write("<path d='M0 0l%d 0' />\n" % w)
-    # Ticks
+    # Ticks.
     s = (-minyear)%10
-    out.write("<path d='" +
-      ''.join(map(lambda x: 'M%d 0l0 2' % x, range(s, w+1, 10))) +
+    # Where we want ticks, in years offset from the earliest year.
+    # We have ticks every decade.
+    tickat = range(s, w+1, 10)
+    out.write("  <path d='" +
+      ''.join(map(lambda x: 'M%d 0l0 2' % x, tickat)) +
       "' />\n")
+    # Labels.
+    # Font size.  Couldn't get this to work in the style element, so it's
+    # here as an attribute on each <text>
+    fs = 2
+    for x in tickat:
+        out.write("  <text text-anchor='middle'"
+          " font-size='%.1f' x='%d' y='4'>%d</text>\n" %
+          (fs, x, minyear+x))
+    # End of "axes" group.
     out.write("</g>\n")
 
     # Transform so that up (on data chart) is +ve.

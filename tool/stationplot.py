@@ -5,6 +5,14 @@
 # stationplot.py
 #
 # David Jones, Clear Climate Code, 2010-03-04
+#
+# For testing purposes it might be interesting to note the following:
+# 61710384000 longest timespan
+# 10160400001 briefest timespan
+# 22224266000 greatest temperature variation
+# 50894004001 least temperature variation
+# 30781001000 widest aspect ratio
+# 21544218001 tallest aspect ratio
 
 """
 Usage: python stationplot.py [-d v2.mean] [-o file.svg] station-id

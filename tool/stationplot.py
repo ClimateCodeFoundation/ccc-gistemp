@@ -116,6 +116,9 @@ def plot(arg, inp, out, meta):
     BAD = -9999
 
     table = asdict(arg, inp)
+    if not table:
+        raise Error('No data found for %s' % (', '.join(arg)))
+        
     if meta:
         meta = get_meta(table, meta)
         title = []
@@ -124,6 +127,7 @@ def plot(arg, inp, out, meta):
               (id11, d['lat'], d['lon'], d['name']))
     title = '\n'.join(title)
 
+    # Calculate first and last year, and highest and lowest temperature.
     minyear = 9999
     maxyear = -9999
     highest = -9999
@@ -139,8 +143,6 @@ def plot(arg, inp, out, meta):
                     continue
                 highest = max(highest, datum)
                 lowest = min(lowest, datum)
-    if highest == -9999:
-        raise Error('No data found for %s' % (', '.join(table)))
     # The data should be such that a station cannot have entirely
     # invalid data.  At least one year should have at least one valid
     # datum.
@@ -148,7 +150,6 @@ def plot(arg, inp, out, meta):
     assert lowest < 9999
     highest /= 10.0
     lowest /= 10.0
-
     limyear = maxyear + 1
 
     # Bounds of the box that displays data.  In SVG viewBox format.

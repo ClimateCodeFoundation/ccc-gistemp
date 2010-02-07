@@ -181,6 +181,36 @@ def from_lines(lines):
             series.append(datum)
     return (series, begin)
 
+def month_anomaly(data):
+    """Convert data to monthly anomalies, by subtracting from every
+    datum the mean for its month.  A fresh array is returned.
+    """
+
+    years = len(data) // 12
+    # For each of the 12 months, its mean.
+    monthly_mean = [BAD]*12
+    # Every datum converted to anomaly by subtracting the mean
+    # for its month.
+    monthly_anom = array.array('d', data)
+    for m in range(12):
+        # *row* contains the data for one month of the year.
+        row = data[m::12]
+        sum,count = sum_valid(row)
+        if count > 0:
+            monthly_mean[m] = sum / float(count)
+        mean = monthly_mean[m]
+        def asanom(datum):
+            """Convert a single datum to anomaly."""
+            if valid(datum):
+                return datum - mean
+            return BAD
+        if valid(mean):
+            anom_row = array.array('d', map(asanom, row))
+        else:
+            anom_row = array.array('d',[BAD]*years)
+        monthly_anom[m::12] = anom_row
+    return monthly_mean, monthly_anom
+
 def monthly_annual(data):
     """Computing a mean and set of annual anomalies.  This has a
     particular algorithm (via monthly and then seasonal means and
@@ -189,24 +219,7 @@ def monthly_annual(data):
     """
 
     years = len(data) // 12
-    # For each of the 12 months, its mean.
-    monthly_mean = array.array('d',[BAD]*12)
-    # In month major order, every datum converted to anomaly by
-    # subtracting the mean for its month.
-    monthly_anom = []
-    for m in range(12):
-        # *row* contains the data for one month of the year.
-        row = data[m::12]
-        sum,count = sum_valid(row)
-        if count > 0:
-            monthly_mean[m] = sum / float(count)
-        mean = monthly_mean[m]
-        monthly_anom_row = array.array('d',[BAD]*years)
-        for n in range(years):
-            datum = row[n]
-            if valid(mean) and valid(datum):
-                monthly_anom_row[n] = datum - mean
-        monthly_anom.append(monthly_anom_row)
+    monthly_mean, monthly_anom = month_anomaly(data)
 
     # :todo:
     # The seasonal calculation shoud be abstracted into a function.
@@ -227,17 +240,23 @@ def monthly_annual(data):
         if count > 1:
             seasonal_mean[s] = sum / float(count)
         seasonal_anom_row = array.array('d', [BAD] * years)
+        # A list of 3 data series, each being an extract for a
+        # particular month
+        month_in_season = []
+        for m in months:
+            row = monthly_anom[m::12]
+            if m == 11:
+                # For december, we take the december of the previous
+                # year.  Which we do by offsetting the array, and not
+                # using the most recent december.
+                row[1:] = row[:-1]
+                row[0] = BAD
+            month_in_season.append(row)
         for n in range(years):
             sum = 0.0
             count = 0
-            for m in months:
-                if m == 11:
-                    if n == 0:
-                        continue
-                    else:
-                        m_anom = monthly_anom[m][n-1]
-                else:
-                    m_anom = monthly_anom[m][n]
+            for i in range(3):
+                m_anom = month_in_season[i][n]
                 if valid(m_anom):
                     sum += m_anom
                     count += 1

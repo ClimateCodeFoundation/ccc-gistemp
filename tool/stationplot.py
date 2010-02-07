@@ -227,6 +227,7 @@ def plot(arg, inp, out, meta):
         out.write("  <text text-anchor='middle'"
           " font-size='%.1f' x='%d' y='%d'>%d</text>\n" %
           (fs, x*hs, overshoot, minyear+x))
+    out.write("  <g id='vaxis' font-size='%.1f' text-anchor='end'>" % fs)
     # Ticks on the vertical axis.
     # Ticks every 5 degrees C
     every = 5*vs
@@ -237,9 +238,11 @@ def plot(arg, inp, out, meta):
       "' />\n")
     for y in tickat:
         # Note: "%.0f' % 4.999 == '5'
-        out.write("  <text text-anchor='end'"
-          " font-size='%.1f' x='-8' y='%.1f'>%.0f</text>\n" %
-          (fs, -y, (y+ybottom)/float(vs)))
+        out.write("  <text alignment-baseline='middle'"
+          " x='-8' y='%.1f'>%.0f</text>\n" %
+          (-y, (y+ybottom)/float(vs)))
+    # End of vertical axis group.
+    out.write("</g>\n")
     # End of "axes" group.
     out.write("</g>\n")
 

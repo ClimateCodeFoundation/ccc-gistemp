@@ -32,6 +32,9 @@ import sys
 # Clear Climate Code
 sys.path.append(os.path.join(os.getcwd(),'code'))
 
+class Error(Exception):
+    """Some sort of error."""
+
 # The hex colours come from
 # http://www.personal.psu.edu/cab38/ColorBrewer/ColorBrewer.html
 # (and reordered)
@@ -93,9 +96,10 @@ def aplot(rows):
             continue
         yield list(block)
 
-def plot(arg, inp, out):
+def plot(arg, inp, out, meta):
     """Read data from `inp` and create a plot of the stations specified
-    in the list `arg`.  Plot is written to `out`.
+    in the list `arg`.  Plot is written to `out`.  Metadata (station
+    name, location) is takem from the `meta` file (usually v2.inv).
     """
 
     import struct
@@ -103,11 +107,19 @@ def plot(arg, inp, out):
     BAD = -9999
 
     table = asdict(arg, inp)
+    if meta:
+        meta = get_meta(table, meta)
+        title = []
+        for id11,d in meta.items():
+            title.append('%s %+06.2f%+07.2f  %s' %
+              (id11, d['lat'], d['lon'], d['name']))
+    title = '\n'.join(title)
+
     minyear = 9999
     maxyear = -9999
     highest = -9999
     lowest = 9999
-    for id12,lines in table.items():
+    for _,lines in table.items():
         for row in lines:
             year = int(row[12:16])
             minyear = min(minyear, year)
@@ -118,6 +130,8 @@ def plot(arg, inp, out):
                     continue
                 highest = max(highest, datum)
                 lowest = min(lowest, datum)
+    if highest == -9999:
+        raise Error('No data found for %s' % (', '.join(table)))
     # The data should be such that a station cannot have entirely
     # invalid data.  At least one year should have at least one valid
     # datum.
@@ -143,6 +157,7 @@ def plot(arg, inp, out):
     path.singleton { stroke-width: 0.2; stroke-linecap: round }
     g#axes path { stroke-width:0.1; fill:none; stroke: #888 }
     g#axes text { fill: black; font-family: Verdana }
+    g#title text { fill: black; font-family: Verdana }
 """)
     assert len(table) <= len(colour_list)
     for id12,colour in zip(table, colour_list):
@@ -151,6 +166,13 @@ def plot(arg, inp, out):
 
     # push chart down and right to give a bit of a border
     out.write("<g transform='translate(12,4)'>\n")
+
+    # In this section 0,0 is at top left of chart, and +ve y is down.
+    if title:
+        out.write("  <g id='title'>\n")
+        out.write("  <text font-size='4' x='0' y='-4'>%s</text>\n" % title)
+        out.write("  </g>\n")
+
     # Transform so that (0,0) on chart is lower left
     out.write("<g transform='translate(0, %.1f)'>\n" % (databox[3]))
     # In this section 0,0 should coincide with bottom left of chart, but
@@ -208,6 +230,28 @@ def plot(arg, inp, out):
     out.write("</g>\n" * 4)
     out.write("</svg>\n")
 
+def get_meta(l, meta):
+    """For the 11-digit stations identifiers in `l`, get the metadata
+    extracted from the file `meta`.  A dictionary is returned from maps from
+    station id to an info dictionary.  The info dictionary has keys:
+    name, lat, lon (and maybe more in future).
+    """
+
+    full = {}
+    for line in meta:
+        id = line[:11]
+        full[id] = dict(
+            name = line[12:42].strip(),
+            lat = float(line[43:49]),
+            lon = float(line[50:57]),
+        )
+    d = {}
+    l = set(map(lambda x: x[:11], l))
+    for id11 in l:
+        if id11 in full:
+            d[id11] = full[id11]
+    return d
+
 def aspath(l):
     """Encode a list of data points as an SVG path element.  The element
     is returned as a string."""
@@ -262,12 +306,15 @@ def main(argv=None):
 
     outfile = 'plot.svg'
     infile = 'input/v2.mean'
-    opt,arg = getopt.getopt(argv[1:], 'o:d:')
+    metafile = 'input/v2.inv'
+    opt,arg = getopt.getopt(argv[1:], 'o:d:m:')
     for k,v in opt:
         if k == '-o':
             outfile = v
         if k == '-d':
             infile = v
+        if k == '-m':
+            metafile = v
     if outfile == '-':
         outfile = sys.stdout
     else:
@@ -278,7 +325,8 @@ def main(argv=None):
         infile = sys.stdin
     else:
         infile = open_or_uncompress(infile)
-    return plot(arg, inp=infile, out=outfile)
+    metafile = open(metafile)
+    return plot(arg, inp=infile, out=outfile, meta=metafile)
 
 if __name__ == '__main__':
     main()

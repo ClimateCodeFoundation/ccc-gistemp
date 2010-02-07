@@ -27,10 +27,10 @@ associated with that station; a 12-digit indentifier will plot only a
 single record.
 
 Normally the output is an SVG document written to the file plot.svg.
-The -o option can be used to change this ("-o -" specifies stdout).
+The -o option can be used to change where it written ("-o -" specifies stdout).
 
-Normally the input is the GHCN dataset input/v2.mean; the -d option can
-be used to change this ("-d -" specifies stdin).
+Normally the input is the GHCN dataset input/v2.mean; the -d option
+specifies an alternate input file ("-d -" specifies stdin).
 """
 
 import math
@@ -333,6 +333,9 @@ def asdict(arg, inp):
         if id12 in arg or id11 in arg:
             table[id12] = list(lines)
     return table
+
+class Usage(Exception):
+    pass
         
 def main(argv=None):
     # http://www.python.org/doc/2.4.4/lib/module-getopt.html
@@ -341,29 +344,35 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
-    outfile = 'plot.svg'
-    infile = 'input/v2.mean'
-    metafile = 'input/v2.inv'
-    opt,arg = getopt.getopt(argv[1:], 'o:d:m:')
-    for k,v in opt:
-        if k == '-o':
-            outfile = v
-        if k == '-d':
-            infile = v
-        if k == '-m':
-            metafile = v
-    if outfile == '-':
-        outfile = sys.stdout
-    else:
-        outfile = open(outfile, 'w')
-    # :todo: yukh!
-    from step0 import open_or_uncompress
-    if infile == '-':
-        infile = sys.stdin
-    else:
-        infile = open_or_uncompress(infile)
-    metafile = open(metafile)
-    return plot(arg, inp=infile, out=outfile, meta=metafile)
+    try:
+        outfile = 'plot.svg'
+        infile = 'input/v2.mean'
+        metafile = 'input/v2.inv'
+        opt,arg = getopt.getopt(argv[1:], 'o:d:m:')
+        if not arg:
+            raise Usage('At least one identifier must be supplied.')
+        for k,v in opt:
+            if k == '-o':
+                outfile = v
+            if k == '-d':
+                infile = v
+            if k == '-m':
+                metafile = v
+        if outfile == '-':
+            outfile = sys.stdout
+        else:
+            outfile = open(outfile, 'w')
+        # :todo: yukh!
+        from step0 import open_or_uncompress
+        if infile == '-':
+            infile = sys.stdin
+        else:
+            infile = open_or_uncompress(infile)
+        metafile = open(metafile)
+        return plot(arg, inp=infile, out=outfile, meta=metafile)
+    except (getopt.GetoptError, Usage), e:
+        sys.stdout.write('%s\n' % str(e))
+        sys.stdout.write(__doc__)
 
 if __name__ == '__main__':
     main()

@@ -25,6 +25,7 @@ Normally the input is the GHCN dataset input/v2.mean; the -d option can
 be used to change this ("-d -" specifies stdin).
 """
 
+import math
 import os
 import sys
 
@@ -141,21 +142,37 @@ def plot(arg, inp, out, meta):
     lowest /= 10.0
 
     limyear = maxyear + 1
+
     # Bounds of the box that displays data.  In SVG viewBox format.
     databox = (minyear, lowest, limyear-minyear, highest-lowest)
     plotwidth = databox[2]
     plotheight = databox[3]
 
-    out.write("""<svg width='1000px' height='750px' viewBox='0 0 %d %d'
-      xmlns="http://www.w3.org/2000/svg" version="1.1">\n""" %
-      (plotwidth+12, plotheight+20))
+    # Vertical scale.  The data y-coordinate is multipled by vs to get
+    # to pixels (then possibly shifted up or down).  This is thus the
+    # number of pixels per degree C.
+    vs = 10
+    # Horizontal scale.  The data x-coordinate is multiplied by hs to
+    # get to pixels (then possibly shifted left or right).  This is thus
+    # the number of pixels per year.
+    hs = 6
+
+    # Bottom edge and top edge of plot area, after data has been scaled.
+    # Forcing them to be integers means our plot can be aligned on
+    # integer coordinates.
+    ybottom = math.floor((lowest-0.05)*vs)
+    ytop = math.ceil((highest+0.05)*vs)
+    plotheight = ytop - ybottom
+
+    out.write("""<svg width='1000px' height='750px'
+      xmlns="http://www.w3.org/2000/svg" version="1.1">\n""")
 
     # Style
     out.write("""<defs>
   <style type="text/css">
     path { stroke-width: 0.1; fill: none }
     path.singleton { stroke-width: 0.2; stroke-linecap: round }
-    g#axes path { stroke-width:0.1; fill:none; stroke: #888 }
+    g#axes path { stroke-width:1; fill:none; stroke: #888 }
     g#axes text { fill: black; font-family: Verdana }
     g#title text { fill: black; font-family: Verdana }
 """)
@@ -165,20 +182,22 @@ def plot(arg, inp, out, meta):
     out.write("  </style>\n</defs>\n")
 
     # push chart down and right to give a bit of a border
-    out.write("<g transform='translate(12,4)'>\n")
+    out.write("<g transform='translate(80,80)'>\n")
 
     # In this section 0,0 is at top left of chart, and +ve y is down.
     if title:
         out.write("  <g id='title'>\n")
-        out.write("  <text font-size='4' x='0' y='-4'>%s</text>\n" % title)
+        out.write("  <text font-size='20' x='0' y='-4'>%s</text>\n" % title)
         out.write("  </g>\n")
 
     # Transform so that (0,0) on chart is lower left
-    out.write("<g transform='translate(0, %.1f)'>\n" % (databox[3]))
+    out.write("<g transform='translate(0, %.1f)'>\n" % plotheight)
     # In this section 0,0 should coincide with bottom left of chart, but
     # oriented as per SVG default.  +ve y is down.
 
-    # Start of "axes" group.
+    # Start of "axes" group.  In this group we are 1-1 with SVG pixels;
+    # (0,0) is at plot lower left, and +ve is down.  Use vs and xs to
+    # scale to/and from data coordinates.
     out.write("<g id='axes'>\n")
     w = limyear - minyear
     # Ticks on the horizontal axis.
@@ -187,38 +206,44 @@ def plot(arg, inp, out, meta):
     # We have ticks every decade.
     tickat = range(s, w+1, 10)
     # Amount by which tick shoots out at the bottom.
-    overshoot = 2
+    overshoot = 16
     out.write("  <path d='" +
       ''.join(map(lambda x: 'M%d %.1fl0 %.1f' %
-      (x, overshoot, -(plotheight+overshoot)), tickat)) +
+      (x*hs, overshoot, -(plotheight+overshoot)), tickat)) +
       "' />\n")
     # Labels.
     # Font size.  Couldn't get this to work in the style element, so it's
     # here as an attribute on each <text>
-    fs = 2
+    fs = 16
     for x in tickat:
         out.write("  <text text-anchor='middle'"
-          " font-size='%.1f' x='%d' y='4'>%d</text>\n" %
-          (fs, x, minyear+x))
+          " font-size='%.1f' x='%d' y='%d'>%d</text>\n" %
+          (fs, x*hs, overshoot, minyear+x))
     # Ticks on the vertical axis.
-    s = (-lowest) % 5
-    tickat = map(lambda x: x+s, range(0, int(highest+.1-lowest-s), 5))
+    # Ticks every 5 degrees C
+    every = 5*vs
+    s = (-ybottom) % every
+    tickat = map(lambda x:x+s, range(0, int(plotheight+1-s), every))
     out.write("  <path d='" +
-      ''.join(map(lambda x: 'M0 %.1fl-2 0' % -x, tickat)) +
+      ''.join(map(lambda y: 'M0 %.1fl-8 0' % -y, tickat)) +
       "' />\n")
     for y in tickat:
         # Note: "%.0f' % 4.999 == '5'
         out.write("  <text text-anchor='end'"
-          " font-size='%.1f' x='-2' y='%.1f'>%.0f</text>\n" %
-          (fs, -y, y+lowest))
+          " font-size='%.1f' x='-8' y='%.1f'>%.0f</text>\n" %
+          (fs, -y, (y+ybottom)/float(vs)))
     # End of "axes" group.
     out.write("</g>\n")
 
     # Transform so that up (on data chart) is +ve.
     out.write("<g transform='scale(1, -1)'>\n")
-    # Transform so that databox lower left ends up at 0,0
-    out.write("<g transform='translate(%d, %.1f)'>\n" %
-      (-databox[0], -databox[1]))
+    # Transform so that plot lower left is at (0,0):
+    out.write("<g transform='translate(0,%.0f)'>\n" % -ybottom)
+    # Transform by (hs,vs) so that outside this group we're in (SVG)
+    # pixels.
+    out.write("<g transform='scale(%.2f,%.2f)'>\n" % (hs, vs))
+    # Transform so that databox left ends up at x=0
+    out.write("<g transform='translate(%d,0)'>\n" % (-minyear))
     out.write("""<rect x='%d' y='%.1f' width='%d' height='%.1f'
       stroke='pink' fill='none' opacity='0.30' />\n""" % databox)
 
@@ -227,7 +252,7 @@ def plot(arg, inp, out, meta):
         for segment in aplot(lines):
             out.write(aspath(segment)+'\n')
         out.write("</g>\n")
-    out.write("</g>\n" * 4)
+    out.write("</g>\n" * 6)
     out.write("</svg>\n")
 
 def get_meta(l, meta):

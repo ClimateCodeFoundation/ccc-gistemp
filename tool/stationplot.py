@@ -69,53 +69,46 @@ gray
 #a6cee3
 """.split()
 
-def aplot(rows):
-    """Take the lines in `rows` and splits the data into contiguous
-    lists suitable for plotting.  A sequence of lists is returned, each
-    list being a list of (year, datum) pairs.  Curiously year will be a
-    fractional year."""
+def aplot(series):
+    """`series` is a (data,begin) pair.  Each datum is enumerated with
+    its fractional year coordinate, and the entire series is split into
+    contiguous chunks.  The results are intended to be suitable for
+    plotting.
+
+    A sequence of lists is returned, each list being a list of
+    (year, datum) pairs.  year will be a fractional year.
+    """
 
     from itertools import groupby
-    import struct
 
-    BAD = -9999
+    def enum_month(data):
+        """Like enumerate, but decorating each datum with a fractional
+        year coordinate."""
 
-    def point(year, month, datum):
-        """Convert year, month, datum to a coordinate."""
-        # Put each data point on the centre of its month, assuming
-        # all months are of equal width.
-        return (year + (month+0.5)/12.0, int(datum))
+        for m,datum in enumerate(data):
+            yield (first + (m+0.5)/12.0, datum)
 
-    def asstream():
-        # previous year
-        prev = None
-        for row in rows:
-            year = float(row[12:16])
-            if prev:
-                assert year > prev
-                if prev+1 < year:
-                    # Entire missing year in record, we only need one
-                    # BAD datam to force a break.
-                    yield point(prev, 0, BAD)
-            prev = year
-            for i,datum in enumerate(struct.unpack('5s'*12, row[16:-1])):
-                yield point(year, i, datum)
-    for isbad,block in groupby(asstream(), lambda x: x[1] == BAD):
+    from step1 import BAD
+    data,first = series
+
+    for isbad,block in groupby(enum_month(data), lambda x: x[1] == BAD):
         if isbad:
             continue
         yield list(block)
 
-def plot(arg, inp, out, meta):
+def plot(arg, mode, inp, out, meta):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
     name, location) is takem from the `meta` file (usually v2.inv).
+    `mode` should be 'temp' to plot temperatures, or 'anom' to plot
+    monthly anomalies.
     """
 
     import struct
 
-    BAD = -9999
+    from step1 import BAD, valid
 
-    table = asdict(arg, inp)
+    table = asdict(arg, inp, mode)
     if not table:
         raise Error('No data found for %s' % (', '.join(arg)))
         
@@ -129,28 +122,22 @@ def plot(arg, inp, out, meta):
 
     # Calculate first and last year, and highest and lowest temperature.
     minyear = 9999
-    maxyear = -9999
+    limyear = -9999
     highest = -9999
     lowest = 9999
-    for _,lines in table.items():
-        for row in lines:
-            year = int(row[12:16])
-            minyear = min(minyear, year)
-            maxyear = max(maxyear, year)
-            data = struct.unpack('5s'*12, row[16:-1])
-            for datum in map(int, data):
-                if datum == BAD:
-                    continue
-                highest = max(highest, datum)
-                lowest = min(lowest, datum)
+    for _,(data,begin) in table.items():
+        minyear = min(minyear, begin)
+        limyear = max(limyear, begin+len(data)//12)
+        valid_data = filter(valid, data)
+        ahigh = max(valid_data)
+        alow = min(valid_data)
+        highest = max(highest, ahigh)
+        lowest = min(lowest, alow)
     # The data should be such that a station cannot have entirely
     # invalid data.  At least one year should have at least one valid
     # datum.
     assert highest > -9999
     assert lowest < 9999
-    highest /= 10.0
-    lowest /= 10.0
-    limyear = maxyear + 1
 
     # Bounds of the box that displays data.  In SVG viewBox format.
     databox = (minyear, lowest, limyear-minyear, highest-lowest)
@@ -259,9 +246,9 @@ def plot(arg, inp, out, meta):
     out.write("""<rect x='%d' y='%.1f' width='%d' height='%.1f'
       stroke='pink' fill='none' opacity='0.30' />\n""" % databox)
 
-    for id12,lines in table.items():
+    for id12,series in table.items():
         out.write("<g id='record%s'>\n" % id12)
-        for segment in aplot(lines):
+        for segment in aplot(series):
             out.write(aspath(segment)+'\n')
         out.write("</g>\n")
     out.write("</g>\n" * 6)
@@ -297,7 +284,7 @@ def aspath(l):
 
     # Format an (x,y) tuple.
     def fmt(t):
-        return "%.3f %.1f" % (t[0], t[1]/10.0)
+        return "%.3f %.1f" % (t[0], t[1])
 
     d = 'M'+fmt(l[0])+'L'+' '.join(map(fmt, l[1:]))
     decorate = ''
@@ -312,11 +299,12 @@ def aspath(l):
     return "<path %sd='%s' />" % (decorate, d)
         
 
-def asdict(arg, inp):
+def asdict(arg, inp, mode):
     """`arg` should be a list of 11-digit station identifiers or
     12-digit record identifiers.  The records from `inp` are extracted
-    and returned as a dictionary (that maps identifiers to lists of
-    lines).
+    and returned as a dictionary (that maps identifiers to (data,begin)
+    pair).  If `mode` is 'anom' then data are converted to monthly
+    anomalies.
     """
 
     def id12(line):
@@ -326,12 +314,16 @@ def asdict(arg, inp):
 
     # http://www.python.org/doc/2.4.4/lib/module-itertools.html
     from itertools import groupby
+    from step1 import from_lines, month_anomaly
 
     table = {}
     for id12,lines in groupby(inp, id12):
         id11 = id12[:11]
         if id12 in arg or id11 in arg:
-            table[id12] = list(lines)
+            data,begin = from_lines(lines)
+            if mode == 'anom':
+                _,data = month_anomaly(data)
+            table[id12] = (data,begin)
     return table
 
 class Usage(Exception):
@@ -348,10 +340,13 @@ def main(argv=None):
         outfile = 'plot.svg'
         infile = 'input/v2.mean'
         metafile = 'input/v2.inv'
-        opt,arg = getopt.getopt(argv[1:], 'o:d:m:')
+        mode = 'temp'
+        opt,arg = getopt.getopt(argv[1:], 'ao:d:m:')
         if not arg:
             raise Usage('At least one identifier must be supplied.')
         for k,v in opt:
+            if k == '-a':
+                mode = 'anom'
             if k == '-o':
                 outfile = v
             if k == '-d':
@@ -369,7 +364,7 @@ def main(argv=None):
         else:
             infile = open_or_uncompress(infile)
         metafile = open(metafile)
-        return plot(arg, inp=infile, out=outfile, meta=metafile)
+        return plot(arg, mode=mode, inp=infile, out=outfile, meta=metafile)
     except (getopt.GetoptError, Usage), e:
         sys.stdout.write('%s\n' % str(e))
         sys.stdout.write(__doc__)

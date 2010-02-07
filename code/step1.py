@@ -183,7 +183,8 @@ def from_lines(lines):
 
 def month_anomaly(data):
     """Convert data to monthly anomalies, by subtracting from every
-    datum the mean for its month.  A fresh array is returned.
+    datum the mean for its month.  A pair of (monthly_mean,monthly_anom)
+    is returned.
     """
 
     years = len(data) // 12

@@ -30,13 +30,13 @@ def checkit(log):
 
     def missing_files(names):
         """Check list of names and return mising ones.  Compression
-        extensions (.gz, .zip) are also tried if supplied name is not found.
+        extensions (.gz) are also tried if supplied name is not found.
         """
 
         missing = []
         for name in names:
             gotit = False
-            for suffix in ['', '.gz', '.zip']:
+            for suffix in ['', '.gz']:
                 if input_ok(name+suffix):
                     gotit = True
                     break

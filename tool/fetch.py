@@ -27,11 +27,18 @@ import sys
 import urllib
 
 # http://www.python.org/doc/2.4.4/lib/module-tarfile.html
-# Conditionally import our modified tarfile for Python2.4
+# Conditionally import our modified tarfile for Python2.4.
 if sys.version_info[:2] == (2, 4):
     import ccc_tarfile as tarfile
 else:
     import tarfile
+# Same for zipfile.  We need the open method of a ZipFile object, but
+# that's only on Python 2.6 and above.  ccc_zipfile is a copy of the
+# Python zipfile module from 2.6 and happily it works on Python 2.4.
+if sys.version_info[:2] <= (2, 5):
+    import ccc_zipfile as zipfile
+else:
+    import zipfile
 
 
 def fetch(files, prefix='input/', output=sys.stdout):
@@ -61,8 +68,10 @@ def fetch(files, prefix='input/', output=sys.stdout):
     # We are moving from USHCNv1 (hcn_doe_mean_data.Z) to USHCNv2
     # (9641C_200907_F52.avg.gz).  It does no harm to remember how to
     # fetch the older file.
+
+    # v2.mean.Z used to be in the NOAA list, but now we get a zip file,
+    # so it's handled slightly specially a bit later on.
     noaa = """
-    ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/zipd/v2.mean.zip
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.temperature.inv
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/hcn_doe_mean_data.Z
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_200907_F52.avg.gz
@@ -117,13 +126,21 @@ def fetch(files, prefix='input/', output=sys.stdout):
         place[n] = ['tar', gistemp_source_tar,
           'GISTEMP_sources/STEP1/input_files/' + n]
 
+    place['v2.mean'] = ['zip',
+      'ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/zipd/v2.mean.zip',
+      'raid2g/ghcn/v2/data/current/zipd/v2.mean']
+
+
     # A "special" place is one that isn't just an ordinary URL.
     # Places are identified as being "special" when they are a list
     # whose first element is a key in this *special* dictionary.
     # Ordinary strings are assumed to be URLs and are not special.
     # But the first element of a string is a one character string, so
     # all *special* keys should be longer than 1 character.
-    special = dict(tar=fetch_tar)
+    special = dict(
+      tar=fetch_tar,
+      zip=fetch_zip,
+    )
     def addurl(d):
         """Add 'url' handler to all plain strings."""
         for short, long in d.items():
@@ -138,8 +155,8 @@ def fetch(files, prefix='input/', output=sys.stdout):
     def removeZ(d):
 	"""Ensure that we can ask for either the compressed or
 	uncompressed version of a file.  To do this we add a short name
-        with the extension removed when the extension is
-        '.Z', '.gz', or '.zip'.
+        with the extension removed when the extension is one of:
+        '.Z'; '.gz'.
 
         Ultimately, it is the compressed version that is fetched.
         """
@@ -148,7 +165,7 @@ def fetch(files, prefix='input/', output=sys.stdout):
         name = {}
         for short, long in d.items():
             split = short.split('.')
-            if split[-1].lower() in ['z','gz','zip']:
+            if split[-1].lower() in ['z','gz']:
                 yield '.'.join(split[:-1]), (long, short)
             yield short, (long, short)
     place = dict(removeZ(place))
@@ -210,6 +227,8 @@ def fetch_tar(l, prefix, output):
     
     # Group by URL so that we process all the members from the same tar
     # file together.
+    # :todo: we should probably sort here, to ensure that the same tar
+    # members comes together.  In practice, there is only one tar file.
     for url,group in itertools.groupby(l, key=lambda x: x[0][1]):
         base, ext = os.path.splitext(url)
         if ext == ".tar":
@@ -221,6 +240,35 @@ def fetch_tar(l, prefix, output):
         print >>output, 'Extracting members from', url, '...'
         fetch_from_tar(u, members, prefix, output,
             compression_type=tar_compression_type)
+        print >>output, "  ... finished extracting"
+
+def fetch_zip(l, prefix, output):
+    """(helper function used by :meth:`fetch`)
+
+    *l* is a list of (*place*,*name*) pairs.  Each *name* is a short name,
+    each *place* is a pair ('zip',*url*,*member*).
+    """
+
+    import itertools
+    import os
+
+    # Group by URL, as per fetch_tar.
+    for url,group in itertools.groupby(l, key=lambda x: x[0][1]):
+        name = url.split('/')[-1]
+        fetch_url([[['url', url], name]], prefix, output)
+        z = zipfile.ZipFile(os.path.join(prefix, name))
+        print >>output, 'Extracting members from', url, '...'
+        for place,name in group:
+            # Only works for text files.
+            dest = open(os.path.join(prefix, name), 'w')
+            src = z.open(place[2])
+            while 1:
+                s = src.read(9999)
+                if s == '':
+                    break
+                dest.write(s)
+            dest.close()
+            src.close()
         print >>output, "  ... finished extracting"
 
 def fetch_from_tar(inp, want, prefix='input', log=sys.stdout,

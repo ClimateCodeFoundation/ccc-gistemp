@@ -124,63 +124,6 @@ def sum_valid(seq):
 # v2.mean_comb file and metadata files) by the from_lines() and
 # read_v2() functions.
 
-def from_lines(lines):
-    """*lines* is a list of lines (strings) that comprise a station's
-    entire record.  The lines are an extract from a file in the same
-    format as the GHCN file v2.mean.Z.  The data are converted to a
-    linear array (could be a list/tuple/array/sequence, I'm not saying),
-    *series*, where series[m] gives the temperature (a floating
-    point value in degrees C) for month *m*, counting from 0 for the
-    January of the first year with data.
-
-    (*series*,*begin*) is returned, where *begin* is
-    the first year for which there is data for the station.
-
-    Invalid data are marked in the input file with -9999 but are
-    translated in the data arrays to BAD.
-    """
-
-    begin = None
-    # Year from previous line.
-    prev = None
-    # The previous line itself.
-    prevline = None
-    series = []
-    for line in lines:
-        year = int(line[12:16])
-        if begin is None:
-            begin = year
-        if prev == year:
-            # There is one case where there are multiple lines for the
-            # same year for a particular station.  The v2.mean input
-            # file has 3 identical lines for "8009991400101971"
-            if line == prevline:
-                print "NOTE: repeated record found: Station %s year %s; data are identical" % (line[:12],line[12:16])
-                continue
-            # This is unexpected.
-            assert 0, "Two lines specify different data for %s" % line[:16]
-        # Check that the sequence of years increases.
-        assert not prev or prev < year
-
-        # In v2.mean the sequence of years for a station record is not
-        # necessarily contiguous.  For example "1486284000001988" is
-        # immediately followed by "1486284000001990", missing out 1989.
-        # Extend with blank data.
-        while prev and prev < year-1:
-            series.extend([BAD]*12)
-            prev += 1
-        prev = year
-        prevline = line
-        for m in range(12):
-            datum = int(line[16+5*m:21+5*m])
-            if datum == -9999:
-                datum = BAD
-            else:
-                # Convert to floating point and degrees C.
-                datum *= 0.1
-            series.append(datum)
-    return (series, begin)
-
 def month_anomaly(data):
     """Convert data to monthly anomalies, by subtracting from every
     datum the mean for its month.  A pair of (monthly_mean,monthly_anom)
@@ -284,28 +227,20 @@ def monthly_annual(data):
     return (annual_mean, annual_anom)
 
 
-def read_v2():
-    """A generator to iterate through the temperature data in
-    'work/v2.mean_comb'.  Each item in the iterator is a (dict,
-    series) pair for a single 12-character station ID.
+
+def add_metadata(dataset):
+    """Processes a dataset, either obtained directly from step 0 or
+    from a step 0 output file, to add station metadata.
     """
 
     info = read_config.v2_get_info()
     sources = read_config.v2_get_sources()
-    f = open('work/v2.mean_comb', 'r')
-    print "reading work/v2.mean_comb"
-    def id12(l):
-        """Extract the 12-digit station record identifier."""
-        return l[:12]
-
-    for (id, lines) in itertools.groupby(f, id12):
-        # lines is a set of lines which all begin with the same 12 character id
-        series, begin = from_lines(list(lines))
-        dict = info[id[:11]].copy()
-        dict['begin'] = begin
+    for (dict, series) in dataset:
+        id = dict['id']
+        dict.update(info[id[:11]])
+        dict['id'] = id
         dict['source'] = sources.get(id, 'UNKNOWN')
-        dict['id' ] = id
-        yield (dict, round_series(series))
+        yield (dict, series)
 
 MIN_OVERLAP = 4
 comb_log = None
@@ -837,6 +772,130 @@ def alter_discont(data):
                     series[i] += a_num
         yield(dict, series)
 
+def step1(data):
+    """The main step 1 function.  Takes an iterator of *(metadata, series)*,
+    applies the step 1 algorithms, and produces a similar iterator.
+    Note: no I/O.
+    """
+    with_metadata = add_metadata(data)
+    records = comb_records(with_metadata)
+    helena_adjusted = adjust_helena(records)
+    combined_pieces = comb_pieces(helena_adjusted)
+    without_strange = drop_strange(combined_pieces)
+    return alter_discont(without_strange)
+
+### Code to read the step 0 output file v2.mean_comb and convert it to
+### our internal representation of station records.
+###
+### Not needed when pipelining step 1 directly from step 0.
+### Will move out to another file eventually.
+
+def from_years(years):
+    """*years* is a list of year records (lists of temperatures) that
+    comprise a station's entire record.  The data are converted to a
+    linear array (could be a list/tuple/array/sequence, I'm not
+    saying), *series*, where series[m] gives the temperature (a
+    floating point value in degrees C) for month *m*, counting from 0
+    for the January of the first year with data.
+
+    (*series*,*begin*) is returned, where *begin* is
+    the first year for which there is data for the station.
+
+    This code is also in step0.py at present, and should be shared.
+    """
+
+    begin = None
+    # Previous year.
+    prev = None
+    series = []
+    for (year, data) in years:
+        if begin is None:
+            begin = year
+        # The sequence of years for a station record is not
+        # necessarily contiguous.  For example "1486284000001988" is
+        # immediately followed by "1486284000001990", missing out 1989.
+        # Extend with blank data.
+        while prev and prev < year-1:
+            series.extend([BAD]*12)
+            prev += 1
+        prev = year
+        series.extend(data)
+    return (series, begin)
+def from_lines(lines):
+    """*lines* is a list of lines (strings) that comprise a station's
+    entire record.  The lines are an extract from a file in the same
+    format as the GHCN file v2.mean.Z.  The data are converted to a
+    linear array (could be a list/tuple/array/sequence, I'm not saying),
+    *series*, where series[m] gives the temperature (a floating
+    point value in degrees C) for month *m*, counting from 0 for the
+    January of the first year with data.
+
+    (*series*,*begin*) is returned, where *begin* is
+    the first year for which there is data for the station.
+
+    Invalid data are marked in the input file with -9999 but are
+    translated in the data arrays to BAD.
+    """
+
+    years = []
+    # Year from previous line.
+    prev = None
+    # The previous line itself.
+    prevline = None
+    for line in lines:
+        year = int(line[12:16])
+        if prev == year:
+            # There is one case where there are multiple lines for the
+            # same year for a particular station.  The v2.mean input
+            # file has 3 identical lines for "8009991400101971"
+            if line == prevline:
+                print "NOTE: repeated record found: Station %s year %s; data are identical" % (line[:12],line[12:16])
+                continue
+            # This is unexpected.
+            assert 0, "Two lines specify different data for %s" % line[:16]
+        # Check that the sequence of years increases.
+        assert not prev or prev < year
+
+        prev = year
+        prevline = line
+        temps = []
+        for m in range(12):
+            datum = int(line[16+5*m:21+5*m])
+            if datum == -9999:
+                datum = BAD
+            else:
+                # Convert to floating point and degrees C.
+                datum *= 0.1
+            temps.append(datum)
+        years.append((year, temps))
+    return from_years(years)
+
+def read_v2():
+    """A generator to iterate through the temperature data in
+    'work/v2.mean_comb'.  Each item in the iterator is a (dict,
+    series) pair for a single 12-character station ID.
+    """
+
+    f = open('work/v2.mean_comb', 'r')
+    print "reading work/v2.mean_comb"
+    def id12(l):
+        """Extract the 12-digit station record identifier."""
+        return l[:12]
+
+    for (id, lines) in itertools.groupby(f, id12):
+        # lines is a set of lines which all begin with the same 12
+        # character id
+        series, begin = from_lines(list(lines))
+        dict = {'id'   : id,
+                'begin': begin,
+                }
+        yield (dict, round_series(series))
+
+### Code to produce the step 1 output file Ts.txt.
+###
+### Not needed when pipelining step 1 directly into step 2.
+### Will eventually move out of this file.
+
 def to_text(dict, series):
     begin = dict['begin']
     t = ' %4d%5d%s%4s%-36s\n' % (math.floor(dict['lat']*10+0.5),
@@ -858,16 +917,11 @@ def write_to_file(data, file):
         f.write(to_text(dict, series))
     f.close()
 
-def results():
-    data = read_v2()
-    records = comb_records(data)
-    helena_adjusted = adjust_helena(records)
-    combined_pieces = comb_pieces(helena_adjusted)
-    without_strange = drop_strange(combined_pieces)
-    return alter_discont(without_strange)
 
 def main():
-    write_to_file(results(), 'work/Ts.txt')
+    step_0_output = read_v2()
+    step_1_output = step1(step_0_output)
+    write_to_file(step_1_output, 'work/Ts.txt')
 
 if __name__ == '__main__':
     main()

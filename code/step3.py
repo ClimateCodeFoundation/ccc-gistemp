@@ -689,11 +689,11 @@ def subbox_grid(infile,
             log.write('%+06.1f' % centre[1])
             log.flush()
             lastcentre = centre
-            # Of possible stations in this region, filter for those with
+            # Of possible stations in this region, filter for those within
             # radius of subbox centre.  Note that it is important that
             # the ordering within the regionstations list is retained
             # (in order to match the GISS code).
-            # station is a list (wt, station) pairs:
+            # *station* is a list of (wt, station) pairs:
             station = list(incircle(regionstations, arc, *centre))
             # Split list of pairs into pair of lists
             wti = map(lambda x: x[0], station)

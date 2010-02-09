@@ -307,23 +307,21 @@ def asdict(arg, inp, mode):
     anomalies.
     """
 
-    def id12(line):
-        """Return the 12-digit record identifier for a line of the
-        v2.mean file."""
-        return line[:12]
-
-    # http://www.python.org/doc/2.4.4/lib/module-itertools.html
-    from itertools import groupby
+    # Clear Climate Code, tool directory
+    import v2index
+    # Clear Climate Code, code directory
     from step1 import from_lines, month_anomaly
 
+    v2 = v2index.File(inp)
+
     table = {}
-    for id12,lines in groupby(inp, id12):
-        id11 = id12[:11]
-        if id12 in arg or id11 in arg:
-            data,begin = from_lines(lines)
+    for id in arg:
+        for id12,series in v2.get(id):
+            data,begin = from_lines(series)
             if mode == 'anom':
                 _,data = month_anomaly(data)
             table[id12] = (data,begin)
+
     return table
 
 class Usage(Exception):

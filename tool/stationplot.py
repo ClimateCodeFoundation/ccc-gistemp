@@ -141,7 +141,6 @@ def plot(arg, mode, inp, out, meta):
 
     # Bounds of the box that displays data.  In SVG viewBox format.
     databox = (minyear, lowest, limyear-minyear, highest-lowest)
-    plotwidth = databox[2]
     plotheight = databox[3]
 
     # Vertical scale.  The data y-coordinate is multipled by vs to get
@@ -153,6 +152,8 @@ def plot(arg, mode, inp, out, meta):
     # the number of pixels per year.
     hs = 6
 
+    plotwidth = databox[2] * vs
+
     # Bottom edge and top edge of plot area, after data has been scaled.
     # Forcing them to be integers means our plot can be aligned on
     # integer coordinates.
@@ -160,8 +161,9 @@ def plot(arg, mode, inp, out, meta):
     ytop = math.ceil((highest+0.05)*vs)
     plotheight = ytop - ybottom
 
-    out.write("""<svg width='1000px' height='750px'
-      xmlns="http://www.w3.org/2000/svg" version="1.1">\n""")
+    out.write("""<svg width='%dpx' height='750px'
+      xmlns="http://www.w3.org/2000/svg" version="1.1">\n""" %
+      (plotwidth+100))
 
     # Style
     out.write("""<defs>

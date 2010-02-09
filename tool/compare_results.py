@@ -21,6 +21,7 @@ Options:
    --labelb=LABEL  Label for RESULTB (default: GISTEMP).
 """
 
+import datetime
 # http://www.python.org/doc/2.4.4/lib/module-getopt.html
 import getopt
 # http://www.python.org/doc/2.4.4/lib/module-math.html
@@ -287,7 +288,8 @@ def compare(dirs, labels, o):
 </head>
 <body>
 <h1>%s</h1>
-""" % (title, title)
+<p>Generated: %s</p>
+""" % (title, title, datetime.datetime.now())
 
     anomaly_file = '%s.Ts.ho2.GHCN.CL.PA.txt'
     box_file = 'BX.Ts.ho2.GHCN.CL.PA.1200'

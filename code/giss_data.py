@@ -21,6 +21,9 @@ __docformat__ = "restructuredtext"
 import sys
 import copy
 import math
+import datetime
+
+import read_config
 
 #: The base year for time series data. Data before this time is not
 #: used in calculations.
@@ -34,16 +37,40 @@ MISSING = 9999
 XMISSING = float(MISSING)
 
 _stations = None
+_v2_sources = None
+_ghcn_last_year = None
 
 def _load_v2_inv():
     """Load the v2.inv file.
 
     :Return:
-        A dictionary of `Station` instances, keyed by the station's
-        `uid`.
+        A dictionary of `Station` instances, keyed by the station's `uid`.
 
     """
     return dict((s.uid, s) for s in StationInventoryReader("input/v2.inv"))
+
+
+def get_ghcn_last_year():
+    """Get the latest year in the GHCN data.
+
+    This simply reads the ``input/v2.mean`` file and extracts the year from
+    each line.
+
+    In the original GISTEMP code, this piece of information was cached in the
+    file ``work/GHCN.last_year`` by step0. This alternative approach avoids the
+    need for this file and perfectly quick enough.
+    """
+    global _ghcn_last_year
+    if _ghcn_last_year is None:
+        f = open("input/v2.mean")
+        max_year = 0
+        for l in f:
+            if l[12:13] == '2':
+                max_year = max(int(l[12:16]), max_year)
+        _ghcn_last_year = max_year
+        f.close()
+
+    return _ghcn_last_year
 
 
 class StationInventoryReader(object):
@@ -51,6 +78,39 @@ class StationInventoryReader(object):
     
     This can be used as a single-pass iterator, yielding `giss_data.Station`
     instances.
+
+    For a list of metadata fields, see *fields*.
+
+    The input file is in the same format as the GHCN V2 file v2.temperature.inv
+    (in fact, it's the same file, but with records added for the Antarctic
+    stations that GHCN doesn't have).  The best description of that file's
+    format is the Fortran program:
+    ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.read.inv.f
+
+    Here is a typical line, with a record diagram
+
+    40371148001 ALMASIPPI,MA                    49.55  -98.20  274  287R   -9FLxxno-9x-9COOL FIELD/WOODSA1   0
+
+    0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345
+    id---------xname--------------------------xlat---xlon----x1---2----34----5-6-7-8-910grveg-----------GU
+
+    id:    40371148001
+    name:  ALMASIPPI,MA
+    lat:   49.55
+    lon:   -98.20
+    1:     elevs: 274
+    2:     elevg: 287R
+    3:     pop: R
+    4:     ipop: -9
+    5:     topo: FL
+    6:     stveg: xx
+    7:     stloc: no
+    8:     iloc: -9
+    9:     airstn: x
+    10:    itowndis: -9
+    grveg: COOL FIELD/WOODS
+    G:     GHCN-brightness: A
+    U:     US-brightness:1
 
     """
     fields = (
@@ -94,8 +154,6 @@ class StationInventoryReader(object):
         self.f.close()
 
 
-# TODO: This load-on demand approach is less than perfect because the loading
-#       takes seconds.
 def stations():
     """Return a dictionary of all known stations.
 
@@ -114,6 +172,13 @@ def stations():
     return _stations
 
 
+def v2_sources():
+    global _v2_sources
+    if _v2_sources is None:
+        _v2_sources = read_config.v2_get_sources()
+    return _v2_sources
+
+
 def clear_cache(func):
     """A decorator, for `TemperatureRecord` methods that change the data.
 
@@ -125,8 +190,8 @@ def clear_cache(func):
     def f(self, *args, **kwargs):
         self._tenths = None
         self._celcius = None
-        self._ngood = None
-        self._ngood_ann_anoms = None
+        self._good_count = None
+        self._ann_anoms_good_count = None
         return func(self, *args, **kwargs)
 
     return f
@@ -135,16 +200,14 @@ def clear_cache(func):
 class StationMetaData(object):
     """The metadata for a set of station records.
 
-    TODO: The descriptions of the header entries are work in progress.
-    
     :Ivar mo1:
-       TBD
+        The number of months covered in the entire data set.
     :Ivar kq:
         The KQ quantity from the header record.
     :Ivar mavg:
-        A code indicating the lenght of time each average value represents. The
-        only supported value is '6', which indicates that each entry is a
-        monthly average. The effect of this having a different value is
+        A code indicating the length of time each average value represents. The
+        only supported by the CCC code is '6', which indicates that each entry
+        is a monthly average. The effect of this having a different value is
         undefined.
     :Ivar monm:
         Maximum length of any time record.
@@ -166,7 +229,7 @@ class StationMetaData(object):
         Probably defines a special value that serves a similar purppose to
         the `missing_flag`. This does not seem to be used by any CCC code.
     :Ivar mlast:
-        TBD
+        TODO
     :Ivar title:
         A title for this set of station records.
     """
@@ -186,30 +249,13 @@ class StationMetaData(object):
     def __repr__(self):
         return '<StationMetadata %r>' % self.__dict__
 
-    # TODO: This may be slightly dubious, but the code that uses looks fairly
-    #       clean. It might be better to either have a factory function to do
-    #       the conversion.
-    def make_sub_box_meta(self):
-        """Create a SubboxMetaData instance with matching values.
-
-        """
-        return SubboxMetaData(self.mo1, self.kq, self.mavg, self.monm,
-                self.monm + 7, self.yrbeg, self.missing_flag,
-                self.precipitation_flag, self.title)
-
-    def pretty(self):
-        """Format prettily, only really for debugging."""
-        s = "StationMetaData:\n"
-        for n, v in sorted(self.__dict__.iteritems()):
-            if not n.startswith("_"):
-                s += "  %-20s: %r\n" % (n, v)
-        return s[:-1]
-           
 
 class Station(object):
     """A monitoring station's information.
     
-    This holds the information about a single monitoring station.
+    This holds the information about a single monitoring station. Not all the
+    fields are used by the CCC code and (currently) the meaning of some of
+    these is unknown.
 
     :Ivar lat, lon:
         The location of the station as floats, representing degrees.
@@ -225,7 +271,7 @@ class Station(object):
         Brighness indication for US stations. A value of '1' or ' ' is taken
         to indicate that the station is in a rural area.
     :Ivar airstn:
-        TODO
+        Unknown.
     :Ivar ground_elevation, elevation:
         The ground elevation at the station's location and
         the elevation of the station above the ground level. Both in metres.
@@ -233,21 +279,21 @@ class Station(object):
         An indication of the type of ground vegetation. For example,
         'TROPICAL DRY FOR'.
     :Ivar stveg:
-        TODO: Something about the station's vegitation?
+        Unknown.
     :Ivar iloc:
-        TODO
+        Unknown.
     :Ivar ipop:
-        TODO
+        Unknown.
     :Ivar itowndis:
-        TODO
+        Unknown.
     :Ivar pop:
-        TODO
+        Unknown.
     :Ivar stloc:
-        TODO
+        Unknown.
     :Ivar topo:
-        TODO
+        Unknown.
     :Ivar idontknow:
-        The last 3 digits in each line of v2.inv.
+        The last 3 digits in each line of v2.inv. Name and meaning unknown.
 
     """
     def __init__(self, name=None, lat=None, lon=None, uid=None,
@@ -295,14 +341,6 @@ class Station(object):
         """The longitude as a integer number of 0.1 degrees."""
         return int(math.floor(self.lon * 10 + 0.5))
 
-    def pretty(self):
-        """Format prettily, only really for debugging."""
-        s = "Station:\n"
-        for n, v in sorted(self.__dict__.iteritems()):
-            if n.startswith("_"):
-                continue
-        return s[:-1]
-
            
 # TODO: Needs some review. Among things to think about:
 #
@@ -340,29 +378,20 @@ class MonthlyTemperatureRecord(object):
     treated as read-only and you should only set values in the data series
     using the provided methods.
 
-    :Ivar good_start_idx, good_end_idx:
-        The range of values in `series`. So ``series[good_start_idx:good_end_idx]``
-        will either be empty or start and end with a valid value.
-    :Ivar series:
-        The temperature series for this station. The values are stored
-        in celsius.
-        (TODO currently sometimes tenths of a degree, but
-        that needs to be changed.)
-    :Ivar first_month:
-        The number of the first month in the data series, counting from a
-        January in a non-existant year zero. The property `last_month` provides
-        the other end of the inclusive range of months held in the `series`.
-
     """
     def __init__(self):
-        self.first_month = sys.maxint
-        self.good_start_idx = sys.maxint
-        self.good_end_idx = 0
+        self._first_month = sys.maxint
+        self._good_start_idx = sys.maxint
+        self._good_end_idx = 0
         self._series = []
         self._celcius = None
         self._tenths = None
-        self._ngood = None
-        self._ngood_ann_anoms = None
+        self._good_count = None
+        self._ann_anoms_good_count = None
+
+    def is_empty(self):
+        """Test whether the record contains data."""
+        return len(self._series) == 0
 
     @classmethod
     def valid(cls, v):
@@ -374,10 +403,44 @@ class MonthlyTemperatureRecord(object):
         return len(self._series)
 
     @property
+    def good_start_idx(self):
+        """Index of the first good value in the `series`.
+        
+        It is always true that ``series[good_start_idx:good_end_idx]`` will
+        either be empty or start and end with a valid value.
+
+        """
+        return self._good_start_idx
+
+    @property
+    def good_end_idx(self):
+        """Index of the entry after the last good value in the `series`.
+        
+        It is always true that ``series[good_start_idx:good_end_idx]`` will
+        either be empty or start and end with a valid value.
+
+        """
+        return self._good_end_idx
+
+    @property
+    def first_month(self):
+        """The number of the last months in the data series.
+
+        This number is counted from January in a non-existant year zero. The
+        property `last_month` provides the other end of the inclusive range of
+        months held in the `series`.
+
+        The `series` contains `last_month` - `first_month` + 1 entries.
+
+        """
+        return self._first_month
+
+    @property
     def last_month(self):
         """The number of the last months in the data series.
 
         The `series` contains ``last_month`` - `first_month` + 1 entries.
+        See `first_month` for details of how months are counted.
 
         """
         return (self.first_month + len(self._series) - 1)
@@ -404,12 +467,20 @@ class MonthlyTemperatureRecord(object):
 
     @property
     def first_good_month(self):
-        """TODO"""
+        """The number of the first good month in the series.
+        
+        See `first_month` for details of how months are counted.
+
+        """
         return self.first_month + self.good_start_idx
 
     @property
     def last_good_month(self):
-        """TODO"""
+        """The number of the last good month in the series.
+        
+        See `first_month` for details of how months are counted.
+
+        """
         return self.first_month + self.good_end_idx - 1
 
     @property
@@ -453,25 +524,37 @@ class MonthlyTemperatureRecord(object):
         return self.last_good_month - BASE_YEAR * 12
 
     @property
-    def ngood(self):
+    def good_count(self):
         """The number of good values in the data."""
-        # TODO: Rename or remove or something. Also handle magic No.
-        if self._ngood is None:
-            bad = 0
+        if self._good_count is None:
+            bad_count = 0
             for v in self._series:
-                bad += self.invalid(v)
-            self._ngood = len(self._series) - bad
-        return self._ngood
+                bad_count += self.invalid(v)
+            self._good_count = len(self._series) - bad_count
+        return self._good_count
 
     @clear_cache
     def strip_invalid(self):
-        """Strip leading and trailing invalid values."""
-        self.first_month = self.first_good_month
-        self._series[:] = self._series[self.good_start_idx:self.good_end_idx]
-        self.good_start_idx = 0
-        self.good_end_idx = len(self._series)
+        """Strip leading and trailing invalid values.
+        
+        Adjusts the record so that the series starts and ends with a good (not
+        `MISSING`) value. If there are no good values, the series will be
+        emptied.
+        
+        """
+        self._first_month = self.first_good_month
+        self._series[:] = self._series[self._good_start_idx:self._good_end_idx]
+        self._good_start_idx = 0
+        self._good_end_idx = len(self._series)
 
     def get_monthly_valid_counts(self):
+        """Get number of good values for each month.
+
+        :Return:
+            A list of 12 entries. Entry zero is the number of good entries
+            for January, entry 1 for february, etc.
+
+        """
         monthly_valid = [0] * 12
         for i, v in enumerate(self._series):
             monthly_valid[(self.first_month + i - 1) % 12] += self.valid(v)
@@ -479,38 +562,39 @@ class MonthlyTemperatureRecord(object):
 
     @clear_cache
     def _set_series(self, first_month, series, missing, convert=lambda x:x):
-        self.first_month = first_month
-        self.good_start_idx = sys.maxint
-        self.good_end_idx = 0
+        self._first_month = first_month
+        self._good_start_idx = sys.maxint
+        self._good_end_idx = 0
         self._series[:] = []
         for in_value in series:
             v = convert(in_value)
             if self.invalid(v):
                 self._series.append(missing)
             else:
-                self.good_start_idx = min(self.good_start_idx, len(self._series))
+                self._good_start_idx = min(self._good_start_idx,
+                        len(self._series))
                 self._series.append(v)
-                self.good_end_idx = max(self.good_end_idx, len(self._series))
+                self._good_end_idx = max(self._good_end_idx, len(self._series))
 
     @clear_cache
     def _add_year_of_data(self, year, data, missing, convert=lambda x:x):
         if self.first_month != sys.maxint:
             # We have data already, so we may need to pad with missing months
-            # TODO: This is not fully correct because it assumes the series is
-            #       already a whole number of years.
+            # Note: This assumes the series is a whole number of years.
             gap = year - self.last_year - 1
             if gap > 0:
                 self._series.extend([missing] * gap * 12)
         start_month = year * 12 + 1
-        self.first_month = min(self.first_month, start_month)
+        self._first_month = min(self.first_month, start_month)
         for m, in_value in enumerate(data):
             v = convert(in_value)
             if self.invalid(v):
                 self._series.append(missing)
             else:
-                self.good_start_idx = min(self.good_start_idx, len(self._series))
+                self._good_start_idx = min(self._good_start_idx,
+                        len(self._series))
                 self._series.append(v)
-                self.good_end_idx = max(self.good_end_idx, len(self._series))
+                self._good_end_idx = max(self._good_end_idx, len(self._series))
 
 
 class StationRecord(MonthlyTemperatureRecord):
@@ -519,21 +603,19 @@ class StationRecord(MonthlyTemperatureRecord):
     There can be multiple temperature series for a single `Station`. The
     `station` property provides the associated `Station` instance.
 
-    :Ivar country_code:
-        The first three digits of the corresponding `Station` uid.
     :Ivar uid:
         An integer that acts as a unique ID for the time series. This
         is generated by taking the last 8 digits of the `Station` uid, and
         adding an additional digit. The last digit distinguished this series
         from other series from the same station.
-    :Ivar years:
-        The number of years for which the `series` contains data.
-        TODO: Should be a property => end - begin + 1
+    :Ivar source:
+        The source of the data, which defaults to 'UNKNOWN'.
 
     """
     def __init__(self, uid, **kwargs):
         super(StationRecord, self).__init__()
         self.uid = uid
+        self.source = v2_sources().get(uid, "UNKNOWN")
         self.ann_anoms = []
 
     @classmethod
@@ -577,33 +659,94 @@ class StationRecord(MonthlyTemperatureRecord):
 
     @property
     def short_id(self):
-        """The shortened form of the record's uinique ID.
+        """The shortened form of the record's uinique ID, as an integer.
 
-        :Return:
-            The uid with the country code removed, converted to an integer.
+        This is the `uid` with the country code removed, converted to an
+        integer.
 
         """
         return int(self.uid[3:])
 
+    @property
+    def country_code(self):
+        """The country code as an integer.
+
+        This is the first three characters of the `uid`, converted to an
+        integer.
+
+        """
+        return int(self.uid[:3])
+
+    @property
+    def discriminator(self):
+        """The discriminator code.
+        
+        This distingushes different records associated with same station.
+        This is the last digit of the record's `uid` converted to an
+        integer.
+
+        """
+        return int(self.uid[-1])
+
     def add_year_of_tenths(self, year, data):
         self._add_year_of_data(year, data, MISSING)
 
+    def has_data_for_year(self, year):
+        for t in self.get_a_year_as_tenths(year):
+            if t != MISSING:
+                return True
+
+    def get_a_month_as_tenths(self, month):
+        """Get the value for a single month."""
+        idx = month - self.first_month
+        if idx < 0:
+            return MISSING
+        try:
+            return self.series_as_tenths[month - self.first_month]
+        except IndexError:
+            return MISSING
+
+    def get_a_year_as_tenths(self, year):
+        """Get the time series data for a year."""
+        start_month = year * 12 + 1
+        return [self.get_a_month_as_tenths(m)
+                for m in range(start_month, start_month + 12)]
+
+    def get_set_of_years_as_tenths(self, first_year, last_year):
+        """Get a set of year records.
+        
+        :Return:
+            A list of lists, where each sub-list contains 12 temperature values
+            for a given year. This works for any range of years, missing years
+            are filled with the MISSING value.
+
+        """
+        return [self.get_a_year_as_tenths(y)
+                for y in range(first_year, last_year + 1)]
+
     def set_series_from_tenths(self, first_month, series):
         self._set_series(first_month, series, MISSING)
+
+    def set_series(self, first_month, series):
+        def to_tenths(v):
+            if v > 999.0:
+                return MISSING
+            return int(math.floor(v * 10.0 + 0.5))
+
+        self._set_series(first_month, series, MISSING, convert=to_tenths)
 
     def set_ann_anoms(self, ann_anoms):
         self.ann_anoms[:] = ann_anoms
 
     @property
-    def ngood_ann_annoms(self):
+    def ann_anoms_good_count(self):
         """Number of good values in the annual anomolies"""
-        # TODO: Rename or remove or something. Also handle magic No.
-        if self._ngood_ann_anoms is None:
+        if self._ann_anoms_good_count is None:
             bad = 0
             for v in self.ann_anoms:
-                bad += v > 9998.99 # TODO: Fix this!
-            self._ngood_ann_anoms = len(self.ann_anoms) - bad
-        return self._ngood_ann_anoms
+                bad += v > 9998.99 # TODO: Yuck! Fix this!
+            self._ann_anoms_good_count = len(self.ann_anoms) - bad
+        return self._ann_anoms_good_count
 
 
     def copy(self):
@@ -611,32 +754,10 @@ class StationRecord(MonthlyTemperatureRecord):
         r.set_series_from_tenths(self.first_month, self.series_as_tenths)
         return r
 
-    def pretty(self):
-        """Format prettily."""
-        s = "StationRecord:\n"
-        for n, v in sorted(self.__dict__.iteritems()):
-            if n.startswith("_"):
-                continue
-            if n == "meta":
-                if v is None:
-                    s += "  %-20s: %r\n" % (n, v)
-                else:
-                    s += "  %-20s: SET\n" % (n, )
-            elif n in ("series", "anomolies"):
-                s += "  %-20s: [%-4d] = %s...\n" % (n, len(v),
-                        str([str(x)[:6] for x in v[:6]])[:-1])
-                s += "  %-20s:            ...%s\n" % ("", 
-                        str([str(x)[:6] for x in v[-6:]])[1:])
-            else:
-                s += "  %-20s: %r\n" % (n, v)
-        return s[:-1]
-           
-    # TODO: Yes its a crap name. Currently for debug, but it should be kept
-    #       and given a better name.
-    def neat(self):
-        """Format neatly."""
+    def report_str(self):
+        """Format neatly for reporting purposes."""
 
-        s = "StationRecord: %s\n" % (self.station.name)
+        s = "StationRecord: %s - %s\n" % (self.station.name, self.uid)
         s += "   All data  : %d:%02d - %d:%02d  [%3d:%02d - %3d:%02d]" % (
                 self.first_year, (self.first_month - 1) % 12 + 1,
                 self.last_year, (self.last_month  - 1) % 12 + 1,
@@ -712,29 +833,21 @@ class SubboxMetaData(object):
                 self.monm4, self.yrbeg, self.missing_flag,
                 self.precipitation_flag, self.title)
 
-    def pretty(self):
-        """Format prettily."""
-        s = "SubboxMetaData:\n"
-        for n, v in sorted(self.__dict__.iteritems()):
-            if not n.startswith("_"):
-                s += "  %-20s: %r\n" % (n, v)
-        return s[:-1]
-           
 
 class SubboxRecord(MonthlyTemperatureRecord):
     """A sub-box record.
     
-    This implements the `SubboxProtocol`.
-
-    This is derived from ``tuple``, which provides the iterable requirement
-    of the `SubboxProtocol`.
-
     This can hold, for example, a record of data as stored within the
     ``input/SBBX.HadR2`` file.
 
-    TODO: Describe Ivars.
-
-    Note: Treat `n` as read-only. Use expand to increase it.
+    :Ivar lat_S, lat_N, lon_W, lon_E:
+        Coordinates describing the box's area.
+    :Ivar stations:
+        The number of stations that contributed to this sub-box.
+    :Ivar station_months:
+        The number of months that contributed to this sub-box.
+    :Ivar d:
+        Unknown.
 
     """
     def __init__(self, lat_S, lat_N, lon_W, lon_E,
@@ -748,7 +861,6 @@ class SubboxRecord(MonthlyTemperatureRecord):
         self.station_months = station_months
         self.d = d
         self.set_series(series)
-        #assert self.station_months == self.ngood
 
     @classmethod
     def invalid(cls, v):
@@ -773,7 +885,6 @@ class SubboxRecord(MonthlyTemperatureRecord):
             self._series.append(XMISSING)
         self._series[idx] = value
 
-    # TODO: This seems odd. Do I need this!
     def trim(self):
         self.station_months = len(self._series) - self._series.count(
                 XMISSING)
@@ -781,8 +892,8 @@ class SubboxRecord(MonthlyTemperatureRecord):
     def __repr__(self):
         return ('<Subbox (%+06.2f,%+06.2f) (%+07.2f,%+07.2f): %d>' %
                 (self.lat_S, self.lat_N, self.lon_W, self.lon_E, self.n))
-    def neat(self):
-        """Format neatly."""
+    def report_str(self):
+        """Format neatly for reporting purposes."""
 
         s = "SubboxRecord:\n"
         s += "   All data  : %d:%02d - %d:%02d  [%3d:%02d - %3d:%02d]" % (

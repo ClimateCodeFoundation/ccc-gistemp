@@ -20,7 +20,6 @@ import eqarea
 # Clear Climate Code
 import fort
 # Clear Climate Code
-import subbox
 
 # http://www.python.org/doc/2.3.5/lib/itertools-functions.html
 import itertools
@@ -28,9 +27,13 @@ import itertools
 import math
 # http://www.python.org/doc/2.3.5/lib/module-struct.html
 import struct
+# http://www.python.org/doc/2.4.4/lib/module-os.html
+import os
+
 
 # See SBBXotoBX.f
-def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991)):
+def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991),
+        ignore_land=False):
     """Simultaneously combine the land series and the ocean series and
     combine subboxes into boxes.  *land* and *ocean* should be open
     binary files for the land and ocean series (subbox gridded); *box*
@@ -39,18 +42,23 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991)):
     diagnostic information will be logged); *rland* and *intrp* are
     equivalent to the command line arguments to SBBXotoBX.f.
     """
+    
+    landsubbox = iter(land)
+    oceansubbox = iter(ocean)
+    land_meta = landsubbox.next()
+    ocean_meta = oceansubbox.next()
 
     bos ='>'
     boxf = fort.File(box, bos=bos)
 
     # RCRIT in SBXotoBX.f line 70
-    radius = float(1200)
-    rland = min(rland, radius)
-    if rland < 0:
-        rland = -9999
     # We make rland (and radius) a float so that any calculations done
     # using it are in floating point.
-    rland = float(rland)
+    radius = float(1200)
+    if not ignore_land:
+        rland = min(rland, radius)
+    else:
+        rland = -9999.0 # Actually this will not be used!
     # clamp intrp to [0,1]
     intrp = max(min(intrp, 1), 0)
 
@@ -80,36 +88,36 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991)):
 
     novrlp=20
 
-    landsubbox = subbox.File(land)
-    oceansubbox = subbox.File(ocean)
-    km = 1
-    if landsubbox.mavg == 6:
-        km = 12
-    if landsubbox.mavg == 7:
-        km = 4
-    NYRSIN = landsubbox.monm/km
+    # TODO: Formalise use of only monthlies, see step 3.
+    assert land_meta.mavg == 6
+    km = 12
+    NYRSIN = land_meta.monm/km
     # IYRBGC in the Fortran code
-    combined_year_beg = min(landsubbox.iyrbeg, oceansubbox.iyrbeg)
+    combined_year_beg = min(land_meta.yrbeg, ocean_meta.yrbeg)
     # index into the combined array of the first year of the land data.
-    I1TIN = 12*(landsubbox.iyrbeg-combined_year_beg)
+    I1TIN = 12*(land_meta.yrbeg-combined_year_beg)
     # as I1TIN but for ocean data
-    I1TINO = 12*(oceansubbox.iyrbeg-combined_year_beg)
+    I1TINO = 12*(ocean_meta.yrbeg-combined_year_beg)
     # combined_n_months is MONMC in the Fortran.
-    combined_n_months = max(landsubbox.monm + I1TIN,
-                            landsubbox.monm + I1TINO)
+    combined_n_months = max(land_meta.monm + I1TIN,
+                            land_meta.monm + I1TINO)
     # 
     # Indices into the combined arrays for the base period (which is a
     # parameter).
     nfb = base[0] - combined_year_beg
     nlb = base[1] - combined_year_beg
 
-    info = landsubbox.info()
-    info[3] = landsubbox.monm
-    info[4] = 2*landsubbox.monm+5
-    info[5] = combined_year_beg
-    boxf.writeline(struct.pack('%s8i' % bos, *info) + landsubbox.title)
+    info = [land_meta.mo1, land_meta.kq, land_meta.mavg, land_meta.monm,
+            land_meta.monm4, land_meta.yrbeg, land_meta.missing_flag,
+            land_meta.precipitation_flag]
 
-    XBAD = landsubbox.missing_flag
+    info[3] = land_meta.monm
+    info[4] = 2 * land_meta.monm + 5
+    info[5] = combined_year_beg
+    boxf.writeline(struct.pack('%s8i' % bos, *info) + land_meta.title)
+
+    # TODO: Use giss_data
+    XBAD = land_meta.missing_flag
 
     # :todo: do we really need the area array to be 8000 cells long?
     for nr,box in enumerate(eqarea.grid()):
@@ -122,40 +130,24 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991)):
         landsub = list(itertools.islice(landsubbox, nsubbox))
         oceansub = list(itertools.islice(oceansubbox, nsubbox))
         for i,l,o in zip(range(nsubbox),landsub,oceansub):
-            l = tuple(l)
-            o = tuple(o)
-            avg[i][I1TIN:I1TIN+len(l)] = l
-            avg[i+nsubbox][I1TINO:I1TINO+len(o)] = o
+            avg[i][I1TIN:I1TIN+l.n] = l.series
+            avg[i+nsubbox][I1TINO:I1TINO+l.n] = o.series
             # Count the number of valid entries.
-            # :todo: perhaps do something fancy with ".count()"
-            for x in l:
-                if x != XBAD:
-                    wgtc[i] += 1
-            for x in o:
-                if x != XBAD:
-                    wgtc[i+nsubbox] += 1
+            wgtc[i] = l.good_count
+            wgtc[i+nsubbox] = o.good_count
             # :ocean:weight:a: Assign a weight to the ocean cell.
             # A similar calculation appears elsewhere.
-            wocn = max(0, (landsub[i].d-rland)/(radius-rland))
-            # Line 174.  Isn't normally so.
-            if rland == XBAD:
+            if ignore_land:
                 wocn = 0
+            else:
+                wocn = max(0, (landsub[i].d-rland)/(radius-rland))
             if wgtc[i+nsubbox] < 12*novrlp:
                 wocn = 0
             # Normally *intrp* is 0
             if wocn > intrp:
                 wocn = 1
-            # The following code appears to ponderously multiply wgtc[i]
-            # by either wocn or (1-wocn) as appropriate.
-            # Line 177
-            wgtc[i] = 0
-            wgtc[i+nsubbox] = 0
-            for x in l:
-                if x != XBAD:
-                    wgtc[i] += (1-wocn)
-            for x in o:
-                if x != XBAD:
-                    wgtc[i+nsubbox] += wocn
+            wgtc[i] *= (1 - wocn)
+            wgtc[i+nsubbox] *= wocn
 
         # GISTEMP sort.
         # We want to end up with IORDR, the permutation array that
@@ -183,9 +175,10 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991)):
         # :ocean:weight:b: Assign weight to ocean cell, see similar
         # calculation, above at :ocean:weight:a.
         # Line 191
-        wocn = max(0, (landsub[ncr].d - rland)/(radius-rland))
-        if rland == XBAD:
+        if ignore_land:
             wocn = 0
+        else:
+            wocn = max(0, (landsub[ncr].d - rland)/(radius-rland))
         if nc == ncr and wgtc[nc + nsubbox] < 12*novrlp:
             wocn = 0
         if wocn > intrp:
@@ -223,9 +216,10 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991)):
             ncr = nc
             if nc >= nsubbox:
                 ncr = nc - nsubbox
-            wocn = max(0, (landsub[ncr].d - rland)/(radius-rland))
-            if rland == XBAD:
+            if ignore_land:
                 wocn = 0
+            else:
+                wocn = max(0, (landsub[ncr].d - rland)/(radius-rland))
             if nc == ncr and wgtc[nc + nsubbox] < 12*novrlp:
                 wocn = 0
             if wocn > intrp:
@@ -380,6 +374,7 @@ def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, km, id,
         print "Unused data - ID/SUBBOX,WT", id, wt1, missing
     return nsm
 
+
 # :todo: make common with step3.py
 # Equivalent to Fortran subroutine TAVG.  Except the bias array
 # (typically 12 elements) is returned.
@@ -443,12 +438,19 @@ def tavg(data, km, nyrs, base, limit, nr, id, deflt=0.0, XBAD=9999):
     return bias
 
 
-def step5():
-    # http://www.python.org/doc/2.4.4/lib/module-os.html
-    import os
+def step5(inputs=()):
+    """Step 5 of the GISS processing.
 
-    land = open(os.path.join('work', 'SBBX1880.Ts.GHCN.CL.PA.1200'), 'rb')
-    ocean = open(os.path.join('work', 'SBBX.HadR2'), 'rb')
+    This step take input provided by steps 3 and 4.
+
+    :Param land, ocean:
+        These are data sources for the land and ocean sub-box data.
+        They need to support the protocol defined by
+        `code.giss_data.SubboxSetProtocol`.
+
+    """
+    land, ocean = inputs
+    #ocean = open(os.path.join('work', 'SBBX.HadR2'), 'rb')
     box = open(os.path.join('result', 'BX.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
     log = open(os.path.join('log', 'SBBXotoBX.log'), 'w')
     SBBXtoBX(land, ocean, box, log, rland=100, intrp=0)
@@ -460,13 +462,3 @@ def step5():
     zonav.main()
     import annzon
     annzon.main()
-
-def main(argv=None):
-    import sys
-
-    if argv is None:
-        argv = sys.argv
-    return step5()
-
-if __name__ == '__main__':
-    main()

@@ -45,7 +45,8 @@ USHCN data:
 
 import itertools
 import math
-import re
+
+import giss_data
 
 # Should probably be moved elsewhere
 def open_or_uncompress(filename):
@@ -58,7 +59,7 @@ def open_or_uncompress(filename):
     try:
         return open(filename)
     except IOError:
-        # When neither  filename nor filename.gz exists we
+        # When none of filename, nor filename.gz exists we
         # want to pretend that the exception comes from the original
         # call to open, above.  Otherwise the user can be confused by
         # claims that "foo.zip" does not exist when they tried to open
@@ -74,438 +75,240 @@ def open_or_uncompress(filename):
             pass
         raise exception[0], exception[1], exception[2]
 
-# Use the same in-band invalid data marker as step1.  In due course we
-# should be able to share code for this sort of thing across all the
-# steps (and possibly use a NaN).
+def zipopen(filename):
+    """Open the zip file `filename` and return a file object for its
+    first member.  This is only really intended to be used to
+    `v2.mean.zip` which is the single file v2.mean packed into a zip
+    archive."""
 
-def round_value(value):
-    """Round a floating-point value to the nearest 0.1. """
+    import zipfile
+    z = zipfile.ZipFile(filename, 'r')
+    name = z.namelist()
+    f = z.open(name[0], 'rU')
+    return f
 
-    return float(math.floor(value * 10.0 + 0.5)) * 0.1
 
-BAD = round_value(999.9)
-
-def invalid(x):
-    """Test for invalid datum ("equal" to the BAD value, for some
-    definition of "equal").
+def round_to_nearest(f):
+    """Returns the int which is nearest to the argument float.  Draws
+    are rounded away from zero. If the argument is None, returns
+    None.
     """
 
-    # If you're feeling spooky about the BAD value, re-enable this:
-    # if abs(x-BAD) < 0.1:
-    #     assert x == BAD
-
-    return x == BAD
-
-def valid(x):
-    """Test for valid datum.  See invalid()."""
-
-    # It's important that this obey Iverson's convention: in other words
-    # return 0 or 1 (or False or True, which it does).
-    return not invalid(x)
-
-### Code to read metadata files.
-
-def read_antarc_station_ids(filename, duplicate):
-    """Reads a SCAR station ID file and returns a dictionary mapping
-    station name to the 12-digit WMO station ID.  (11 digits from the
-    file, plus the final "duplicate flag" digit from our argument).
-    """
-
-    dict = {}
-    for line in open('input/%s' % filename):
-        id11 = line[:11]
-        station = line[12:42].strip()
-        dict[station] = id11 + duplicate
-    return dict
-
-def read_USHCN_stations():
-    """Reads the USHCN station list and returns a dictionary
-    mapping USHCN station ID to 12-digit WMO station ID.
-    """
-
-    stations = {}
-    for line in open('input/ushcn2.tbl'):
-        (USHCN_id, WMO_id, duplicate) = line.split()
-        USHCN_id = int(USHCN_id)
-        country_code = int(WMO_id[:3])
-        if country_code != 425:
-            raise ValueError, "non-425 station found in ushcn.tbl: '%s'" % line
-        if duplicate != '0':
-            raise ValueError, "station in ushcn.tbl with non-zero duplicate: '%s'" % line
-        stations[USHCN_id] = WMO_id+duplicate
-    # some USHCNv2 station IDs convert to USHCNv1 station IDs:
-    for line in open('input/ushcnV2_cmb.tbl'):
-        (v2_station,_,v1_station,_) = line.split()
-        stations[int(v2_station)] = stations[int(v1_station)]
-    return stations
-
-### Code to read input data files in various formats.
-
-def read_float(s):
-    """Converts s to a float, or to BAD if float conversion fails."""
-
-    try:
-        return float(s)
-    except:
-        return BAD
-
-def read_Hohenpeissenberg():
-    """reads the Hohenpeissenberg data from
-    input/t_hohenpeissenberg_200306.txt_as_received_July17_2003
-    which has a header line and then one line per year from 1781.
-    We only want data from 1880 to 2002.
-    Returns an iterator (id12, year, temperatures).
-    """
-
-    for line in open('input/t_hohenpeissenberg_200306.txt_as_received_July17_2003'):
-        if line[0] in '12':
-            year = int(line[:4])
-            if year < 1880 or year > 2002:
-                continue
-            data = line.split()
-            temps = map(read_float, data[1:13])
-            temps = temps + [BAD] * (len(temps)-12)
-            yield ('617109620002', year, temps)
-
-def read_antarc_line(line):
-    """Convert a single line from the Antarctic/Australasian dataset
-    files into a year and a 12-tuple of floats (the temperatures in
-    Centigrade).  Missing values become BAD.
-    """
-
-    year = int(line[:4])
-    line = line[4:]
-    tuple = []
-    if line[6] == '.' or line[7] == '-':
-        # Some of the datasets are 12f8.1 with missing values as '       -'.
-        for i in range(0,12):
-            tuple.append(read_float(line[i*8:i*8+8]))
+    if f is None:
+        return None
+    if f >= 0:
+        return int(math.floor(f + 0.5))
     else:
-        # Others are xx12f7.1 or xxx12f7.1 with missing values as '       '.
-        np = line.find('.')
-        if np < 0:
-            raise ValueError, "Non-data line encountered: '%s'" % line
-        position = (np % 7) + 2
-        for i in range(0,12):
-            tuple.append(read_float(line[i*7+position:i*7+7+position]))
-    return (year, tuple)
+        return int(math.ceil(f - 0.5))
 
-antarc_discard_re = re.compile(r'^$|^Get |^[12A-Z]$')
-antarc_temperature_re = re.compile(r'^(.*) .* *temperature')
 
-def read_antarc_data(filename, stations):
-    """Reads an Antarctic dataset file - antarc1.txt or antarc3.txt.
-    Returns an iterator (id12, year, temperatures).
-    """
-
-    for line in open('input/%s' % filename):
-        if antarc_discard_re.search(line):
-            continue
-        station_line = antarc_temperature_re.match(line)
-        if station_line:
-            station_name = station_line.group(1)
-            station_name = station_name.replace('\\','')
-            id12 = stations[station_name]
-            continue
-        line = line.strip()
-        if line.find('.') >= 0 and line[0] in '12':
-            year, data = read_antarc_line(line)
-            yield (id12, year, data)
-        
-austral_discard_re = re.compile(r'^$|:')
-austral_header_re = re.compile(r'^\s*(.+?)  .*(E$|E )')
-
-def read_austral_data(filename, stations):
-    """Reads the Australasian dataset file antarc2.txt.
-    Returns an iterator (id12, year, temperatures).
-    """
-
-    for line in open('input/%s' % filename):
-        if austral_discard_re.search(line):
-            continue
-        station_line = austral_header_re.match(line)
-        if station_line:
-            station_name = station_line.group(1).strip()
-            id12 = stations[station_name]
-            continue
-        line = line.strip()
-        if line.find('.') >= 0 and line[0] in '12':
-            year, data = read_antarc_line(line)
-            yield (id12, year, data)
-        
-def read_antarctica():
-    """Reads the SCAR datasets (Antarctic and Australasian).
-    Returns an iterator (id12, year, temperatures).
-    """
-
-    stations1 = read_antarc_station_ids('antarc1.list', '8')
-    stations2 = read_antarc_station_ids('antarc2.list', '7')
-    stations3 = read_antarc_station_ids('antarc3.list', '9')
-    return itertools.chain(read_antarc_data('antarc1.txt', stations1),
-                           read_antarc_data('antarc3.txt', stations3),
-                           read_austral_data('antarc2.txt', stations2))
-
-def read_GHCN(filename):
-    """Reads a GHCN data file (usually v2.mean).
-    Returns an iterator (id12, year, temperatures).
-    """
-
+def read_GHCN(ghcn_source, antarc_source):
+    """An iterator to read a GHCN data file (usually v2.mean)."""
     GHCN_last_year = 0
-    for line in open_or_uncompress('input/%s' % filename):
-        id12 = line[:12]
-        year = int(line[12:16])
-        GHCN_last_year = max(year, GHCN_last_year)
-        temps = []
-        for i in range(0,12):
-            t = float(line[i*5+16:i*5+21])
-            if t < -9998:
-                temps.append(BAD)
-            else:
-                temps.append(t / 10.0)
-        yield (id12, year, temps)
-    t = open('work/GHCN.last_year','w')
-    t.write('%d\n' % GHCN_last_year)
-    t.close()
+    for record in ghcn_source:
+        GHCN_last_year = max(record.last_year, GHCN_last_year)
+        yield record
+    for record in antarc_source:
+        yield record
 
-def read_USHCN():
-    """Returns USHCN dataset as a dictionary mapping 12-digit WMO
-    station ID to a dictionary mapping year number to temperature data
-    list.
-    """
-
-    hash = {}
-    last_year = 0
-    stations = read_USHCN_stations()
-    # initialize hash from WMO station ID to results
-    for (USHCN_id, id12) in stations.items():
-        hash[id12] = {}
-    for line in open_or_uncompress('input/9641C_200907_F52.avg'):
-        if line[6] != '3': # 3 indicates mean temperatures
-            continue
-        USHCN_station = int(line[0:6])
-        id12 = stations[USHCN_station]
-        year = int(line[7:11])
-        if year < 1880: # discard data before 1880
-            continue
-        last_year = max(year, last_year)
-        temps = []
-        valid = False
-        for m in range(0,12):
-            temp_fahrenheit = int(line[m*7+11:m*7+17])
-            flag = line[m*7+17]
-            if ((flag in 'EQ') or              # interpolated data
-                (temp_fahrenheit == -9999)) :  # absent data
-                temp = BAD
-            else:
-                # degrees centigrade
-                temp = (temp_fahrenheit - 320) * 5/90.0
-                valid = True
-            temps.append(temp)
-        if valid: # some valid data found
-            hash[id12][year] = temps
-    return (hash, last_year)
-
-### Code to combine and manipulate input data sets
-
-def include_US(GHCN):
-    """Adds the USHCN data to the GHCN dataset (passed in as an
-    iterator argument).  Returns an iterator for the combined dataset.
-    Where the GHCN dataset contains data for stations in the USHCN
-    set, return the USHCN data, adjusted for differences in
-    monthly temperature means.
-    """
-
-    GHCN_hash = {}
-    (USHCN, last_year) = read_USHCN()
-    while True:
-        try:
-            GHCN_line = GHCN.next()
-            (id12, year, data) = GHCN_line
-            if USHCN.has_key(id12):
-                if not USHCN[id12].has_key(year):
-                    # discard this GHCN result line
-                    continue
-                GHCN_hash.setdefault(id12,{})
-                GHCN_hash[id12][year] = data
-            else:
-                yield GHCN_line
-        except StopIteration: # end of GHCN iterator
-            # now iterate over USHCN stations.
-            for (id12, udata) in USHCN.items():
-                gdata = GHCN_hash.get(id12, {})
-                # Calculate a set of monthly offsets USHCN-GHCN for
-                # this station.
-                # For compatibility with GISTEMP, these offsets are
-                # averages over up to ten years, working backwards
-                # from the present day to 1979, and are rounded to the
-                # nearest tenth of a degree.
-                diffs = []
-                for month in range(0,12):
-                    diff = 0
-                    count = 0
-                    for year in range(last_year, 1979, -1):
-                        if (udata.has_key(year) and valid(udata[year][month]) and
-                            gdata.has_key(year) and valid(gdata[year][month])):
-                            diff += udata[year][month]-gdata[year][month]
-                            count += 1
-                            if count == 10:
-                                break
-                    if count > 0:
-                        # compatibility with GISTEMP requires that we
-                        # round this to the nearest tenth of a degree.
-                        average = diff/count
-                        diffs.append(average)
-                    else:
-                        diffs.append(0)
-                # Now apply the USHCN-GHCN offsets to every year for
-                # this station in which there is GHCN data.  Note that
-                # years in USHCN but not in GHCN are just copied, not
-                # adjusted.  This may be a bug.
-                for year in sorted(udata.keys()):
-                    temps = udata[year]
-                    if gdata.has_key(year):
-                        # station-years in GHCN are adjusted
-                        def adjust(t,d):
-                            if valid(t):
-                                return t-d
-                            else:
-                                return BAD
-                        adjusted = map(adjust, temps, diffs)
-                        yield(id12, year, adjusted)
-                    else:
-                        yield(id12, year, temps)
-            return
 
 def dump_old(set, year):
     """Returns the input set without any items in years prior to the
     specified year.
     """
     
-    return (item for item in set if item[1] >= year)
+    return (item for item in set if item[4] >= year)
 
-def remove_Hohenpeissenberg(set):
-    """Remove data from an iterator if it from Hohenpeisenberg prior
-    to 2003.
+
+def calc_monthy_USHCN_offsets(u_record, g_record):
+    u_years = u_record.get_set_of_years_as_tenths(1980, u_record.last_year)
+    g_years = g_record.get_set_of_years_as_tenths(1980, u_record.last_year)
+    reversed_year_pairs = list(reversed(zip(u_years, g_years)))
+
+    diffs = [0] * 12
+    for month in range(12):
+        sum = 0.0
+        count = 0
+        for u_year, g_year in reversed_year_pairs:
+            u_temp, g_temp = u_year[month], g_year[month]
+            if giss_data.MISSING not in (u_temp, g_temp):
+                sum += u_temp - g_temp
+                count += 1
+                if count == 10:
+                    break
+
+        if count > 0:
+            # compatibility with GISTEMP requires that we round this
+            # to the nearest tenth of a degree.
+            diffs[month] = round_to_nearest(sum / count)
+
+    return diffs
+
+
+def adjust_USHCN(ushcn_records, ghcn_records, us_only):
+    """Where the GHCN dataset contains data for stations in the USHCN
+    set, adjust the USHCN data, for differences in
+    monthly temperature means.
     """
+    print "Adjust USHCN records"
 
-    return (t for t in set if (t[0][:11] != '61710962000' or
-                               t[1] > 2002))
+    def adj(t, d):
+        if t != giss_data.MISSING:
+            return t - d
+        return t
 
-def from_years(years):
-    """*years* is a list of year records (lists of temperatures) that
-    comprise a station's entire record.  The data are converted to a
-    linear array (could be a list/tuple/array/sequence, I'm not
-    saying), *series*, where series[m] gives the temperature (a
-    floating point value in degrees C) for month *m*, counting from 0
-    for the January of the first year with data.
-
-    (*series*,*begin*) is returned, where *begin* is
-    the first year for which there is data for the station.
-
-    Code almost identical to this is also in step1.py at present, and
-    should be shared.
-    """
-
-    begin = None
-    # Previous year.
-    prev = None
-    series = []
-    for (year, data) in years:
-        if begin is None:
-            begin = year
-        # Some input datasets can have duplicate years.  We just drop
-        # the duplicate data here.
-        if prev and prev >= year:
+    # For each USHCN record look for a corresponding GHCN record. Matching
+    # GHCN records have the same station_uid and a discriminator of zero.
+    # Hence we can generate a lookup key by: ``u_record.station_uid + "0"``.
+    to_remove = []
+    for u_key, u_record in ushcn_records.iteritems():
+        key = u_record.station_uid + "0"
+        g_record = ghcn_records.get(key, None)
+        if g_record is None:
+            print "NO MODS", u_record.uid
             continue
-        # The sequence of years for a station record is not
-        # necessarily contiguous.  For example "1486284000001988" is
-        # immediately followed by "1486284000001990", missing out 1989.
-        # Extend with blank data.
-        while prev and prev < year-1:
-            series.extend([BAD]*12)
-            prev += 1
-        prev = year
-        series.extend(data)
-    return (series, begin)
+        diffs = calc_monthy_USHCN_offsets(u_record, g_record)
 
-def as_station_record(id, lines):
-    """Takes a set of *lines*, which are triples (id, year, data), for
-    a single station, and returns a pair *(dict, series)*, in which
-    *series* is a combined list of monthly values and *dict* is a
-    metadata dictionary.
-    """
+        # Now apply the USHCN-GHCN offsets to every year for
+        # this station in which there is GHCN data.  Note that
+        # years in USHCN but not in GHCN are just copied, not
+        # adjusted.  This may be a bug.
+        tenths = list(u_record.series_as_tenths)
+        new_data = []
+        for year in range(u_record.first_year, u_record.last_year + 1):
+            temps = u_record.get_a_year_as_tenths(year)
+            if g_record.has_data_for_year(year):
+                new_data.extend([adj(t, d) for t, d in zip(temps, diffs)])
+            else:
+                new_data.extend(temps)
+        g_record.set_series_from_tenths(u_record.first_year * 12 + 1, new_data)
+        to_remove.append(u_key)
+        us_only.pop(key, None)
 
-    (series, begin) = from_years((year, data) for (_, year, data) in lines)
-    dict = {}
-    dict['id'] = id
-    dict['begin'] = begin
-    return (dict, series)
+    for k in to_remove:
+        del ushcn_records[k]
+    for k in us_only:
+        ghcn_records.pop(k, None)
 
 
-### Main step 0 function.
+def remove_Hohenpeissenberg_from_GHCN(ghcn_records, hohenpeis_record):
+    print "Remove Hohenpeissenberg data from GHCN records"
 
-def step0():
-    """Replaces GISTEMP STEP0.
-    Reads the GHCN, USHCN, SCAR, and Hohenpeissenberg data
-    and returns a single combined dataset as an iterator
-    of *(metadata, series)* pairs.
-    """
+    for g_record in ghcn_records.itervalues():
+        if g_record.station_uid == hohenpeis_record.station_uid:
+            # Extract the data for the years 2003 to present.
+            new_data = []
+            for year in range(2003, g_record.last_year + 1):
+                new_data.extend(g_record.get_a_year_as_tenths(year))
 
-    combined = itertools.chain(read_GHCN("v2.mean"),
-                               read_antarctica())
-    since_1880 = dump_old(combined, 1880)
-    including_US = include_US(since_1880)
-    with_Hohenpeissenberg = itertools.chain(read_Hohenpeissenberg(),
-                                            remove_Hohenpeissenberg(including_US))
-    sorted_lines = sorted(with_Hohenpeissenberg)
-    for (id, lines) in itertools.groupby(sorted_lines, lambda line: line[0]):
-        yield as_station_record(id, lines)
+            if g_record.uid == hohenpeis_record.uid:
+                # If the record has the same UID as Hohenpeissenberg then
+                # replace the data with Hohenpeissenberg plus the recent
+                # years.
+                last_year = g_record.last_year
+                g_record.set_series_from_tenths(hohenpeis_record.first_month,
+                        hohenpeis_record.series_as_tenths)
+                for i, year in enumerate(range(2003, last_year + 1)):
+                    g_record.add_year_of_tenths(year, new_data[i * 12:(i + 1) * 12])
 
-# Code to output result set; these functions will move out of step0.py
-# in due course.
+            else:
+                # For other records, just replace the data with the later
+                # years.
+                g_record.set_series_from_tenths(2002 * 12 + 1, new_data)
 
-def round_to_nearest(f):
-    """Returns the int which is nearest to the argument float.  Draws
-    are rounded away from zero.
-    """
-
-    if f >= 0:
-        return int(math.floor(f + 0.5))
-    else:
-        return int(math.ceil(f - 0.5))
 
 def str_temp(temp):
-    """Takes a float, and converts to 5 characters of ASCII: decimal
-    representation or "-9999" if None.
+    """Takes either None or an integer, and converts to 5 characters
+    of ASCII: decimal representation or "-9999" if None.
     """
 
-    if invalid(temp):
+    if temp is None:
         return '-9999'
     else:
-        return "%5d" % round_to_nearest(temp * 10.0)
+        return "%5d" % temp
 
-def str_line(id, year, temps):
-    """Turns a single year from the dataset into a line in the v2.mean format."""
+def str_line(line):
+    """Turns a dataset item into a line in the v2.mean format."""
 
-    return ('%s%04d%s\n' % (id, year, ''.join(map(str_temp, temps))))
+    (country_code, WMO_station, modifier, duplicate, year, temps) = line
+    return ('%03d%05d%03d%1d%04d%s\n' %
+            (country_code, WMO_station, modifier,
+             duplicate, year, ''.join(map(str_temp, temps))))
 
 def write_data(set, filename):
     """Writes a dataset to a file in v2.mean format."""
 
     f = open(filename, 'w')
-    for (dict, series) in set:
-        id = dict['id']
-        year = dict['begin']
-        for months in (series[i:i+12] for i in range(0,len(series),12)):
-            f.write(str_line(id, year, months))
-            year = year + 1
+    for line in sorted(str_line(item) for item in set):
+        f.write(line)
     f.close()
 
-def main():
-    write_data(step0(), "work/v2.mean_comb")
 
-if __name__ == '__main__':
-    main()
+# TODO: Should the antarc_source really appear at this stage?
+def load_GHCN(ghcn_source, antarc_source):
+    print "Load GHCN records"
+    return dict((record.uid, record) for record in itertools.chain(
+            read_GHCN(ghcn_source, antarc_source)))
+
+
+def read_USHCN(ushcn_source):
+    """Read all USHCN station records from the input.
+
+    :Return:
+        A tuple of ``(records, us_only)``. The ``records`` is a dictionary of
+        all the records, keyed by the record UID. The ``us_only`` is a
+        dictionary, where each key is the UID that would match a a
+        corresponding station record from the GHCN data source.
+
+    """
+    print "Load USHCN records"
+    d = dict((record.uid, record) for record in ushcn_source)
+    return d, ushcn_source.us_only
+
+
+class Step0Iterator(object):
+    """An iterator for step 1.
+    
+    An instance of this class acts as an iterator that produces a stream of
+    `giss_data.StationRecord` instances.
+
+    """
+    def __init__(self, ushcn_source, ghcn_source, antarc_source, 
+            hohenpeis_source):
+        self.ushcn_source = ushcn_source
+        self.ghcn_source = ghcn_source
+        self.antarc_source = antarc_source
+        self.hohenpeis_source = hohenpeis_source
+
+    def __iter__(self):
+        return self._it()
+
+    def _it(self):
+        ushcn_records, us_only = read_USHCN(self.ushcn_source)
+        ghcn_records = load_GHCN(self.ghcn_source, 
+                self.antarc_source)
+        adjust_USHCN(ushcn_records, ghcn_records, us_only)
+        hohenpeis_record = list(self.hohenpeis_source)[0]
+        remove_Hohenpeissenberg_from_GHCN(ghcn_records, hohenpeis_record)
+
+        records = {}
+        records.update(ghcn_records)
+        records.update(ushcn_records)
+
+        # TODO: I think the whole point of sorting here is so that step1
+        # receives the records in a good order to perfrom its
+        # ``comb_records(self.record_source)`` processing. We can probably
+        # dispense with this by making use of the fact that we have a
+        # dictionary here, so we can combine at this stage. [Paul O]
+        for uid, record in sorted(records.iteritems()):
+            if record.n:
+                yield record
+
+    
+def step0(inputs):
+    return Step0Iterator(inputs.ushcn_source, inputs.ghcn_source,
+            inputs.antarc_source, inputs.hohenpeis_source) 
+
 
 # This file is copyright (C) 2008 Ravenbrook Limited.
 #

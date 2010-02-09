@@ -38,10 +38,8 @@ import earth # required for radius.
 # Clear Climate Code
 import eqarea
 # Clear Climate Code
-import fort
+import giss_data
 
-# http://www.python.org/doc/2.3.5/lib/module-array.html
-from array import array
 # http://www.python.org/doc/2.3.5/lib/module-getopt.html
 import getopt
 # http://www.python.org/doc/2.3.5/lib/module-math.html
@@ -55,6 +53,7 @@ from warnings import warn
 
 # The width of a standard word according to Python's struct module.
 w = len(struct.pack('=I', 0))
+
 
 class Stations:
     """A representation of a collection of station data.  Concretely a
@@ -75,58 +74,19 @@ class Stations:
     km - number of records per year, derived from MAVG.
     """
 
-    def __init__(self, infile):
+    def __init__(self, infile, km, meta):
         """infile should be a sequence of file objects.  Each file
         object should be opened in binary onto a trimmed NCAR file,
         identical in format to the input files that GISTEMP's
         to.SBBXgrid.f program expects.
         
-        Hostically (and in emulation of the GISS GISTEMP code) there
+        Historically (and in emulation of the GISS GISTEMP code) there
         were be 6 zonal files, but now only one is usually supplied.
         The "for f infile" loop is a relic, but still kept.
         """
-
-        self.yrbeg = None
-        self.kq = None
-        self.monm = None
-        self.bad = None
-        self.header = []
-
-        self.station = []
-
-        for f in infile:
-            ff = fort.File(f)
-
-            r = ff.readline()
-            self.header.append(r)
-            self.title = r[9*w:]
-            # First record contains various INFO items.
-            # When referring to comments in to.SBBXgrid.f recall that Fortran
-            # arrays are typically indexed from 1 onwards; Python from 0
-            # onwards.  Therefore INFO(1) corresponds to a[0]
-            a = struct.unpack('9i', r[:9*w])
-            mfirst = a[0]
-            mlast = a[8]
-            kq = a[1]
-            self.kq = self.kq or kq
-            mavg = a[2]
-            monm = a[3]
-            self.monm = self.monm or monm
-            recsize = a[4]
-            yrbeg = a[5]
-            # Check all YRBEGs are the same
-            if self.yrbeg and yrbeg != self.yrbeg :
-                warn(('File %s has a YRBEG of %d, different from the ' +
-                      'YRBEG of %d on the first file.') %
-                      (f.name, yrbeg, self.yrbeg))
-            self.yrbeg = self.yrbeg or yrbeg
-            bad = a[6]
-            self.bad = self.bad or bad
-            trace = a[7]
-
-            for r in ff:
-                self.station.append(Station(r, mfirst, mlast, bad=bad))
-                mfirst,mlast = struct.unpack('2I', r[-2*w:])
+        (self.reader, ) = infile
+        self.meta = meta
+        self.station_records = None
 
         # This computation of scale isn't clearly correct, for example,
         # are KQ values bigger than 20 really supposed to be silently
@@ -142,19 +102,23 @@ class Stations:
         if self.scale == 0 :
             raise 'Program not ready for quantity %d' % stations.kq
 
-        # Derive KM
-        # to.SBBXgrid.f lines 140 and following
-        self.km = 1
-        if mavg == 6:
-            self.km = 12
-        if mavg == 7:
-            self.km = 4
+        self.km = km
+
+    def __getattr__(self, name):
+        return getattr(self.meta, name)
 
     def all(self):
-        """An iterator that yields every station."""
+        """An iterator that yields every station record."""
+        if self.station_records is not None:
+            for record in self.station_records:
+                yield record
+            return
 
-        for st in self.station:
-            yield st
+        station_records = []
+        for record in self.reader:
+            station_records.append(record)
+            yield record
+        self.station_records = station_records
 
     def inbox(self, lats, latn, longw, longe):
         """An iterator that yields every station within the box bounded
@@ -178,9 +142,10 @@ class Stations:
         assert lats <= latn
         assert longw <= longe
 
-        for st in self.station:
-            lat = st.lat
-            lon = st.lon
+        for record in self.all():
+            st = record.station
+            lat = st.lat_fixed_1
+            lon = st.lon_fixed_1
 
             # See to.SBBXgrid.f lines 213 and following
             if lon > longe:
@@ -189,18 +154,12 @@ class Stations:
                 lon += 360
 
             if (lats < lat < latn) and (longw < lon < longe):
-                yield st
+                yield record
             if lats == lat and longw <= lon < longe:
-                yield st
+                yield record
             if longw == lon and lats <= lat < latn:
-                yield st
+                yield record
 
-    def incircle(self, arc, lat, lon):
-        """Returns all stations within a certain distance of a point of
-        interest.  See the function incircle for details, the entire
-        station list is used as the iterable."""
-
-        return incircle(self.all(), arc, lat, lon)
 
 def incircle(iterable, arc, lat, lon):
     """An iterator that filters iterable (the argument) and yields every
@@ -239,14 +198,16 @@ def incircle(iterable, arc, lat, lon):
     coslon = math.cos(lon*math.pi/180)
     sinlon = math.sin(lon*math.pi/180)
 
-    for st in iterable:
+    for record in iterable:
+        st = record.station
+        s_lat, s_lon = st.lat_fixed_1, st.lon_fixed_1
         # A possible improvement in speed (which the corresponding
         # Fortran code does) would be to store the trig values of
         # the station location in the station object.
-        sinlats = math.sin(st.lat*math.pi/180)
-        coslats = math.cos(st.lat*math.pi/180)
-        sinlons = math.sin(st.lon*math.pi/180)
-        coslons = math.cos(st.lon*math.pi/180)
+        sinlats = math.sin(s_lat*math.pi/180)
+        coslats = math.cos(s_lat*math.pi/180)
+        sinlons = math.sin(s_lon*math.pi/180)
+        coslons = math.cos(s_lon*math.pi/180)
 
         # Cosine of angle subtended by arc between 2 points on a
         # unit sphere is the vector dot product.  See to.SBBXgrid.f
@@ -258,70 +219,8 @@ def incircle(iterable, arc, lat, lon):
             # See to.SBBXgrid.f line 285
             d = math.sqrt(2*(1-cosd))
             d /= arc
-            yield (1-d, st)
+            yield (1-d, record)
 
-
-class Station:
-    """A representation of a time series of data from a station (and
-    associated metadata."""
-
-    def __init__(self, record, m0, ml, bad=9999):
-        """Create a station series from its representation as a Fortran
-        binary record.  m0 is the month corresponding to the first data
-        item; ml is the month corresponding to the last data item.  ml
-        is not used except to check that the lengh of the record is
-        correct.  bad is the data value corresponding to a bad entry
-        (normally stored in the file's metadata); bad is used to
-        calculate the ngood member, the number of good data values."""
-
-        # Length of record trail, the non-variable part, in bytes.
-        ltrail = 15*w
-
-        # The month where the data series begins.  This value is simply
-        # taken from the input file, but conventionally the value 1
-        # indicates January in the year YRBEG (which is indicated in the
-        # file header).
-        self.m0 = m0
-
-        trail = record[-ltrail:]
-        lat,lon,id,height = struct.unpack('2iIi', trail[:4*w])
-        id = '%09d' % id
-        # Latitude in degrees
-        self.lat = lat * 0.1
-        # Longitude in degrees
-        self.lon = lon * 0.1
-        # Height in metres.  Not expected to be used.
-        self.height = height
-        if len(record[:-ltrail]) != w*(ml-m0+1):
-            warn(('Station ID %s has suspect record length. ' +
-                'mfirst=%s mlast=%d record-length=%d\n') %
-                (id, m0, ml, len(record)), SyntaxWarning)
-        name = trail[4*w:-2*w]
-        # raw name field (36 characters, including the final 6 used as
-        # metadata)
-        self.rawname = name
-        # Some metadata is stored in the name field, *sigh*
-        meta = name[-6:]
-        name = name[:-6]
-        # 3 digit country code
-        cc = meta[3:6]
-        meta = meta[0:3]
-        # Prepend country code to station ID.
-        id = cc + id
-        # Station ID as a 12-digit string
-        self.id = id
-
-        data = record[:-ltrail]
-        n = len(data)//w
-        # The time series as an array.array
-        self.data = array('i', struct.unpack('%di' % n, data))
-        self.ngood = len(self.data) - self.data.count(bad)
-        # We derive from m0 a beginning and end pair that correspond to
-        # the range that the station data occupies in the AVG array used
-        # when combining (the AVG array goes from the first month to the
-        # last month)
-        self.databeg = m0 - 1
-        self.dataend = self.databeg + len(self.data)
 
 def sort(l, cmp):
     """Sort the list l (in place) according to the comparison function
@@ -424,15 +323,70 @@ def combine(km, XBAD, bias, avg, wt, dnew, nf1, nl1, wt1, wtm, id,
     return nsm
 
 
-def subbox_grid(infile,
-        subbox_out, box_out, station_use_out, radius=1200,
-        year_begin=1880, base_year=(1951,1980), audit=None,
+# TODO: This is an almost duplicate of the function in step5.
+#       Make the code common.
+
+# Equivalent to Fortran subroutine TAVG.
+# See to.SBBXgrid.f lines 563 and following.
+def tavg(km, XBAD, bias, data, nyrs, base, limit, nr, nc, deflt=0.0):
+    """tavg computes the time averages (separately for each calendar
+    month if km=12) over the base period (year base to limit) and
+    saves them in bias. In case of no data, the average is set to
+    deflt if nr=0 or computed over the whole period if nr>0.
+
+    Similarly to combine() data is treated as a linear array divided
+    into years by considering contiguous chunks of km elements.
+
+    Note: the Python convention for base and limit is used, the base
+    period consists of the years starting at base and running up to,
+    but including, the year limit.
+    """
+
+    missed = km
+    len = km*[0]    # Warning: shadows builtin "len"
+    for k in range(km):
+        bias[k] = deflt
+        sum = 0.0
+        m = 0
+        for n in range(base, limit):
+            kn = k+km*n     # CSE for array index
+            if data[kn] >= XBAD:
+                continue
+            m += 1
+            sum += data[kn]
+        len[k] = m
+        if m == 0:
+            continue
+        bias[k] = float(sum)/float(m)
+        missed -= 1
+    if nr*missed == 0:
+        return
+    # Base period is data free (for at least one month); use bias
+    # with respect to whole series.
+    for k in range(km):
+        if len[k] > 0:
+            continue
+        print "No data in base period - MONTH,NR,NC", k, nr, nc
+        sum = 0.0
+        m = 0
+        for n in range(nyrs):
+            kn = k+km*n     # CSE for array index
+            if data[kn] >= XBAD:
+                continue
+            m += 1
+            sum += data[kn]
+        if m == 0:
+            continue
+        bias[k] = float(sum)/float(m)
+    return
+
+
+def iter_subbox_grid(stations, monm, radius=1200,
+        base_year=(1951,1980), audit=None,
         just_subbox=()):
     """(This is the equivalent of to.SBBXgrid.f) Convert the input file,
     infile, into gridded datasets which are output on the file (-like)
-    object subbox_out and box_out.
-    station_use_out should also be a file object, it is used to record
-    which records are used for which box (region).
+    object box_out.
 
     radius specifies a radius in kilometres, it is
     equivalent to the RCRIT value in the Fortran code.
@@ -446,110 +400,6 @@ def subbox_grid(infile,
 
     log = sys.stdout
 
-    # Helper functions (rather big ones).  These are separate in the
-    # Fortran.
-
-    # Equivalent to Fortran subroutine TAVG.
-    # See to.SBBXgrid.f lines 563 and following.
-    def tavg(data, nyrs, base, limit, nr, nc, deflt=0.0):
-        """tavg computes the time averages (separately for each calendar
-        month if km=12) over the base period (year base to limit) and
-        saves them in bias. In case of no data, the average is set to
-        deflt if nr=0 or computed over the whole period if nr>0.
-
-        Similarly to combine() data is treated as a linear array divided
-        into years by considering contiguous chunks of km elements.
-
-        Note: the Python convention for base and limit is used, the base
-        period consists of the years starting at base and running up to,
-        but including, the year limit.
-        """
-
-        missed = km
-        len = km*[0]    # Warning: shadows builtin "len"
-        for k in range(km):
-            bias[k] = deflt
-            sum = 0.0
-            m = 0
-            for n in range(base, limit):
-                kn = k+km*n     # CSE for array index
-                if data[kn] >= XBAD:
-                    continue
-                m += 1
-                sum += data[kn]
-            len[k] = m
-            if m == 0:
-                continue
-            bias[k] = float(sum)/float(m)
-            missed -= 1
-        if nr*missed == 0:
-            return
-        # Base period is data free (for at least one month); use bias
-        # with respect to whole series.
-        for k in range(km):
-            if len[k] > 0:
-                continue
-            print "No data in base period - MONTH,NR,NC", k, nr, nc
-            sum = 0.0
-            m = 0
-            for n in range(nyrs):
-                kn = k+km*n     # CSE for array index
-                if data[kn] >= XBAD:
-                    continue
-                m += 1
-                sum += data[kn]
-            if m == 0:
-                continue
-            bias[k] = float(sum)/float(m)
-        return
-
-    # In Python you can't write to lexically scoped variables in an
-    # output scope.  As a hack workaround we make the buffer a list and
-    # use output_line_buffer[0]
-    output_line_buffer = [None]
-
-    def buffer_line_out(out, line, count=None):
-        """Buffers a line of output so that the output file can be
-        written in trimmed format.  See header comment of trimSBBX.f for
-        details.  out is the (Fortran binary) file on which to output;
-        line is the record to output except for the first word; count is
-        the number of data in this record, it is actually output at the
-        beginning of the _previous_ record.
-        """
-
-        # The assertion only fire after flush_out has been called (see
-        # below); once flush_out has been called, no-one should be
-        # calling this function, so this assertion provides a check that
-        # no-one is.
-        assert output_line_buffer[0] is not IOError
-
-        # Only the first record output (the header row) is allowed to
-        # not specify a count.
-        assert count or not output_line_buffer[0]
-        if output_line_buffer[0] is not None:
-            out.writeline(struct.pack('>i', count) +
-                          output_line_buffer[0])
-        output_line_buffer[0] = line
-
-    def flush_out(out):
-        """Flush the last line of the output file."""
-
-        out.writeline(struct.pack('>i',1) + output_line_buffer[0])
-        # inhibit further output, see buffer_line_out
-        output_line_buffer[0] = IOError
-    
-    def swrite(out, dmin):
-        """Write binary record onto (the binary fortran file opened for
-        writing) out."""
-
-        # The Fortran code uses NSTNS which is actually an alias, via a
-        # COMMON/DIAG/ declaration, to NSTCMB in the main program.  Gak.
-        # See to.SBBXgrid.f lines 103 and 634
-        record = struct.pack('>4i', *latlon)
-        record += struct.pack('>2if', nstcmb, nstmns, dmin)
-        record += struct.pack('>%df' % monm, *avg[-monm:])
-        buffer_line_out(out, record, monm)
-
     # trimmed input files will be assumed.
 
     # Parameters.  These are a mixture of computed constants, and
@@ -561,9 +411,8 @@ def subbox_grid(infile,
 
     radius = float(radius)
 
-    # Fortran version of output file.
-    # must be big-endian because it's a GISTEMP data product.
-    subboxf = fort.File(subbox_out, bos='>')
+    # Critical radius as an angle of arc
+    arc = radius / earth.radius
 
     # number of boxes
     nbox = 80
@@ -586,43 +435,9 @@ def subbox_grid(infile,
     # precision)
     km2persubbox = (4*math.pi*earth.radius**2) / (nbox * nsubbox)
 
-    # Critical radius as an angle of arc
-    arc = radius / earth.radius
-
-    stations = Stations([infile])
-
-    # Output series cannot begin earlier than input series.
-    # See to.SBBXgrid.f line 151
-    if year_begin < stations.yrbeg:
-        year_begin = stations.yrbeg
-
-    BAD = stations.bad
-    XBAD = float(BAD)
+    BAD = giss_data.MISSING
+    XBAD = giss_data.XMISSING
     km = stations.km
-    # Number of months to _output_
-    monm = (stations.yrbeg + (stations.monm//km) - year_begin) * km
-
-    # Output header
-    # See to.SBBXgrid.f lines 160 and following
-    info = list(struct.unpack('8I', stations.header[0][:8*w]))
-    info[0] = 1
-    info[3] = monm
-    info[4] = info[3]+7
-    info[5] = year_begin
-    # The edits to the title are done with it as a list of characters.
-    # It's just easier that way, as slice assignment can be used.
-    title = [' ']*80
-    title[:len(stations.title)] = stations.title
-    title[20:40] = 'ANOM (C)  CR     KM '
-    # Equivalent to to.SBBXgrid.f lines 172 and 115 to 119
-    title[33:37] = '%4d' % int(radius)
-    if stations.kq == 2:
-        title[25:29] = '(mm)'
-    title[46:58] = '%4d-present' % year_begin
-    # Convert title back to traditional string.
-    title = ''.join(title)
-    print title
-    buffer_line_out(subboxf, struct.pack('>7I', *info[1:]) + title)
 
     regions = list(eqarea.gridsub())
     if audit:
@@ -658,15 +473,15 @@ def subbox_grid(infile,
         extent[1] = box[1] + ddlat
 
         regionstations = list(stations.inbox(*extent))
-        if False and audit:
+        if audit:
             print 'UNSORTED LIST'
             for station in regionstations:
                 print station.id
         # Descending sort by number of good records
         # Sadly we cannot use Python's sort method here, we must use an
         # emulation of the GISS Fortran.
-        sort(regionstations, lambda x,y: y.ngood-x.ngood)
-        if True and audit:
+        sort(regionstations, lambda x,y: y.good_count - x.good_count)
+        if audit:
             print 'SORTED LIST'
             for station in regionstations:
                 print station.id
@@ -706,53 +521,67 @@ def subbox_grid(infile,
             wt = [0.0]*stations.monm
             avg = [XBAD]*stations.monm
             if len(station) == 0:
-                swrite(subboxf, dmin=XBAD)
+                box_obj = giss_data.SubboxRecord(
+                    lat_S=latlon[0], lat_N=latlon[1], lon_W=latlon[2],
+                    lon_E=latlon[3], stations=nstcmb, station_months=nstmns,
+                    d=XBAD, series=avg)
                 log.write('\nNo stations for center %+05.1f%+06.1f\n' %
                   (centre))
+                yield box_obj
                 continue
             # Initialise data with first station
             # See to.SBBXgrid.f lines 315 to 330
-            nstmns = station[0].ngood
+            nstmns = station[0].good_count
             nstcmb = 1
-            id0 = [station[0].id]
+            id0 = [station[0].station.uid]
             if audit:
                 print "%+06.2f%+06.2f%+07.2f%+07.2f %s %r" % (subbox[0], subbox[1],
-                    subbox[2], subbox[3], station[0].id, wti[0])
+                    subbox[2], subbox[3], station[0].station.uid, wti[0])
             # :todo: increment use count here. NUSEID
             wmax = wti[0]
             wtm = km * [wti[0]]
             bias = km * [0.0]
-            offset = station[0].databeg
-            avg[offset:station[0].dataend] = station[0].data
-            a = station[0].data # just a temporary
+            #offset = station[0].databeg PAO
+            r = station[0]
+            offset = r.rel_first_month - 1
+            avg[offset:offset + len(r.series_as_tenths)] = r.series_as_tenths
+            a = r.series_as_tenths # just a temporary
             for i in range(len(a)):
                 if a[i] < BAD :
                     wt[i + offset] = wti[0]
             # Add in the remaining stations
             # See to.SBBXgrid.f lines 331 and following
             for i in range(1,len(station)):
+                # TODO: A StationMethod method to produce a padded data series
+                #       would be good here. Hence we could just do:
+                #           dnew = station[i].padded_series(stations.monm)
                 dnew = [XBAD]*stations.monm
-                dnew[station[i].databeg:station[i].dataend] = station[i].data
+                aa, bb = station[i].rel_first_month, station[i].rel_last_month
+                dnew[aa - 1:bb] = station[i].series_as_tenths
                 # index, 0-based, of first year with data
-                nf1 = station[i].databeg // km
+                #nf1 = station[i].databeg // km
+                # TODO: I think first_year/last_year (+1) should work here.
+                nf1 = (station[i].rel_first_month - 1) // km
                 # one more than the index of last year with data
-                nl1 = 1 + (station[i].dataend-1) // km
+                #nl1 = 1 + (station[i].dataend-1) // km
+                nl1 = 1 + station[i].rel_last_month // km
                 if audit:
                     print "ADD %s %r" % (station[i].id, wti[i])
                 nsm = combine(km, XBAD, bias, avg, wt, dnew, nf1, nl1,
-                        wti[i], wtm, station[i].id)
+                        wti[i], wtm, station[i].uid)
                 nstmns += nsm
                 if nsm == 0:
                     continue
                 nstcmb += 1
-                id0.append(station[i].id)
+                # TODO: What is id0 used for?
+                id0.append(station[i].uid)
                 # :todo: increment use count here
                 if wmax < wti[i]:
                     wmax = wti[i]
             # See to.SBBXgrid.f line 354
             # This is conditional in the Fortran code, but in practice
             # NFB is always bigger than 0, so TAVG always gets called.
-            tavg(avg, len(avg)//km, base_year[0]-stations.yrbeg,
+            tavg(km, XBAD, bias, avg, len(avg)//km, base_year[0]-stations.yrbeg,
                 # :todo: remove dummy 99s
                 base_year[1]-stations.yrbeg+1, 99, 99)
             # Subtract BIAS, then scale and write the result to disk
@@ -763,37 +592,12 @@ def subbox_grid(infile,
                         avg[m] = stations.scale*(avg[m]-bias[k])
                     m += 1
                     # :todo: increment LENC
-            swrite(subboxf, dmin=radius*(1-wmax))
-    flush_out(subboxf)
+            box_obj = giss_data.SubboxRecord(n=monm,
+                    lat_S=latlon[0], lat_N=latlon[1], lon_W=latlon[2],
+                    lon_E=latlon[3], stations=nstcmb, station_months=nstmns,
+                    d=radius*(1-wmax), series=avg[:monm])
+            yield box_obj
     print >>log
-
-
-def step3(label='GHCN.CL.PA', radius=1200, audit=None, subbox=()):
-    """Do STEP3 of the GISTEMP algorithm.  label specifies the common part
-    of the filenames for the 6 input files.  The filenames that are
-    actually used as inputs will be formed by prepending "Ts." to label
-    and appending ".n" where n is an integer from 1 to 6.  radius is the
-    RCRIT value used in the algorithm, measured in Kilometres.
-    """
-
-    # Label string including radius
-    labelr = 'Ts.%(label)s.%(radius)d' % locals()
-
-    subbox_grid_output = open('work/SBBX1880.%s' % labelr, 'wb')
-    # This output file doesn't get written.  But it might one day.
-    box_grid_output = open('work/BX.%s' % labelr, 'wb')
-    # This log file doesn't actually get used.  But it might one day.
-    station_use_output = open('log/statn.use.%s' % labelr, 'wb')
-
-    # Open the input file
-    infile = open('work/Ts.%s' % (label), 'rb')
-
-    subbox_grid(infile,
-        subbox_grid_output, box_grid_output, station_use_output,
-        radius=radius, audit=audit, just_subbox=subbox)
-
-    # if [[ $rad -eq 1200 ]] ; then ./zonav $label ; fi
-    # ./trimSBBX SBBX1880.Ts.${label}.$rad
 
 
 # Mostly for debugging.
@@ -843,27 +647,54 @@ def fst(file='Ts.GHCN.CL.PA'):
 
     return Stations([file])
 
-# Strictly utility, not part of the public interface.
-def singlefloat(x):
-    """Convert 32-bit (unsigned) integer to single-precision floating
-    point.  Actually, a Python float (hence a double) of the same value
-    as the single-precision float is returned.
+
+class Step3Iterator(object):
+    def __init__(self, record_source, radius=1200, year_begin=1880,
+            audit=None, subbox=()):
+        # Ensure record_source is a true generator, so we can pop off the
+        # leading meta data before handing the station records to the next
+        # phase.
+        record_source = iter(record_source)
+        m = record_source.next()
+        self.meta = giss_data.SubboxMetaData(m.mo1, m.kq, m.mavg, m.monm,
+                m.monm + 7, m.yrbeg, m.missing_flag, m.precipitation_flag,
+                m.title)
+
+        # Only monthly data supported, indicated by self.meta.mavg == 6, hence
+        # km = 12. Load all the station records into a `Stations` instance.
+        # TODO: The names `Stations` is slightly misleading.
+        assert self.meta.mavg == 6
+        km = 12
+        stations = Stations([record_source], km, self.meta)
+
+        # Output series cannot begin earlier than input series.
+        year_begin = max(year_begin, self.meta.yrbeg)
+        monm = (self.meta.yrbeg + (self.meta.monm // km) - year_begin) * km
+
+        units = '(C)'
+        if stations.kq == 2:
+            units = '(mm)'
+        title = "%20.20s ANOM %-4s CR %4dKM %s-present" % (self.meta.title,
+                units, radius, year_begin)
+        self.meta.mo1 = 1
+        self.meta.title = title.ljust(80)
+
+        self.box_source = iter_subbox_grid(stations, monm,
+                radius=radius, base_year=(1951,1980), audit=None,
+                just_subbox=subbox)
+
+    def __iter__(self):
+        return self._it()
+
+    def _it(self):
+        yield self.meta
+        for box in self.box_source:
+            yield box
+
+
+def step3(record_source, radius=1200, year_begin=1880, audit=None, subbox=()):
+    """Step 3 of the GISS processing.
+
     """
-
-    return struct.unpack('f', struct.pack('I', x))[0]
-
-def main(argv=None):
-    if argv is None:
-        argv = sys.argv
-    audit = None
-    subbox = ()
-    opt,arg = getopt.getopt(argv[1:], 'a:s:')
-    for o,v in opt:
-        if o == '-a':
-            audit = eval(v, {'__builtins__':None})
-        if o == '-s':
-            subbox = map(int, v.split(','))
-    return step3(audit=audit, subbox=subbox)
-
-if __name__ == '__main__':
-    main(argv=sys.argv)
+    return Step3Iterator(record_source,
+            radius=radius, year_begin=year_begin, audit=audit, subbox=subbox)

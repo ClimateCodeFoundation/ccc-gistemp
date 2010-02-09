@@ -14,11 +14,9 @@ __docformat__ = "restructuredtext"
 import sys
 import math
 import itertools
-import read_config
 
 import earth
-import fort
-import ccc_binary
+import giss_data
 
 BAD = 9999
 
@@ -36,11 +34,12 @@ def valid(x):
     # return 0 or 1 (or False or True, which it does).
     return not invalid(x)
 
-def read_text():
+
+def load_time_series(record_source):
     """ Reads the data file work/Ts.txt, output by step 1, and returns
     an iterator of the contents.
 
-    Each item in the iterator is a pair (dict, series).  dict contains
+    Each item in the iterator is a pair (station, series).  station contains
     station information, and series contains the temperature series,
     as a list of monthly values.  Each value is an integer in tenths
     of degrees C.
@@ -49,64 +48,35 @@ def read_text():
     files may not be necessary, and their formats are a little
     awkward, but retained for now for testing against Fortran.
     """
-
-    v2_inv = read_config.v2_get_info()
-    in_file = open("work/Ts.txt")
-    short_station_log = open('log/short.station.list', "w")
-    station_log = open('log/station.log', "w")
-    mult = 0
-    last_id11 = None
     minimum_monthly_max = 20
-    min_year = 1880
 
-    for (station_line, lines) in itertools.groupby(in_file, lambda line: line[0] == ' '):
-        if station_line: # line beginning with a blank introduces a new station
-            lines = list(lines)
-            assert len(lines) == 1
-            line = lines[0]
-            id12 = line[10:22]
-            id11 = id12[:11]
-            if id11 == last_id11:
-                mult += 1
-            else:
-                mult = 0
-                last_id11 = id11
-            dict = v2_inv[id11].copy()
-            dict['id'] = id12
-        else: # lines consists of the temperature series
-            series = []
-            monthly_valid = [0] * 12
-            min_month = None
-            for line in lines:
-                data = map(int, line.split())
-                year = int(data[0])
-                if not dict.has_key('begin'):
-                    dict['begin'] = year
-                monthlies = data[1:]
-                for month in range(12):
-                    if valid(monthlies[month]):
-                        monthly_valid[month] += 1
-                        if min_month is None:
-                            min_month = month + 12*year
-                        max_month = month + 12*year
-                series.extend(monthlies)
-            mmax = max(monthly_valid)
-            station_log.write("%12d%12d%12d%12d%12d%12d\n" % (
-                    mult, int(dict['id'][3:]), mmax, minimum_monthly_max,
-                    min_month - min_year * 12 + 1,
-                    max_month - min_year * 12 + 1))
-            if mmax >= minimum_monthly_max:
-                dict['end'] = year
-                dict['years'] = dict['end'] - dict['begin'] + 1
-                dict['min_month'] = min_month
-                dict['max_month'] = max_month
-                yield (dict, series)
-            else:
-                short_station_log.write("%12d  %30s%c%c%c%3s dropped\n" %
-                                        (int(dict['id'][3:]), dict['name'],
-                                         dict['US-brightness'],
-                                         dict['pop'], dict['GHCN-brightness'],
-                                         dict['id'][:3]))
+    station_log = open('log/station.log', "w")
+    short_station_log = open('log/short.station.list', "w")
+
+    mult = 0
+    last_station_uid = None
+    for record in record_source:
+        if record.station_uid == last_station_uid:
+            mult += 1
+        else:
+            mult = 0
+            last_station_uid = record.station_uid
+
+        station = record.station
+        mmax = max(record.get_monthly_valid_counts())
+        station_log.write("%12d%12d%12d%12d%12d%12d\n" % (
+                mult, record.short_id, mmax, minimum_monthly_max,
+                record.rel_first_month + record.good_start_idx,
+                record.rel_first_month + record.good_end_idx - 1))
+        if mmax >= minimum_monthly_max:
+            yield record
+        else:
+            short_station_log.write("%12d  %30s%c%c%c%3s dropped\n" %
+                    (record.short_id, station.name,
+                    station.US_brightness,
+                    station.pop, station.GHCN_brightness,
+                    record.uid[:3]))
+
 
 def invnt(name, stream):
     """Turns the data *stream* into a station list, in log/*name*.station.list,
@@ -116,26 +86,32 @@ def invnt(name, stream):
     """
     
     log = open('log/%s.station.list' % name,'w')
-    for (dict, series) in stream:
+    for record in stream:
+        station = record.station
         log.write("work/%s %9d %-30s lat,lon (.1deg)%5d%6d %s%s%s cc=%3s\n" % (
-                  name, int(dict['id'][3:12]), dict['name'],
-                  math.floor(dict['lat'] * 10.0 + 0.5),
-                  math.floor(dict['lon'] * 10.0 + 0.5),
-                  dict['pop'], dict['US-brightness'], dict['GHCN-brightness'], dict['id'][:3]))
-        yield (dict, series)
+                  name, int(record.uid[3:12]), station.name,
+                  math.floor(station.lat * 10.0 + 0.5),
+                  math.floor(station.lon * 10.0 + 0.5),
+                  station.pop, station.US_brightness,
+                  station.GHCN_brightness, record.uid[:3]))
+        yield record
     log.close()
 
 def annual_anomalies(stream):
     """Iterates over the station record *stream*, returning an
     iterator giving an annual anomaly series for each station as
-    (dict, anoms).  The algorithm is as follows: compute monthly
+    (station, anoms).  The algorithm is as follows: compute monthly
     averages, then monthly anomalies, then seasonal anomalies (means
     of monthly anomalies for at least two months) then annual
     anomalies (means of seasonal anomalies for at least three
     seasons).
     """
 
-    for (dict, series) in stream:
+    all = []
+    for record in stream:
+        station = record.station
+        all.append(record)
+        series = record.series_as_tenths
         monthly_means = []
         for m in range(12):
             month_data = filter(valid, series[m::12])
@@ -173,14 +149,16 @@ def annual_anomalies(stream):
                 annual_anoms.append(BAD)
         
         if first is not None:
-            dict['first'] = first + dict['begin']
-            dict['last'] = last + dict['begin']
-            yield (dict, annual_anoms[first: last+1])
+            record.first = first + record.first_year
+            record.last = last + record.first_year
+            record.anomolies = annual_anoms[first: last+1]
+            yield record
 
-def is_rural(dict):
-    """Test whether the station described by *dict* is rural.
+def is_rural(station):
+    """Test whether the station described by *station* is rural.
     """
-    return dict['US-brightness'] == '1' or (dict['US-brightness'] == ' ' and dict['pop'] == 'R')
+    return station.US_brightness == '1' or (station.US_brightness == ' ' and
+            station.pop == 'R')
 
 class Struct(object):
     pass
@@ -196,7 +174,7 @@ g.slpx = 0.5
 g.log = None
 
 def urban_adjustments(anomaly_stream):
-    """Takes an iterator of station annual anomaly records (*dict*,
+    """Takes an iterator of station annual anomaly records (*station*,
     *series*) and produces an iterator of urban adjustment parameters
     records.  The urban adjustment parameters describe a two-part
     linear fit to the difference in annual anomalies between an urban
@@ -242,15 +220,21 @@ def urban_adjustments(anomaly_stream):
     f79 = open("log/PApars.noadj.stations.list", "w")
 
     last_year = int(open('work/GHCN.last_year', 'r').read().strip())
-    iyoff = 1879
+    iyoff = giss_data.BASE_YEAR - 1
     iyrm = last_year - iyoff
 
     rural_stations = []
     urban_stations = []
+    urban_lkup = {}
  
     pi180 = math.pi / 180.0
 
-    for (dict, anomalies) in anomaly_stream:
+    all = []
+    for record in anomaly_stream:
+        station = record.station
+        all.append(record)
+        record.urban_adjustment = None
+        anomalies = record.anomolies
         length = len(anomalies)
         # convert anomalies back from int to float;
         # TODO: preserve as float between annual_anomalies and here.
@@ -259,8 +243,8 @@ def urban_adjustments(anomaly_stream):
                 anomalies[i] *= 0.1
 
         # throw away some precision in lat/lon for compatibility with Fortran
-        lat = 0.1 * math.floor(dict['lat']* 10 + 0.5)
-        lon = 0.1 * math.floor(dict['lon']* 10 + 0.5)
+        lat = 0.1 * math.floor(station.lat * 10 + 0.5)
+        lon = 0.1 * math.floor(station.lon * 10 + 0.5)
 
         d = Struct()
         d.anomalies = anomalies
@@ -268,14 +252,17 @@ def urban_adjustments(anomaly_stream):
         d.snlat = math.sin(lat * pi180)
         d.cslon = math.cos(lon * pi180)
         d.snlon = math.sin(lon * pi180)
-        d.id = dict['id']
-        d.first_year = dict['first'] - iyoff
+        d.id = record.uid
+        d.first_year = record.first - iyoff
         d.last_year = d.first_year + length - 1
         d.uses = 0
-        if is_rural(dict):
+        d.station = station
+        d.record = record
+        if is_rural(station):
             rural_stations.append(d)
         else:
             urban_stations.append(d)
+            urban_lkup[record] = d
 
     nstau = len(urban_stations)        # total number of bright / urban or dim / sm.town stations
     nstar = len(rural_stations)        # total number of dark / rural stations
@@ -283,19 +270,25 @@ def urban_adjustments(anomaly_stream):
 
     # Sort the rural stations according to the length of the time record
     # (ignoring gaps).
-    for i, station in enumerate(rural_stations):
-        station.recLen = len([v for v in station.anomalies if valid(v)])
-        station.index = i
+    for i, st in enumerate(rural_stations):
+        st.recLen = len([v for v in st.anomalies if valid(v)])
+        st.index = i
         g.log.write(" rural station: %11d  id: %s  #ok %11d\n" % (
-                    i + 1, station.id, station.recLen))
+                    i + 1, st.id, st.recLen))
     rural_stations.sort(key=lambda s:s.recLen)
     rural_stations.reverse()
-    for i, station in enumerate(rural_stations):
+    for i, st in enumerate(rural_stations):
         g.log.write(" rural station: %11d  id: %s  #ok %11d\n" % (
-                    i + 1, station.id, station.recLen))
+                    i + 1, st.id, st.recLen))
 
     # Combine time series for rural stations around each urban station
-    for us in urban_stations:
+    for record in all:
+        station = record.station
+        us = urban_lkup.get(record, None)
+        if us is None:
+            yield record
+            continue
+
         iyu1 = us.first_year + iyoff - 1           # subtract 1 for a possible partial yr
         iyu2 = us.last_year + iyoff + 1            # add 1 for partial year
 
@@ -319,7 +312,8 @@ def urban_adjustments(anomaly_stream):
                     needNewNeighbours = True
                     continue
 
-                counts, urban_series, combined = combine_neighbors(us, iyrm, iyoff, neighbors, minimum_overlap)
+                counts, urban_series, combined = combine_neighbors(
+                        us, iyrm, iyoff, neighbors, minimum_overlap)
                 iy1 = 1
                 needNewNeighbours = False
 
@@ -353,6 +347,7 @@ def urban_adjustments(anomaly_stream):
                     us.id, 1 + iyoff, iy1 - 1 + iyoff))
 
         if dropStation:
+            yield record
             continue
 
         #===  c subtract urban station and call a curve fitting program
@@ -376,7 +371,9 @@ def urban_adjustments(anomaly_stream):
                  n2x = iyu2
 
         flag = flags(fit, first + iyoff, last + iyoff)
-        yield (us.id, fit, first + iyoff, last + iyoff, n1x, n2x, flag)
+        us.record.urban_adjustment = (us.id, fit, first + iyoff, 
+                last + iyoff, n1x, n2x, flag)
+        yield us.record
 
     nuse = 0
     for rs in rural_stations:
@@ -459,7 +456,8 @@ def combine_neighbors(us, iyrm, iyoff, neighbors, minimum_overlap):
                     rs.id))
         dnew = [BAD] * iyrm
         dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
-        nsm, ncom = cmbine(combined, weights, counts, dnew, rs.first_year, rs.last_year, rs.weight, minimum_overlap)
+        nsm, ncom = cmbine(combined, weights, counts, dnew, rs.first_year,
+            rs.last_year, rs.weight, minimum_overlap)
         g.log.write(" data added:  %11d  overlap: %11d  years\n" % (nsm, ncom))
         if nsm != 0:
             rs.uses += 1
@@ -508,7 +506,8 @@ def prepare_series(iy1, iyrm, combined, urban_series, counts, f, iyoff, x, minim
     return quorate_count, first, last, quorate_period_total, length
 
     
-def cmbine(combined, weights, counts, data, first, last, weight, minimum_overlap):
+def cmbine(combined, weights, counts, data, first, last, weight,
+        minimum_overlap):
     """Adds the array *data* with weight *weight* into the array of
     weighted averages *combined*, with total weights *weights* and
     combined counts *counts* (that is, entry *combined[i]* is the
@@ -683,7 +682,8 @@ def flags(fit, iy1, iy2):
         g.nsw0 += 1
     return iflag
 
-def apply_adjustments(stream, adjustments):
+#def apply_adjustments(stream, adjustments):
+def apply_adjustments(stream):
     """Applies the urban adjustment records from the iterator
     *adjustments* to the station records in *stream*.  Returns an
     iterator of adjusted station records.
@@ -705,63 +705,67 @@ def apply_adjustments(stream, adjustments):
     log = open('log/padjust.log', 'w')
     first_year = 1880
     adj_dict = {}
-    for adjustment in adjustments:
-        id = adjustment[0]
-        adj_dict[id] = adjustment
 
-    for (dict, series) in stream:
+    for record in stream:
+        station = record.station
+        series = record.series_as_tenths
         report_name = "%s%c%c%c%3s" % (
-                      dict['name'], dict['US-brightness'],
-                      dict['pop'], dict['GHCN-brightness'], dict['id'][:3])
-        report_station = "station   %9d" % int(dict['id'][3:])
-        if adj_dict.has_key(dict['id']):
+                      station.name, station.US_brightness,
+                      station.pop, station.GHCN_brightness, station.uid[:3])
+        report_station = "station   %9d" % int(record.uid[3:])
+        if record.urban_adjustment is not None:
             # adjust
-            m1 = dict['min_month'] - first_year * 12 + 1  # number of first valid month
-            m2 = dict['max_month'] - first_year * 12 + 1  # number of last valid month
-            offset = dict['min_month'] - dict['begin'] * 12 # index of first valid month
-            (_, fit, iy1, iy2, iy1e, iy2e, flag) = adj_dict[dict['id']]
-            a, b = adj(first_year, dict, series, fit, iy1e, iy2e, iy1, iy2, flag, m1, m2, offset)
+            m1 = record.rel_first_month + record.good_start_idx
+            m2 = record.rel_first_month + record.good_end_idx - 1
+            offset = record.good_start_idx # index of first valid month
+            (_, fit, iy1, iy2, iy1e, iy2e, flag) = record.urban_adjustment
+            a, b = adj(first_year, record, series, fit, iy1e, iy2e, iy1, iy2,
+                    flag, m1, m2, offset)
             # a and b are numbers of new first and last valid months
             log.write(" %s  %s saved\n" % (report_station, report_name))
-            log.write(" %s  %s adjusted %s %s\n" % (report_station, report_name, (m1, m2), (a, b)))
+            log.write(" %s  %s adjusted %s %s\n" % (report_station, report_name,
+                (m1, m2), (a, b)))
             aa = a - m1
             bb = b - a + 1
-            log.write("ADJ %s %s %s %s %s\n" % (report_name, len(series), len(series), aa, bb))
-            series = series[aa + offset:aa + offset + bb]
-            dict['begin'] = ((a-1) / 12) + first_year
-            dict['first'] = dict['begin']
-            dict['min_month'] = a-1 + first_year * 12
-            dict['max_month'] = b-1 + first_year * 12
-            dict['end'] = ((b-1) / 12) + first_year
-            dict['last'] = dict['end']
-            log.write("%s %s\n" % (len(series), len(series)))
-            yield(dict, series)
+            log.write("ADJ %s %s %s %s %s\n" % (report_name, len(series), len(series),
+                aa, bb))
+            record.set_series_from_tenths(a-1 + first_year * 12 + 1,
+                    series[aa + offset:aa + offset + bb])
+            record.begin = ((a-1) / 12) + first_year
+            record.first = record.begin
+            record.end = ((b-1) / 12) + first_year
+            record.last = record.last_year
+            log.write("%s %s\n" % (len(record.series_as_tenths),
+                len(record.series_as_tenths)))
+            yield record
             log.write(" %s  %s saved\n" % (report_station, report_name))
         else:
-            if is_rural(dict):
-                # rural station: not adjusted
-                offset = dict['min_month'] - dict['begin'] * 12 # index of first valid month
-                length = dict['max_month'] - dict['min_month'] + 1
-                series = series[offset : offset + length]
-                dict['begin'] = dict['first']
-                dict['end'] = dict['last']
-                yield (dict, series)
+            if is_rural(station):
+                # Just remove leading/trailing invalid values for rural stations.
+                record.strip_invalid()
+                record.begin = record.first
+                record.end = record.last
+                yield record
                 log.write(" %s  %s saved\n" % (report_station, report_name))
             else:
                 # unadjusted urban station: skip
                 log.write(" %s  %s skipped\n" % (report_station, report_name))
 
-def adj(first_year, dict, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offset):
+def adj(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offset):
     (sl1, sl2, knee, sl0) = fit
     if iflag not in (0, 100):
         # Use linear approximation
         sl1, sl2 = sl0, sl0
 
     base = m1
+    #print "CC>>", first_year, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offset
+    #print "    ", sl1, sl2, knee, sl0
+    #print "    ", base
 
     m1o, m2o = m1, m2
     m1 = -100
     m0 = 12 * (iy1 - first_year)   # Dec of year iy1
+    #print "    ", m1o, m2o, m1, m0, series[0], series[1], series[-1]
     for iy in range(iy1, iy2 + 1):
         sl = sl1
         if iy > knee:
@@ -786,99 +790,58 @@ def adj(first_year, dict, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offs
 
     return m1, m2
 
-def results_to_text(input_name, output_name):
-    """ Useful for debugging.  Takes a trimmed data file
-    *input_name* and produces a text equivalent called *output_name*.
-    """
 
-    infile = fort.open(input_name, "rb")
-    outfile = open(output_name, 'w')
-
-    header = ccc_binary.CCHeader(infile.readline())
-    outfile.write("'%s' %s\n" % (header.title, header.info))
-
-    m1 = header.info[0]
-    m2 = header.info[8]
-
-    for s in infile:
-        nMonths = m2 - m1 + 1
-        rec = ccc_binary.CCRecord(nMonths, data=s)
-        outfile.write("id %d lat %d lon %d height %d name %s m1 %d m2 %d\n" % (
-                rec.ID, rec.Lat, rec.Lon, rec.iht, rec.name, rec.m1, rec.m2))
-        outfile.write("%s\n" % rec.idata)
-        m1 = rec.m1
-        m2 = rec.m2
-
-def write_results(stream, filename):
-    """ Takes a *stream* of step2 result records and writes them to
-    a Fortran-format binary file named *filename*.
-    """
-
-    first_year = 1880
-    last_year = int(open('work/GHCN.last_year', 'r').read().strip())
-    MTOT = 12 * (last_year - first_year + 1)
-    header = ccc_binary.CCHeader()
-    header.title = 'GHCN V2 Temperatures (.1 C)'
-    header.info[1] = 1
-    header.info[2] = 6
-    header.info[3] = MTOT
-    header.info[4] = MTOT+15
-    header.info[5] = 1880
-    header.info[6] = 9999
-    header.info[7] = -9999
-
-    outfile = fort.open(filename, "wb")
-
-    header_written = False
-
-    for (dict, series) in stream:
-        m1 = dict['min_month'] - first_year * 12 + 1
-        m2 = dict['max_month'] - first_year * 12 + 1
-        if header_written:
-            rec.m1 = m1
-            rec.m2 = m2
-            outfile.writeline(rec.binary)
-        else:
-            header.info[0] = m1
-            header.info[8] = m2
-            outfile.writeline(header.binary)
-            header_written = True
-        rec = ccc_binary.CCRecord(m2 - m1 + 1)
-        rec.idata = series
-        rec.Lat = math.floor(dict['lat'] * 10 + 0.5)
-        rec.Lon = math.floor(dict['lon'] * 10 + 0.5)
-        rec.iht = int(dict['elevs'])
-        rec.ID = int(dict['id'][3:])
-        rec.name = "%s%c%c%c%3s" % (dict['name'], dict['US-brightness'],
-                                    dict['pop'], dict['GHCN-brightness'], dict['id'][:3])
-
-    rec.m1 = 9999
-    rec.m2 = 9999
-    outfile.writeline(rec.binary)
+class Step2Iterator(object):
+    """An iterator for step 2.
     
-def main(argv=None):
-    if argv is None:
-        argv = sys.argv
+    An instance of this class acts as an iterator that produces a stream of
+    `giss_data.StationRecord` instances.
 
-    data = invnt('Ts.GHCN.CL', read_text())
-    # At this point we may need to reorder the data so that all the
-    # stations between +60.1 and +90.0 comes first, then all the
-    # stations between +30.1 and +60.0 come next, and so on.  Thus
-    # reflecting how GISTEMP re-orders them when they are split into 6
-    # files.  Doing the reordering makes a tiny amount of difference,
-    # see http://code.google.com/p/ccc-gistemp/issues/detail?id=25
-    #
-    # But if you feel like doing this, you'll need to look at the, now
-    # deleted, split_binary.py program to see exactly how the split
-    # happens.
+    """
+    def __init__(self, record_source):
+        """Constructor:
 
-    (data_1, data_2) = itertools.tee(data, 2)
+        :Param record_source:
+            An iterable source of `giss_data.StationRecord` instances.
 
-    anomalies = annual_anomalies(data_1)
-    adjustments = urban_adjustments(anomalies)
+        """
+        self.record_source = record_source
+
+        #self.first_year = giss_data.BASE_YEAR
+        last_year = giss_data.get_ghcn_last_year()
+        #MTOT = 12 * (last_year - self.first_year + 1)
+        MTOT = 12 * (last_year - giss_data.BASE_YEAR + 1)
+
+        self.meta = giss_data.StationMetaData(
+                mo1=None, kq=1, mavg=6, monm=MTOT, monm4=MTOT + 15,
+                yrbeg=1880, missing_flag=9999, precipitation_flag=-9999,
+                mlast=None, title='GHCN V2 Temperatures (.1 C)')
+
+    def __iter__(self):
+        return self._it()
+
+    def _it(self):
+        # First record is the data-set metadata.
+        yield self.meta
+
+        data = invnt('Ts.GHCN.CL', load_time_series(self.record_source))
+        # At this point we may need to reorder the data so that all the
+        # stations between +60.1 and +90.0 comes first, then all the
+        # stations between +30.1 and +60.0 come next, and so on.  Thus
+        # reflecting how GISTEMP re-orders them when they are split into 6
+        # files.  Doing the reordering makes a tiny amount of difference,
+        # see http://code.google.com/p/ccc-gistemp/issues/detail?id=25
+        #
+        # But if you feel like doing this, you'll need to look at the, now
+        # deleted, split_binary.py program to see exactly how the split
+        # happens.
+
+        anomalies = annual_anomalies(data)
+        adjustments = urban_adjustments(anomalies)
+        adjusted = invnt('Ts.GHCN.CL.PA', apply_adjustments(adjustments))
+        for record in adjusted:
+            yield record
+
     
-    adjusted = invnt('Ts.GHCN.CL.PA', apply_adjustments(data_2, adjustments))
-    write_results(adjusted, 'work/Ts.GHCN.CL.PA')
-
-if __name__ == '__main__':
-    main()
+def step2(record_source):
+    return Step2Iterator(record_source)

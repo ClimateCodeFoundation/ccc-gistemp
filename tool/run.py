@@ -22,8 +22,22 @@ import os
 # http://www.python.org/doc/2.4.4/lib/module-sys.html
 import sys
 
-# Clear Climate Code
-sys.path.append(os.path.join(os.getcwd(),'code'))
+# Extend sys.path to support access to all the clear climate code.
+import extend_path
+import tool.step0
+import tool.step1
+import tool.step2
+import tool.step3
+import tool.step4
+import tool.step5
+
+import code.step0
+import code.step1
+import code.step2
+import code.step3
+import code.step4
+import code.step5
+
 
 class Fatal(Exception):
     def __init__(self, msg):
@@ -44,38 +58,50 @@ def mkdir(path):
         log("... creating directory %s" % path)
         os.makedirs(path)
 
-def run_step0():
-    log("====> STEP 0 ====")
-    import step0
-    step0.main()
 
-def run_step1():
-    log("====> STEP 1 ====")
-    import step1
-    step1.main()
+def run_step(source, sink):
+    for record in source:
+        sink.add_record(record)
+    sink.close()
 
-def run_step2():
-    log("====> STEP 2 ====")
-    import step2
-    step2.main()
 
-def run_step3():
-    log("====> STEP 3 ====")
-    import step3
-    step3.main([])
+def run_step0(options):
+    source = tool.step0.get_step_iter()
+    sink = tool.step0.get_outputs()
+    run_step(source, sink)
 
-def run_step4():
-    log("====> STEP 4 ====")
-    import step4
-    return step4.main(verbose=1)
 
-def run_step5():
-    log("====> STEP 5 ====")
+def run_step1(options):
+    source = tool.step1.get_step_iter(steps=options.steps)
+    sink = tool.step1.get_outputs()
+    run_step(source, sink)
+
+
+def run_step2(options):
+    source = tool.step2.get_step_iter(steps=options.steps)
+    sink = tool.step2.get_outputs()
+    run_step(source, sink)
+
+
+def run_step3(options):
+    source = tool.step3.get_step_iter(steps=options.steps)
+    sink = tool.step3.get_outputs()
+    run_step(source, sink)
+
+
+def run_step4(options):
+    source = tool.step4.get_step_iter(steps=options.steps)
+    sink = tool.step4.get_outputs()
+    run_step(source, sink)
+
+
+def run_step5(options):
+    inputs = tool.step5.get_inputs(steps=options.steps)
+
     # Save standard output so we can restore it when we're done with this step.
     old_stdout = sys.stdout
 
-    import step5
-    step5.main([])
+    code.step5.step5(inputs)
 
     log("... running vischeck")
     import vischeck
@@ -88,37 +114,48 @@ def run_step5():
     # Restore standard output.
     sys.stdout = old_stdout
 
-def main(argv = None):
+
+def parse_steps(steps):
+    steps = steps.strip()
+    if not steps:
+        return range(0, 6)
+    try:
+        step = int(steps)
+        return [step]
+
+    except (TypeError, ValueError):
+        try:
+            a, b = [int(v) for v in steps.split(",")]
+            return range(a, b + 1)
+
+        except ValueError:
+            sys.exit("Do not understand steps arg %r" % steps)
+
+
+def parse_options():
+    import optparse
+    usage = "usage: %prog [options]"
+    parser = optparse.OptionParser(usage)
+
+    parser.add_option("-s", "--steps", action="store", metavar="S[,S]",
+            default="",
+            help="Select range of steps to run")
+    parser.add_option("--save-work_files", action="store_true",
+            help="Save intermediate files in the work sub-directory")
+    options, args = parser.parse_args()
+    if len(args) != 0:
+        parser.error("Unexpected arguments")
+
+    options.steps = parse_steps(options.steps)
+    return options, args
+
+
+def main(options, args):
     # http://www.python.org/doc/2.4.4/lib/module-time.html
     import time
 
-    if argv is None:
-        argv = sys.argv
+    step_list = options.steps
     try:
-        # By default, run all steps.
-        steps = '0,1,2,3,4,5'
-        
-        # Parse command-line arguments.
-        try:
-            opts, args = getopt.getopt(argv[1:], 'hs:',
-                                       ['help', 'step=', 'steps='])
-            for o, a in opts:
-                if o in ('-h', '--help'):
-                    print __doc__
-                    return 0
-                elif o in ('-s', '--step', '--steps'):
-                    steps = a
-                else:
-                    raise Fatal("Unsupported option: %s" % o)
-        except getopt.error, msg:
-            raise Fatal(str(msg))
-
-        try:
-            step_list = map(int, steps.split(','))
-        except ValueError:
-            raise Fatal("--steps must be a comma-separated list of numbers, "
-                        "not '%s'." % steps)
-
         rootdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         if os.getcwd() != rootdir:
             raise Fatal("The GISTEMP procedure must be run from the root "
@@ -144,20 +181,21 @@ def main(argv = None):
         # Record start time now, and ending times for each step.
         laptime = [time.time()]
         elapsed = []
-        for s in step_list:
-            if not step_fn.has_key(s):
-                raise Fatal("Can't run step %d" % s)
-            ret = step_fn[s]()
-            if ret not in (0, None):
-                raise Fatal("Step %d failed" % s)
-            laptime.append(time.time())
-            elapsed.append(laptime[-1] - laptime[-2])
-            log("STEP %s took %.1f seconds" %
-                  (s, elapsed[-1]))
+        s = max(step_list)
 
-        log("====> Timing Summary ====")
-        for step,took in zip(step_list, elapsed):
-            log("STEP %s: %6.1f seconds" % (step, took))
+        if not step_fn.has_key(s):
+            raise Fatal("Can't run step %d" % s)
+
+        log("====> STEPS %d to %d  ====" % (step_list[0], step_list[-1]))
+        ret = step_fn[s](options)
+        #laptime.append(time.time())
+        #elapsed.append(laptime[-1] - laptime[-2])
+        #log("STEP %s took %.1f seconds" %
+        #      (s, elapsed[-1]))
+
+        #log("====> Timing Summary ====")
+        #for step,took in zip(step_list, elapsed):
+        #    log("STEP %s: %6.1f seconds" % (step, took))
 
         return 0
     except Fatal, err:
@@ -165,5 +203,7 @@ def main(argv = None):
         sys.stderr.write('\n')
         return 2
 
+
 if __name__ == '__main__':
-    sys.exit(main())
+    options, args = parse_options()
+    sys.exit(main(options, args))

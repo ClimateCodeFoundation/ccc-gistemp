@@ -1,58 +1,59 @@
 #!/usr/bin/env python
-#
-# $Id: //info.ravenbrook.com/project/ccc/master/code/ncartotext.py#6 $
+# $URL$
+# $Rev$
 #
 # ncartotext.py
 #
 # David Jones.  Ravenbrook Limited.  2008-08-13
-#
-# Command line tool for converting Fortran binary NCAR file
-# into text format.  The NCAR format is the input to STEP3 of GISTEMP.
-# It is at least partly documented in the header comment of the file
-# to.SBBXgrid.f .
-#
-# The name NCAR is taken from the comments at the top of to.SBBXgrid.f;
-# it seems doubtful that NCAR really exists as a proper
-# format, it is simply what one (Fortran) program happens to output and
-# another happens to read.  Or, it just might stand for National Center
-# for Atmospheric Research (in the US).
-#
-# The output format consists of a header line containing metadata for
-# the file, followed by one line for each station.
-#
-# Each station line consists of metadata followed by (temperature) data:
-# ID 101603550002 SKIKDA                         *UC +36.90+007.00+0007 M1043
-# Considering the line as a series of words separated by spaces, the
-# words in order are:
-# ID: the literal word "ID" to remind you that the station ID follows.
-# station-id: 12-digit station ID.  The first 3 digits identify the
-#   country.
-# name: The name of the station.  Any spaces internal to the station
-#   name are replaced with underscores.  Trailing spaces are preserved,
-#   making it neater, but also preserving both the fixed-width format
-#   and the "words separated by spaces" format.
-# misc: A 3-character word giving miscellaneous metadata.  The first
-#   character gives the USHCN-brightness index (0/1/2), '*' when this
-#   metadata is absent (typicaly for non-USHCN stations); second
-#   character gives the population index (U/S/R for Urban, Suburban,
-#   Rural, respectively); third character gives the GHCN-brightness
-#   index (A/B/C).
-# location: The location of the station in ISO 6709 notation.  Latitude
-#   and longitude (in decimal degrees), height.  All values signed.
-#   When height is not available it appears as -0999
-# first-month: the character "M" followed by a 4-digit number.  The
-#   number denotes the first month of the station data, where 1 denotes
-#   January of the first year (see YRBEG from the file metadata);
-#   subsequent months have subsequent numbers.  Thus 1043 denotes
-#   November of YRBEG+86.
-# Following the station metadata, on the same line, is the station data
-#   one word for each month.  Missing data are denoted by using the BAD
-#   value (see file metadata), which is typically 9999.
-#
-# Written according to the Python 2.3 documentation:
-# http://www.python.org/doc/2.3.5/
-# It should therefore work with Python version 2.3 and any future
-# compatible versions.
+
+"""
+Command line tool for converting Fortran binary NCAR file
+into text format.  The NCAR format is the input to STEP3 of GISTEMP
+(hence the ouput of STEP2).  It is at least partly documented in
+the header comment of the file to.SBBXgrid.f .
+
+The name NCAR is taken from the comments at the top of to.SBBXgrid.f;
+I have no idea if this is an actual documented format, but NCAR
+probably stands for National Center for Atmospheric Research
+(in the US).
+
+The output format consists of a header line containing metadata for
+the file, followed by one line for each station.
+
+Each station line consists of metadata followed by (temperature) data:
+ID 101603550002 SKIKDA                         *UC +36.90+007.00+0007 M1043
+Considering the line as a series of words separated by spaces, the
+words in order are:
+ID: the literal word "ID" to remind you that the station ID follows.
+station-id: 12-digit station ID.  The first 3 digits identify the
+  country.
+name: The name of the station.  Any spaces internal to the station
+  name are replaced with underscores.  Trailing spaces are preserved,
+  making it neater, but also preserving both the fixed-width format
+  and the "words separated by spaces" format.
+misc: A 3-character word giving miscellaneous metadata.  The first
+  character gives the USHCN-brightness index (0/1/2), '*' when this
+  metadata is absent (typicaly for non-USHCN stations); second
+  character gives the population index (U/S/R for Urban, Suburban,
+  Rural, respectively); third character gives the GHCN-brightness
+  index (A/B/C).
+location: The location of the station in ISO 6709 notation.  Latitude
+  and longitude (in decimal degrees), height.  All values signed.
+  When height is not available it appears as -0999
+first-month: the character "M" followed by a 4-digit number.  The
+  number denotes the first month of the station data, where 1 denotes
+  January of the first year (see YRBEG from the file metadata);
+  subsequent months have subsequent numbers.  Thus 1043 denotes
+  November of YRBEG+86.
+Following the station metadata, on the same line, is the station data
+  one word for each month.  Missing data are denoted by using the BAD
+  value (see file metadata), which is typically 9999.
+
+Written according to the Python 2.3 documentation:
+http://www.python.org/doc/2.3.5/
+It should therefore work with Python version 2.3 and any future
+compatible versions.
+"""
 
 # http://www.python.org/doc/2.3.5/lib/module-getopt.html
 import getopt

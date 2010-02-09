@@ -54,17 +54,21 @@
 # It should therefore work with Python version 2.3 and any future
 # compatible versions.
 
-# Ravenbrook
-sys.path.append(os.path.join(os.getcwd(),'code'))
-import fort
 # http://www.python.org/doc/2.3.5/lib/module-getopt.html
 import getopt
+# http://www.python.org/doc/2.4.4/lib/module-os.html
+import os
 # http://www.python.org/doc/2.3.5/lib/module-re.html
 import re
 # http://www.python.org/doc/2.3.5/lib/module-struct.html
 import struct
 # http://www.python.org/doc/2.3.5/lib/module-sys.html
 import sys
+
+# Allows imports from the code directory.
+sys.path.append(os.path.join(os.getcwd(),'code'))
+# Clear Climate Code
+import fort
 
 # Move somewhere else?
 def iso6709(lat, lon, height=None):

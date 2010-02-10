@@ -178,6 +178,7 @@ def main(options, args):
             4: run_step4,
             5: run_step5,
         }
+        
         # Record start time now, and ending times for each step.
         laptime = [time.time()]
         elapsed = []
@@ -187,7 +188,20 @@ def main(options, args):
             raise Fatal("Can't run step %d" % s)
 
         log("====> STEPS %d to %d  ====" % (step_list[0], step_list[-1]))
-        ret = step_fn[s](options)
+        # As a special case, if we are running a sequence of steps ending with step4,
+        # we need to run step3 and step4 separately. This is beacuse the steps
+        # join up like this::
+        #
+        #         0 ---> 1 ---> 2 ---> 3 -.
+        #                                  |--> 5
+        #                              4 -'
+        #
+        if s == 4 and 3 in step_list:
+            step_fn[3](options)
+            step_fn[4](options)
+        else:
+            step_fn[s](options)
+
         #laptime.append(time.time())
         #elapsed.append(laptime[-1] - laptime[-2])
         #log("STEP %s took %.1f seconds" %

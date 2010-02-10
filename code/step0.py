@@ -64,9 +64,7 @@ def round_to_nearest(f):
 
 def read_GHCN(ghcn_source, antarc_source):
     """An iterator to read a GHCN data file (usually v2.mean)."""
-    GHCN_last_year = 0
     for record in ghcn_source:
-        GHCN_last_year = max(record.last_year, GHCN_last_year)
         yield record
     for record in antarc_source:
         yield record
@@ -170,10 +168,10 @@ def remove_Hohenpeissenberg_from_GHCN(ghcn_records, hohenpeis_record):
 
 
 # TODO: Should the antarc_source really appear at this stage?
-def load_GHCN(ghcn_source, antarc_source):
+def asdict(ghcn_source, antarc_source):
     print "Load GHCN records"
-    return dict((record.uid, record) for record in itertools.chain(
-            read_GHCN(ghcn_source, antarc_source)))
+    return dict((record.uid, record) for record in
+      itertools.chain(ghcn_source, antarc_source))
 
 
 def read_USHCN(ushcn_source):
@@ -197,7 +195,7 @@ def step0(inputs):
 
     """
     ushcn_records, us_only = read_USHCN(inputs.ushcn_source)
-    ghcn_records = load_GHCN(inputs.ghcn_source, 
+    ghcn_records = asdict(inputs.ghcn_source, 
             inputs.antarc_source)
     adjust_USHCN(ushcn_records, ghcn_records, us_only)
     hohenpeis_record = list(inputs.hohenpeis_source)[0]

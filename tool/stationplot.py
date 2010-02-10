@@ -37,9 +37,12 @@ import math
 import os
 import sys
 
-# :todo: yukh!
 # Clear Climate Code
-sys.path.append(os.path.join(os.getcwd(),'code'))
+import extend_path
+
+# :todo: Should really import this from somewhere.  Although this BAD
+# value is entirely internal to this module.
+BAD = 9999
 
 class Error(Exception):
     """Some sort of error."""
@@ -88,7 +91,6 @@ def aplot(series):
         for m,datum in enumerate(data):
             yield (first + (m+0.5)/12.0, datum)
 
-    from step1 import BAD
     data,first = series
 
     for isbad,block in groupby(enum_month(data), lambda x: x[1] == BAD):
@@ -106,7 +108,8 @@ def plot(arg, mode, inp, out, meta):
 
     import struct
 
-    from step1 import BAD, valid
+    def valid(datum):
+        return datum != BAD
 
     table = asdict(arg, inp, mode)
     if not table:
@@ -299,6 +302,89 @@ def aspath(l):
         d = d[:-1] + 'l 0 0'
         decorate = "class='singleton' "
     return "<path %sd='%s' />" % (decorate, d)
+
+# Pasted from
+# http://code.google.com/p/ccc-gistemp/source/browse/trunk/code/step1.py?r=251
+# :todo: abstract properly.
+def from_years(years):
+    """*years* is a list of year records (lists of temperatures) that
+    comprise a station's entire record.  The data are converted to a
+    linear array (could be a list/tuple/array/sequence, I'm not
+    saying), *series*, where series[m] gives the temperature (a
+    floating point value in degrees C) for month *m*, counting from 0
+    for the January of the first year with data.
+
+    (*series*,*begin*) is returned, where *begin* is
+    the first year for which there is data for the station.
+
+    This code is also in step0.py at present, and should be shared.
+    """
+
+    begin = None
+    # Previous year.
+    prev = None
+    series = []
+    for (year, data) in years:
+        if begin is None:
+            begin = year
+        # The sequence of years for a station record is not
+        # necessarily contiguous.  For example "1486284000001988" is
+        # immediately followed by "1486284000001990", missing out 1989.
+        # Extend with blank data.
+        while prev and prev < year-1:
+            series.extend([BAD]*12)
+            prev += 1
+        prev = year
+        series.extend(data)
+    return (series, begin)
+def from_lines(lines):
+    """*lines* is a list of lines (strings) that comprise a station's
+    entire record.  The lines are an extract from a file in the same
+    format as the GHCN file v2.mean.Z.  The data are converted to a
+    linear array (could be a list/tuple/array/sequence, I'm not saying),
+    *series*, where series[m] gives the temperature (a floating
+    point value in degrees C) for month *m*, counting from 0 for the
+    January of the first year with data.
+
+    (*series*,*begin*) is returned, where *begin* is
+    the first year for which there is data for the station.
+
+    Invalid data are marked in the input file with -9999 but are
+    translated in the data arrays to BAD.
+    """
+
+    years = []
+    # Year from previous line.
+    prev = None
+    # The previous line itself.
+    prevline = None
+    for line in lines:
+        year = int(line[12:16])
+        if prev == year:
+            # There is one case where there are multiple lines for the
+            # same year for a particular station.  The v2.mean input
+            # file has 3 identical lines for "8009991400101971"
+            if line == prevline:
+                print "NOTE: repeated record found: Station %s year %s; data are identical" % (line[:12],line[12:16])
+                continue
+            # This is unexpected.
+            assert 0, "Two lines specify different data for %s" % line[:16]
+        # Check that the sequence of years increases.
+        assert not prev or prev < year
+
+        prev = year
+        prevline = line
+        temps = []
+        for m in range(12):
+            datum = int(line[16+5*m:21+5*m])
+            if datum == -9999:
+                datum = BAD
+            else:
+                # Convert to floating point and degrees C.
+                datum *= 0.1
+            temps.append(datum)
+        years.append((year, temps))
+    return from_years(years)
         
 
 def asdict(arg, inp, mode):
@@ -312,7 +398,7 @@ def asdict(arg, inp, mode):
     # Clear Climate Code, tool directory
     import v2index
     # Clear Climate Code, code directory
-    from step1 import from_lines, month_anomaly
+    from code.step1 import month_anomaly
 
     v2 = v2index.File(inp)
 
@@ -357,12 +443,10 @@ def main(argv=None):
             outfile = sys.stdout
         else:
             outfile = open(outfile, 'w')
-        # :todo: yukh!
-        from step0 import open_or_uncompress
         if infile == '-':
             infile = sys.stdin
         else:
-            infile = open_or_uncompress(infile)
+            infile = open(infile)
         metafile = open(metafile)
         return plot(arg, mode=mode, inp=infile, out=outfile, meta=metafile)
     except (getopt.GetoptError, Usage), e:

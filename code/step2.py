@@ -219,7 +219,7 @@ def urban_adjustments(anomaly_stream):
     # Isolated urban stations
     f79 = open("log/PApars.noadj.stations.list", "w")
 
-    last_year = int(open('work/GHCN.last_year', 'r').read().strip())
+    last_year = giss_data.get_ghcn_last_year()
     iyoff = giss_data.BASE_YEAR - 1
     iyrm = last_year - iyoff
 

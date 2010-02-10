@@ -321,11 +321,10 @@ class V2MeanWriter(object):
         self.f.close()
 
 
-class AntarticReader(object):
-    def __init__(self, path, station_path, record_discriminator):
+class AntarcticReader(object):
+    def __init__(self, path, station_path, discriminator):
         self.f = open(path)
-        self.record_discriminator = record_discriminator
-        self.stations = read_antarc_station_ids(station_path)
+        self.stations = read_antarc_station_ids(station_path, discriminator)
 
     def __iter__(self):
         return self._it()
@@ -340,12 +339,10 @@ class AntarticReader(object):
             if station_line:
                 station_name = station_line.group(1)
                 station_name = station_name.replace('\\','')
-                (country_code, WMO_station, modifier) = stations[station_name]
+                id12 = stations[station_name]
                 if record is not None:
                     yield record
-                record = code.giss_data.StationRecord("%03d%05d%03d%1d" % (
-                        country_code, WMO_station, modifier,
-                        self.record_discriminator))
+                record = code.giss_data.StationRecord(id12)
                 continue
             line = line.strip()
             if line.find('.') >= 0 and line[0] in '12':
@@ -358,7 +355,7 @@ class AntarticReader(object):
         self.f.close()
 
 
-class AustroAntarticReader(AntarticReader):
+class AustroAntarcticReader(AntarcticReader):
     def _it(self):
         # TODO: We can make the austro and other reader much more common.
         record = None
@@ -369,12 +366,10 @@ class AustroAntarticReader(AntarticReader):
             station_line = austral_header_re.match(line)
             if station_line:
                 station_name = station_line.group(1).strip()
-                (country_code, WMO_station, modifier) = stations[station_name]
+                id12 = stations[station_name]
                 if record is not None:
                     yield record
-                record = code.giss_data.StationRecord("%03d%05d%03d%1d" % (
-                        country_code, WMO_station, modifier,
-                        self.record_discriminator))
+                record = code.giss_data.StationRecord(id12)
                 continue
             line = line.strip()
             if line.find('.') >= 0 and line[0] in '12':
@@ -431,19 +426,16 @@ def read_antarc_line(line):
     return (year, tuple)
 
 
-def read_antarc_station_ids(path):
+def read_antarc_station_ids(path, discriminator):
     """Reads a SCARs station ID files and returns a dictionary
-    mapping station name to the WMO triple
-    (country_code, WMO_station, modifier).
+    mapping station name to the 12-digit station ID.
     """
 
     dict = {}
     for line in open(path):
-        country_code = int(line[:3])
-        WMO_station = int(line[3:8])
-        modifier = int(line[8:11])
+        id11 = line[:11]
         station = line[12:42].strip()
-        dict[station] = (country_code, WMO_station, modifier)
+        dict[station] = id11 + discriminator
     return dict
 
 
@@ -457,9 +449,8 @@ class USHCNReader(object):
         self.record_discriminator = record_discriminator
         self.stations = read_USHCN_stations(station_path)
         self.us_only = {}
-        for WMO_station, modifier in self.stations.itervalues():
-            station_uid = "%03d%05d%03d" % (425, WMO_station, modifier)
-            self.us_only[station_uid + "0"] = None
+        for id12 in self.stations.itervalues():
+            self.us_only[id12] = None
 
     def __iter__(self):
         return self._it()
@@ -483,17 +474,14 @@ class USHCNReader(object):
             if line[6] != '3': # 3 indicates mean temperatures
                 continue
             USHCN_station = int(line[0:6])
-            record_discriminator = int(line[6])
-            (WMO_station, modifier) = stations[USHCN_station]
+            id12 = stations[USHCN_station]
             year = int(line[7:11])
             if year < code.giss_data.BASE_YEAR: # discard data before 1880
                 continue
-            station_uid = "%03d%05d%03d" % (425, WMO_station, modifier)
-            if record is None or station_uid != record.station_uid:
+            if record is None or id12[:11] != record.station_uid:
                 if record is not None:
                     yield fill_record()
-                record = code.giss_data.StationRecord("%03d%05d%03d%1d" % (
-                        425, WMO_station, modifier, record_discriminator))
+                record = code.giss_data.StationRecord(id12)
                 years_data = {}
 
             temps = []
@@ -524,21 +512,18 @@ class USHCNReader(object):
 
 def read_USHCN_stations(path):
     """Reads the USHCN station list and returns a dictionary
-    mapping USHCN station ID to (WMO station ID, modifier).
+    mapping USHCN station ID to 12-digit station ID.
     """
 
     stations = {}
     for line in open(path):
         (USHCN_id, WMO_id, duplicate) = line.split()
-        country_code = int(WMO_id[0:3])
-        WMO_station = int(WMO_id[3:8])
-        modifier = int(WMO_id[8:11])
         USHCN_id = int(USHCN_id)
-        if country_code != 425:
+        if WMO_id[0:3] != '425': # non-US country_code
             raise ValueError, "non-425 station found in ushcn.tbl: '%s'" % line
         if duplicate != '0':
             raise ValueError, "station in ushcn.tbl with non-zero duplicate: '%s'" % line
-        stations[USHCN_id] = (WMO_station, modifier)
+        stations[USHCN_id] = WMO_id + '0'
     # some USHCNv2 station IDs convert to USHCNv1 station IDs:
     for line in open('input/ushcnV2_cmb.tbl'):
         (v2_station,_,v1_station,_) = line.split()
@@ -559,8 +544,7 @@ class HohenpeissenbergReader(object):
         return self._it()
 
     def _it(self):
-        record = code.giss_data.StationRecord("%03d%05d%03d%1d" % (
-                617, 10962, 0, 2))
+        record = code.giss_data.StationRecord('617109620002')
         for line in self.f:
             if line[0] in '12':
                 year = int(line[:4])
@@ -569,7 +553,6 @@ class HohenpeissenbergReader(object):
                 data = line.split()
                 temps = map(read_tenths, data[1:13])
                 assert len(temps) == 12
-                #temps = temps + [MISSING] * (len(temps)-12)
                 record.add_year_of_tenths(year, temps)
         yield record
 

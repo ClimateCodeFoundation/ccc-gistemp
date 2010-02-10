@@ -72,14 +72,6 @@ def read_GHCN(ghcn_source, antarc_source):
         yield record
 
 
-def dump_old(set, year):
-    """Returns the input set without any items in years prior to the
-    specified year.
-    """
-    
-    return (item for item in set if item[4] >= year)
-
-
 def calc_monthy_USHCN_offsets(u_record, g_record):
     u_years = u_record.get_set_of_years_as_tenths(1980, u_record.last_year)
     g_years = g_record.get_set_of_years_as_tenths(1980, u_record.last_year)
@@ -175,33 +167,6 @@ def remove_Hohenpeissenberg_from_GHCN(ghcn_records, hohenpeis_record):
                 # For other records, just replace the data with the later
                 # years.
                 g_record.set_series_from_tenths(2002 * 12 + 1, new_data)
-
-
-def str_temp(temp):
-    """Takes either None or an integer, and converts to 5 characters
-    of ASCII: decimal representation or "-9999" if None.
-    """
-
-    if temp is None:
-        return '-9999'
-    else:
-        return "%5d" % temp
-
-def str_line(line):
-    """Turns a dataset item into a line in the v2.mean format."""
-
-    (country_code, WMO_station, modifier, duplicate, year, temps) = line
-    return ('%03d%05d%03d%1d%04d%s\n' %
-            (country_code, WMO_station, modifier,
-             duplicate, year, ''.join(map(str_temp, temps))))
-
-def write_data(set, filename):
-    """Writes a dataset to a file in v2.mean format."""
-
-    f = open(filename, 'w')
-    for line in sorted(str_line(item) for item in set):
-        f.write(line)
-    f.close()
 
 
 # TODO: Should the antarc_source really appear at this stage?

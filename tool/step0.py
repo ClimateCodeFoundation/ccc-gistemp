@@ -23,12 +23,12 @@ def get_inputs(steps=()):
             "input/9641C_200907_F52.avg", 'input/ushcn2.tbl')
     inputs.ghcn_source = tool.giss_io.V2MeanReader("input/v2.mean")
     inputs.antarc_source = itertools.chain(
-            tool.giss_io.AntarticReader("input/antarc1.txt", 
-                "input/antarc1.list", 8),
-            tool.giss_io.AntarticReader("input/antarc3.txt",
-                "input/antarc3.list", 9),
-            tool.giss_io.AustroAntarticReader("input/antarc2.txt",
-                "input/antarc2.list", 7))
+            tool.giss_io.AntarcticReader("input/antarc1.txt", 
+                "input/antarc1.list", '8'),
+            tool.giss_io.AntarcticReader("input/antarc3.txt",
+                "input/antarc3.list", '9'),
+            tool.giss_io.AustroAntarcticReader("input/antarc2.txt",
+                "input/antarc2.list", '7'))
     inputs.hohenpeis_source = tool.giss_io.HohenpeissenbergReader(
             "input/t_hohenpeissenberg_200306.txt_as_received_July17_2003")
 

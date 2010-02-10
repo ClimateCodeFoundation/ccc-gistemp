@@ -216,31 +216,31 @@ class SubboxReader(object):
         return getattr(self.meta, name)
 
 
-class StationTsReader(object):
-    def __init__(self, path):
-        self.f = open(path)
+def StationTsReader(path):
+    """Opens a file in Ts.txt file format (output by step 1) and yields
+    each station.
 
-    def __iter__(self):
-        return self._it()
+    """
 
-    def _it(self):
-        for (record_line, lines) in itertools.groupby(
-                self.f, lambda line: line[0] == ' '):
-            if record_line: 
-                # line beginning with a blank introduces a new station
-                # record.
-                lines = list(lines)
-                assert len(lines) == 1
-                line = lines[0]
-                record_uid = line[10:22]
-                record = code.giss_data.StationRecord(line[10:22])
-            else:
-                # Lines consists of the temperature series. Year +
-                # temperature values, as a set of contiguous years.
-                for line in lines:
-                    data = [int(v) for v in line.split()]
-                    record.add_year_of_tenths(data[0], data[1:])
-                yield record
+    f = open(path)
+
+    for (record_line, lines) in itertools.groupby(
+      f, lambda line: line[0] == ' '):
+        if record_line: 
+            # Line beginning with a blank introduces a new station
+            # record.
+            lines = list(lines)
+            assert len(lines) == 1
+            line = lines[0]
+            id12 = line[10:22]
+            record = code.giss_data.StationRecord(id12)
+        else:
+            # Lines consists of the temperature series. Year +
+            # temperature values, as a set of contiguous years.
+            for line in lines:
+                data = [int(v) for v in line.split()]
+                record.add_year_of_tenths(data[0], data[1:])
+            yield record
 
 
 class StationTsWriter(object):
@@ -262,41 +262,34 @@ class StationTsWriter(object):
         self.f.close()
 
 
-class V2MeanReader(object):
-    def __init__(self, path):
-        self.f = open(path)
+def V2MeanReader(path):
+    """Reads a file in GHCN v2.mean format and yields each station."""
 
-    def __iter__(self):
-        return self._it()
+    f = open(path)
+    def id12(l):
+        """Extract the 12-digit station record identifier."""
+        return l[:12]
 
-    def _it(self):
-        def extract_record_uid(l):
-            """Extract the 12-digit station record identifier."""
-            return l[:12]
+    for (id, lines) in itertools.groupby(f, id12):
+        # lines is a set of lines which all begin with the same 12
+        # character id
+        record = code.giss_data.StationRecord(id)
+        prev_line = None
+        for line in lines:
+            if line != prev_line:
+                year = int(line[12:16])
+                tenths = [int(line[a:a+5]) for a in range(16, 16+12*5, 5)]
+                if year >= code.giss_data.BASE_YEAR:
+                    record.add_year_of_tenths(year, tenths)
+                prev_line = line
+            else:
+                print ("NOTE: repeated record found: Station %s year %s;"
+                       " data are identical" % (line[:12],line[12:16]))
 
-        for (id, lines) in itertools.groupby(self.f, extract_record_uid):
-            # lines is a set of lines which all begin with the same 12
-            # character id
-            prev_line = None
-            for i, line in enumerate(lines):
-                if i == 0:
-                    # Use first line to create the station record.
-                    uid = extract_record_uid(line)
-                    record = code.giss_data.StationRecord(uid)
-                if line != prev_line:
-                    year = int(line[12:16])
-                    tenths = [int(line[a:a+5]) for a in range(16, 16+12*5, 5)]
-                    if year >= code.giss_data.BASE_YEAR:
-                        record.add_year_of_tenths(year, tenths)
-                    prev_line = line
-                else:
-                    print ("NOTE: repeated record found: Station %s year %s;"
-                           " data are identical" % (line[:12],line[12:16]))
+        if not record.is_empty():
+            yield record
 
-            if not record.is_empty():
-                yield record
-
-        self.f.close()
+    f.close()
 
 
 class V2MeanWriter(object):
@@ -531,30 +524,25 @@ def read_USHCN_stations(path):
     return stations
 
 
-class HohenpeissenbergReader(object):
+def HohenpeissenbergReader(path):
     """reads the Hohenpeissenberg data from
     input/t_hohenpeissenberg_200306.txt_as_received_July17_2003
     which has a header line and then one line per year from 1781.
     We only want data from 1880 to 2002.
     """
-    def __init__(self, path):
-        self.f = open(path)
+    f = open(path)
 
-    def __iter__(self):
-        return self._it()
-
-    def _it(self):
-        record = code.giss_data.StationRecord('617109620002')
-        for line in self.f:
-            if line[0] in '12':
-                year = int(line[:4])
-                if year < 1880 or year > 2002:
-                    continue
-                data = line.split()
-                temps = map(read_tenths, data[1:13])
-                assert len(temps) == 12
-                record.add_year_of_tenths(year, temps)
-        yield record
+    record = code.giss_data.StationRecord('617109620002')
+    for line in f:
+        if line[0] in '12':
+            year = int(line[:4])
+            if year < 1880 or year > 2002:
+                continue
+            data = line.split()
+            temps = map(read_tenths, data[1:13])
+            assert len(temps) == 12
+            record.add_year_of_tenths(year, temps)
+    yield record
 
 
 def read_tenths(s):

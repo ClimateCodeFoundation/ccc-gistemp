@@ -17,6 +17,33 @@ import code.giss_data
 import code.read_config
 
 
+def open_or_uncompress(filename):
+    """Opens the text file `filename` for reading.  If this fails then
+    it attempts to find a compressed version of the file by appending
+    '.gz' to the name and opening that (uncompressing it on
+    the fly).
+    """
+
+    try:
+        return open(filename)
+    except IOError:
+        # When none of filename, nor filename.gz exists we
+        # want to pretend that the exception comes from the original
+        # call to open, above.  Otherwise the user can be confused by
+        # claims that "foo.gz" does not exist when they tried to open
+        # "foo".  In order to maintain this pretence, we have to get
+        # the exception info and save it. See
+        # http://blog.ianbicking.org/2007/09/12/re-raising-exceptions/
+        import sys
+        exception = sys.exc_info()
+        try:
+            import gzip
+            return gzip.open(filename + '.gz')
+        except IOError:
+            pass
+        raise exception[0], exception[1], exception[2]
+
+
 class SubboxWriter(object):
     def __init__(self, rawfile, bos='>', trimmed=True):
         self.trimmed = trimmed
@@ -426,7 +453,7 @@ antarc_temperature_re = re.compile(r'^(.*) .* *temperature')
 
 class USHCNReader(object):
     def __init__(self, path, station_path, record_discriminator=None):
-        self.f = open(path)
+        self.f = open_or_uncompress(path)
         self.record_discriminator = record_discriminator
         self.stations = read_USHCN_stations(station_path)
         self.us_only = {}

@@ -226,48 +226,30 @@ def read_USHCN(ushcn_source):
     return d, ushcn_source.us_only
 
 
-class Step0Iterator(object):
-    """An iterator for step 1.
-    
-    An instance of this class acts as an iterator that produces a stream of
+def step0(inputs):
+    """An iterator for step 1.  Produces a stream of
     `giss_data.StationRecord` instances.
 
     """
-    def __init__(self, ushcn_source, ghcn_source, antarc_source, 
-            hohenpeis_source):
-        self.ushcn_source = ushcn_source
-        self.ghcn_source = ghcn_source
-        self.antarc_source = antarc_source
-        self.hohenpeis_source = hohenpeis_source
+    ushcn_records, us_only = read_USHCN(inputs.ushcn_source)
+    ghcn_records = load_GHCN(inputs.ghcn_source, 
+            inputs.antarc_source)
+    adjust_USHCN(ushcn_records, ghcn_records, us_only)
+    hohenpeis_record = list(inputs.hohenpeis_source)[0]
+    remove_Hohenpeissenberg_from_GHCN(ghcn_records, hohenpeis_record)
 
-    def __iter__(self):
-        return self._it()
+    records = {}
+    records.update(ghcn_records)
+    records.update(ushcn_records)
 
-    def _it(self):
-        ushcn_records, us_only = read_USHCN(self.ushcn_source)
-        ghcn_records = load_GHCN(self.ghcn_source, 
-                self.antarc_source)
-        adjust_USHCN(ushcn_records, ghcn_records, us_only)
-        hohenpeis_record = list(self.hohenpeis_source)[0]
-        remove_Hohenpeissenberg_from_GHCN(ghcn_records, hohenpeis_record)
-
-        records = {}
-        records.update(ghcn_records)
-        records.update(ushcn_records)
-
-        # TODO: I think the whole point of sorting here is so that step1
-        # receives the records in a good order to perfrom its
-        # ``comb_records(self.record_source)`` processing. We can probably
-        # dispense with this by making use of the fact that we have a
-        # dictionary here, so we can combine at this stage. [Paul O]
-        for uid, record in sorted(records.iteritems()):
-            if record.n:
-                yield record
-
-    
-def step0(inputs):
-    return Step0Iterator(inputs.ushcn_source, inputs.ghcn_source,
-            inputs.antarc_source, inputs.hohenpeis_source) 
+    # TODO: I think the whole point of sorting here is so that step1
+    # receives the records in a good order to perfrom its
+    # ``comb_records(self.record_source)`` processing. We can probably
+    # dispense with this by making use of the fact that we have a
+    # dictionary here, so we can combine at this stage. [Paul O]
+    for uid, record in sorted(records.iteritems()):
+        if record.n:
+            yield record
 
 
 # This file is copyright (C) 2008 Ravenbrook Limited.

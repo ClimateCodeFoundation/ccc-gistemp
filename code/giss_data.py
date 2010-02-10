@@ -347,8 +347,7 @@ class Station(object):
 # 1. Might it be seen as too complicated? It is complicated for a reason; to
 #    make the code that manipulates temperature series more readable.
 # 2. Should we use properties or convert the properties to methods?
-# 3. Should all instance variables become properties (or methods)?
-# 4. Some of the names are open to improvement.
+# 3. Some of the names are open to improvement.
 class MonthlyTemperatureRecord(object):
     """Base class for monthly temperature records.
 
@@ -393,9 +392,8 @@ class MonthlyTemperatureRecord(object):
         """Test whether the record contains data."""
         return len(self._series) == 0
 
-    @classmethod
-    def valid(cls, v):
-        return not cls.invalid(v)
+    def valid(self, v):
+        return not self.invalid(v)
 
     @property
     def n(self):
@@ -533,7 +531,6 @@ class MonthlyTemperatureRecord(object):
             self._good_count = len(self._series) - bad_count
         return self._good_count
 
-    @clear_cache
     def strip_invalid(self):
         """Strip leading and trailing invalid values.
         
@@ -546,6 +543,7 @@ class MonthlyTemperatureRecord(object):
         self._series[:] = self._series[self._good_start_idx:self._good_end_idx]
         self._good_start_idx = 0
         self._good_end_idx = len(self._series)
+    strip_invalid = clear_cache(strip_invalid)
 
     def get_monthly_valid_counts(self):
         """Get number of good values for each month.
@@ -560,7 +558,6 @@ class MonthlyTemperatureRecord(object):
             monthly_valid[(self.first_month + i - 1) % 12] += self.valid(v)
         return monthly_valid
 
-    @clear_cache
     def _set_series(self, first_month, series, missing, convert=lambda x:x):
         self._first_month = first_month
         self._good_start_idx = sys.maxint
@@ -575,8 +572,8 @@ class MonthlyTemperatureRecord(object):
                         len(self._series))
                 self._series.append(v)
                 self._good_end_idx = max(self._good_end_idx, len(self._series))
+    _set_series = clear_cache(_set_series)
 
-    @clear_cache
     def _add_year_of_data(self, year, data, missing, convert=lambda x:x):
         if self.first_month != sys.maxint:
             # We have data already, so we may need to pad with missing months
@@ -595,6 +592,7 @@ class MonthlyTemperatureRecord(object):
                         len(self._series))
                 self._series.append(v)
                 self._good_end_idx = max(self._good_end_idx, len(self._series))
+    _add_year_of_data = clear_cache(_add_year_of_data)
 
 
 class StationRecord(MonthlyTemperatureRecord):
@@ -618,8 +616,7 @@ class StationRecord(MonthlyTemperatureRecord):
         self.source = v2_sources().get(uid, "UNKNOWN")
         self.ann_anoms = []
 
-    @classmethod
-    def invalid(cls, v):
+    def invalid(self, v):
         return v in (MISSING, -MISSING)
 
     @property
@@ -744,7 +741,7 @@ class StationRecord(MonthlyTemperatureRecord):
         if self._ann_anoms_good_count is None:
             bad = 0
             for v in self.ann_anoms:
-                bad += v > 9998.99 # TODO: Yuck! Fix this!
+                bad += self.invalid(v)
             self._ann_anoms_good_count = len(self.ann_anoms) - bad
         return self._ann_anoms_good_count
 
@@ -862,8 +859,7 @@ class SubboxRecord(MonthlyTemperatureRecord):
         self.d = d
         self.set_series(series)
 
-    @classmethod
-    def invalid(cls, v):
+    def invalid(self, v):
         return abs(v - XMISSING) < 0.1
 
     @property
@@ -874,16 +870,16 @@ class SubboxRecord(MonthlyTemperatureRecord):
     def set_series(self, series):
         self._set_series(BASE_YEAR * 12, series, XMISSING)
 
-    @clear_cache
     def pad_with_missing(self, n):
         while self.n < n:
             self._series.append(XMISSING)
+    pad_with_missing = clear_cache(pad_with_missing)
             
-    @clear_cache
     def set_value(self, idx, value):
         while idx >= len(self.series):
             self._series.append(XMISSING)
         self._series[idx] = value
+    set_value = clear_cache(set_value)
 
     def trim(self):
         self.station_months = len(self._series) - self._series.count(

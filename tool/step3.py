@@ -14,6 +14,7 @@ import code.step3
 import tool.giss_io
 
 import tool.step2
+from tool.fork import fork
 
 
 # TODO: What should I do?
@@ -58,15 +59,19 @@ def old_main(argv=None):
     return do_step3(audit=audit, subbox=subbox)
 
 
-def get_inputs(steps=()):
+def get_inputs(steps=(), save_work=True):
     if 2 in steps:
-        return tool.step2.get_step_iter(steps)
+        source = tool.step2.get_step_iter(steps, save_work)
+        if save_work:
+            sink = tool.step2.get_outputs()
+            source = fork(source, sink)
+        return source
     f = open("work/Ts.GHCN.CL.PA", "rb")
     return tool.giss_io.StationReader(f, bos='<')
 
 
-def get_step_iter(steps=()):
-    return code.step3.step3(get_inputs(steps))
+def get_step_iter(steps=(), save_work=True):
+    return code.step3.step3(get_inputs(steps, save_work))
 
 
 def get_outputs():

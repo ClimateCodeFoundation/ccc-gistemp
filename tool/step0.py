@@ -17,11 +17,11 @@ class Struct:
     pass
 
 
-def get_inputs(steps=()):
+def get_inputs(steps=(), save_work=True):
     inputs = Struct()
     inputs.ushcn_source = tool.giss_io.USHCNReader(
             "input/9641C_200907_F52.avg", 'input/ushcn2.tbl')
-    inputs.ghcn_source = tool.giss_io.V2MeanReader("input/v2.mean")
+    inputs.ghcn_source = tool.giss_io.V2MeanReader( "input/v2.mean")
     inputs.antarc_source = itertools.chain(
             tool.giss_io.AntarcticReader("input/antarc1.txt", 
                 "input/antarc1.list", '8'),
@@ -35,7 +35,7 @@ def get_inputs(steps=()):
     return inputs
 
 
-def get_step_iter(steps=()):
+def get_step_iter(steps=(), save_work=True):
     return code.step0.step0(get_inputs())
 
 

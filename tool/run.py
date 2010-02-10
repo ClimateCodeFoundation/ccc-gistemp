@@ -72,31 +72,31 @@ def run_step0(options):
 
 
 def run_step1(options):
-    source = tool.step1.get_step_iter(steps=options.steps)
+    source = tool.step1.get_step_iter(options.steps, options.save_work)
     sink = tool.step1.get_outputs()
     run_step(source, sink)
 
 
 def run_step2(options):
-    source = tool.step2.get_step_iter(steps=options.steps)
+    source = tool.step2.get_step_iter(options.steps, options.save_work)
     sink = tool.step2.get_outputs()
     run_step(source, sink)
 
 
 def run_step3(options):
-    source = tool.step3.get_step_iter(steps=options.steps)
+    source = tool.step3.get_step_iter(options.steps, options.save_work)
     sink = tool.step3.get_outputs()
     run_step(source, sink)
 
 
 def run_step4(options):
-    source = tool.step4.get_step_iter(steps=options.steps)
+    source = tool.step4.get_step_iter(options.steps, options.save_work)
     sink = tool.step4.get_outputs()
     run_step(source, sink)
 
 
 def run_step5(options):
-    inputs = tool.step5.get_inputs(steps=options.steps)
+    inputs = tool.step5.get_inputs(options.steps, options.save_work)
 
     # Save standard output so we can restore it when we're done with this step.
     old_stdout = sys.stdout
@@ -140,8 +140,9 @@ def parse_options():
     parser.add_option("-s", "--steps", action="store", metavar="S[,S]",
             default="",
             help="Select range of steps to run")
-    parser.add_option("--save-work_files", action="store_true",
-            help="Save intermediate files in the work sub-directory")
+    parser.add_option("--no-work_files", "--suppress-work-files",
+            action="store_false", default=True, dest="save_work",
+            help="Do not save intermediate files in the work sub-directory")
     options, args = parser.parse_args()
     if len(args) != 0:
         parser.error("Unexpected arguments")
@@ -180,8 +181,7 @@ def main(options, args):
         }
         
         # Record start time now, and ending times for each step.
-        laptime = [time.time()]
-        elapsed = []
+        start_time = time.time()
         s = max(step_list)
 
         if not step_fn.has_key(s):
@@ -202,14 +202,9 @@ def main(options, args):
         else:
             step_fn[s](options)
 
-        #laptime.append(time.time())
-        #elapsed.append(laptime[-1] - laptime[-2])
-        #log("STEP %s took %.1f seconds" %
-        #      (s, elapsed[-1]))
-
-        #log("====> Timing Summary ====")
-        #for step,took in zip(step_list, elapsed):
-        #    log("STEP %s: %6.1f seconds" % (step, took))
+        end_time = time.time()
+        log("====> Timing Summary ====")
+        log("Run took %.1f seconds" % (end_time - start_time))
 
         return 0
     except Fatal, err:

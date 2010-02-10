@@ -14,16 +14,21 @@ import code.step2
 import tool.giss_io
 
 import tool.step1
+from tool.fork import fork
 
 
-def get_inputs(steps=()):
+def get_inputs(steps=(), save_work=True):
     if 1 in steps:
-        return tool.step1.get_step_iter(steps)
+        source = tool.step1.get_step_iter(steps, save_work)
+        if save_work:
+            sink = tool.step1.get_outputs()
+            source = fork(source, sink)
+        return source
     return tool.giss_io.StationTsReader("work/Ts.txt")
 
 
-def get_step_iter(steps=()):
-    return code.step2.step2(get_inputs(steps))
+def get_step_iter(steps=(), save_work=True):
+    return code.step2.step2(get_inputs(steps, save_work))
 
 
 def get_outputs():

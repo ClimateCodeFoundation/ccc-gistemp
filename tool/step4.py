@@ -11,12 +11,12 @@ import code.step4
 import tool.giss_io
 
 
-def get_inputs(steps=()):
+def get_inputs(steps=(), save_work=True):
     f = open('input/SBBX.HadR2', 'rb')
     return tool.giss_io.SubboxReader(f)
 
 
-def get_step_iter(steps=()):
+def get_step_iter(steps=(), save_work=True):
     return code.step4.step4(get_inputs(steps))
 
 

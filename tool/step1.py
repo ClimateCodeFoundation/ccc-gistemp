@@ -14,16 +14,21 @@ import code.step1
 import tool.giss_io
 
 import tool.step0
+from tool.fork import fork
 
 
-def get_inputs(steps=()):
+def get_inputs(steps=(), save_work=True):
     if 0 in steps:
-        return tool.step0.get_step_iter(steps)
+        source = tool.step0.get_step_iter(steps, save_work)
+        if save_work:
+            sink = tool.step0.get_outputs()
+            source = fork(source, sink)
+        return source
     return tool.giss_io.V2MeanReader("work/v2.mean_comb")
 
 
-def get_step_iter(steps=()):
-    return code.step1.step1(get_inputs(steps))
+def get_step_iter(steps=(), save_work=True):
+    return code.step1.step1(get_inputs(steps, save_work))
 
 
 def get_outputs():

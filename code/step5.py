@@ -130,8 +130,8 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991),
         landsub = list(itertools.islice(landsubbox, nsubbox))
         oceansub = list(itertools.islice(oceansubbox, nsubbox))
         for i,l,o in zip(range(nsubbox),landsub,oceansub):
-            avg[i][I1TIN:I1TIN+l.n] = l.series
-            avg[i+nsubbox][I1TINO:I1TINO+l.n] = o.series
+            avg[i][I1TIN:I1TIN+len(l.series)] = l.series
+            avg[i+nsubbox][I1TINO:I1TINO+len(o.series)] = o.series
             # Count the number of valid entries.
             wgtc[i] = l.good_count
             wgtc[i+nsubbox] = o.good_count

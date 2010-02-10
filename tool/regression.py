@@ -181,7 +181,9 @@ def run_test():
     if not options.skip_run:
         #ret = run.main([sys.argv, "--steps", "3"])
         sys.stdout.write("Executing CCC code...\n")
-        ret = run.main([sys.argv])
+        options.save_work = True
+        options.steps = range(6)
+        ret = run.main(options, [])
         if ret != 0:
             return 1
 

@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-"""Module that knows how to run step 2.
+"""Module that knows how to run step 0.
 
 <+Detailed multiline documentation+>
 """
 __docformat__ = "restructuredtext"
 
 import itertools
-import os
 
 import extend_path
 
@@ -14,7 +13,7 @@ import code.step0
 import tool.giss_io
 
 
-class Struct():
+class Struct:
     pass
 
 
@@ -22,7 +21,7 @@ def get_inputs(steps=()):
     inputs = Struct()
     inputs.ushcn_source = tool.giss_io.USHCNReader(
             "input/9641C_200907_F52.avg", 'input/ushcn2.tbl')
-    inputs.ghcn_source = tool.giss_io.V2MeanReader( "input/v2.mean")
+    inputs.ghcn_source = tool.giss_io.V2MeanReader("input/v2.mean")
     inputs.antarc_source = itertools.chain(
             tool.giss_io.AntarticReader("input/antarc1.txt", 
                 "input/antarc1.list", 8),

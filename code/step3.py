@@ -525,8 +525,8 @@ def iter_subbox_grid(stations, monm, radius=1200,
                     lat_S=latlon[0], lat_N=latlon[1], lon_W=latlon[2],
                     lon_E=latlon[3], stations=nstcmb, station_months=nstmns,
                     d=XBAD, series=avg)
-                log.write('\nNo stations for center %+05.1f%+06.1f\n' %
-                  (centre))
+                log.write('*')
+                log.flush()
                 yield box_obj
                 continue
             # Initialise data with first station

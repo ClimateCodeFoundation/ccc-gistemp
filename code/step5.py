@@ -41,6 +41,8 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991),
     routine will be written); *log* should be an open text file (where
     diagnostic information will be logged); *rland* and *intrp* are
     equivalent to the command line arguments to SBBXotoBX.f.
+    *ignore_land* is a flag that when True means cells with both
+    ocean and land data will ignore their land data.
     """
     
     landsubbox = iter(land)
@@ -51,14 +53,17 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991),
     bos ='>'
     boxf = fort.File(box, bos=bos)
 
-    # RCRIT in SBXotoBX.f line 70
+    # RCRIT in SBBXotoBX.f line 70
     # We make rland (and radius) a float so that any calculations done
     # using it are in floating point.
     radius = float(1200)
     if not ignore_land:
         rland = min(rland, radius)
     else:
-        rland = -9999.0 # Actually this will not be used!
+        # Leave rland unassigned.  Any attempt to use it will fail (with
+        # an UnboundLocalError), so that provides a check that we don't
+        # use it.
+        pass
     # clamp intrp to [0,1]
     intrp = max(min(intrp, 1), 0)
 
@@ -94,14 +99,14 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991),
     NYRSIN = land_meta.monm/km
     # IYRBGC in the Fortran code
     combined_year_beg = min(land_meta.yrbeg, ocean_meta.yrbeg)
-    # index into the combined array of the first year of the land data.
-    I1TIN = 12*(land_meta.yrbeg-combined_year_beg)
-    # as I1TIN but for ocean data
-    I1TINO = 12*(ocean_meta.yrbeg-combined_year_beg)
+    # Index into the combined array of the first year of the land data.
+    land_offset = 12*(land_meta.yrbeg-combined_year_beg)
+    # As I1TIN but for ocean data.
+    ocean_offset = 12*(ocean_meta.yrbeg-combined_year_beg)
     # combined_n_months is MONMC in the Fortran.
-    combined_n_months = max(land_meta.monm + I1TIN,
-                            land_meta.monm + I1TINO)
-    # 
+    combined_n_months = max(land_meta.monm + land_offset,
+                            land_meta.monm + ocean_offset)
+
     # Indices into the combined arrays for the base period (which is a
     # parameter).
     nfb = base[0] - combined_year_beg
@@ -130,8 +135,8 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991),
         landsub = list(itertools.islice(landsubbox, nsubbox))
         oceansub = list(itertools.islice(oceansubbox, nsubbox))
         for i,l,o in zip(range(nsubbox),landsub,oceansub):
-            avg[i][I1TIN:I1TIN+len(l.series)] = l.series
-            avg[i+nsubbox][I1TINO:I1TINO+len(o.series)] = o.series
+            avg[i][land_offset:land_offset+len(l.series)] = l.series
+            avg[i+nsubbox][ocean_offset:ocean_offset+len(o.series)] = o.series
             # Count the number of valid entries.
             wgtc[i] = l.good_count
             wgtc[i+nsubbox] = o.good_count
@@ -156,7 +161,7 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991),
         # next longest record, and so on.  We do that by decorating the
         # *wgtc* array with indexes 0 to 199, and then extracting the
         # (permuted) indexes into IORDR.
-        # :todo: should probably import from a purpopse built module.
+        # :todo: should probably import from a purpose built module.
         from step3 import sort
         z = zip(wgtc, range(2*nsubbox))
         # We only want to compare the weights (because we want to emulate
@@ -165,7 +170,7 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991),
         sort(z, lambda x,y: y[0]-x[0])
         wgtc,IORDR = zip(*z)
 
-        # From here to the for loop over the cells (below) we are
+        # From here to the "for" loop over the cells (below) we are
         # initialising data for the loop.  Primarily the AVGR and WTR
         # arrays.
         nc = IORDR[0]
@@ -450,11 +455,10 @@ def step5(inputs=()):
 
     """
     land, ocean = inputs
-    #ocean = open(os.path.join('work', 'SBBX.HadR2'), 'rb')
     box = open(os.path.join('result', 'BX.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
     log = open(os.path.join('log', 'SBBXotoBX.log'), 'w')
     SBBXtoBX(land, ocean, box, log, rland=100, intrp=0)
-    # necessary, because box is an input to the next stage, so the file
+    # Necessary, because box is an input to the next stage, so the file
     # needs to be fully written.
     box.close()
 

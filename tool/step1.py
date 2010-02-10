@@ -1,12 +1,12 @@
 #!/usr/bin/env python
-"""Module that knows how to run step 2.
+# $URL$
+# $Rev$
+
+"""Module that knows how to run step 1.
 
 <+Detailed multiline documentation+>
 """
 __docformat__ = "restructuredtext"
-
-import os
-import cPickle as pickle
 
 import extend_path
 

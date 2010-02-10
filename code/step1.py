@@ -735,36 +735,21 @@ def alter_discont(data):
         yield record
 
 
-class Step1Iterator(object):
-    """An iterator for step 1.
-    
-    An instance of this class acts as an iterator that produces a stream of
+def step1(record_source):
+    """An iterator for step 1.  Produces a stream of
     `giss_data.StationRecord` instances.
 
+    :Param record_source:
+        An iterable source of `giss_data.StationRecord` instances.
+
     """
-    def __init__(self, record_source):
-        """Constructor:
 
-        :Param record_source:
-            An iterable source of `giss_data.StationRecord` instances.
-
-        """
-        self.record_source = record_source
-
-    def __iter__(self):
-        return self._it()
-
-    def _it(self):
-        records = comb_records(self.record_source)
-        helena_adjusted = adjust_helena(records)
-        combined_pieces = comb_pieces(helena_adjusted)
-        without_strange = drop_strange(combined_pieces)
-        for record in alter_discont(without_strange):
-            yield record
-
-    
-def step1(record_source):
-    return Step1Iterator(record_source)
+    records = comb_records(record_source)
+    helena_adjusted = adjust_helena(records)
+    combined_pieces = comb_pieces(helena_adjusted)
+    without_strange = drop_strange(combined_pieces)
+    for record in alter_discont(without_strange):
+        yield record
 
 
 # Notes:

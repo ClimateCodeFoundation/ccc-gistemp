@@ -15,12 +15,15 @@
 # 21544218001 tallest aspect ratio
 
 """
-Usage: python stationplot.py [-d v2.mean] [-o file.svg] station-id
+Usage: python stationplot.py [-d v2.mean] [-o file.svg] [-a] station-id
 
 Tool to plot the records for a station.  Stations have an 11-digit
 identifier, and in the GHCN file v2.mean they have a single digit added, the
 duplicate marker, to form a 12-digit record identifier.  One station may
 have several "duplicate" records associated with it.
+
+Anomalies can be plotted (each datum has the mean for that month
+subtracted from it) by using the -a option.
 
 Specifying an 11-digit identifier will plot all the duplicates
 associated with that station; a 12-digit indentifier will plot only a

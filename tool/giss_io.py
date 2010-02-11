@@ -297,6 +297,12 @@ def V2MeanReader(path, year_min=-9999):
         """Extract the 12-digit station record identifier."""
         return l[:12]
 
+    def v2_int(s):
+        v = int(s)
+        if v == -9999:
+            return code.giss_data.MISSING
+        return v
+
     for (id, lines) in itertools.groupby(f, id12):
         # lines is a set of lines which all begin with the same 12
         # character id
@@ -305,7 +311,7 @@ def V2MeanReader(path, year_min=-9999):
         for line in lines:
             if line != prev_line:
                 year = int(line[12:16])
-                tenths = [int(line[a:a+5]) for a in range(16, 16+12*5, 5)]
+                tenths = [v2_int(line[a:a+5]) for a in range(16, 16+12*5, 5)]
                 if year >= year_min:
                     record.add_year_of_tenths(year, tenths)
                 prev_line = line

@@ -36,6 +36,24 @@ MISSING = 9999
 #: The floating point version of `MISSING`.
 XMISSING = float(MISSING)
 
+# In converting all the underlying temperature values from integral to
+# floats (as part of converting the whole algorithm to floats), I am
+# temporarily retaining most of the same object interfaces, but the
+# implementations need to convert frequently between integral
+# tenth-degrees and float degrees.  For all plausible integers i,
+# float_to_tenths(tenths_to_float(i)) == i.
+# Nick Barnes 2010-02-11
+
+def tenths_to_float(t):
+    if t == MISSING:
+        return XMISSING
+    return t * 0.1
+
+def float_to_tenths(f):
+    if abs(f - XMISSING) < 0.01:
+        return MISSING
+    return int(round(f * 10.0))
+
 _stations = None
 _v2_sources = None
 _ghcn_last_year = None
@@ -65,7 +83,7 @@ def get_ghcn_last_year():
         f = open("input/v2.mean")
         max_year = 0
         for l in f:
-            if l[12:13] == '2':
+            if l[12:13] == '2': # first digit of year is a '2'
                 max_year = max(int(l[12:16]), max_year)
         _ghcn_last_year = max_year
         f.close()
@@ -189,7 +207,6 @@ def clear_cache(func):
     """
     def f(self, *args, **kwargs):
         self._tenths = None
-        self._celsius = None
         self._good_count = None
         self._ann_anoms_good_count = None
         return func(self, *args, **kwargs)
@@ -383,7 +400,6 @@ class MonthlyTemperatureRecord(object):
         self._good_start_idx = sys.maxint
         self._good_end_idx = 0
         self._series = []
-        self._celsius = None
         self._tenths = None
         self._good_count = None
         self._ann_anoms_good_count = None
@@ -583,7 +599,7 @@ class MonthlyTemperatureRecord(object):
                 self._series.extend([missing] * gap * 12)
         start_month = year * 12 + 1
         self._first_month = min(self.first_month, start_month)
-        for m, in_value in enumerate(data):
+        for in_value in data:
             v = convert(in_value)
             if self.invalid(v):
                 self._series.append(missing)
@@ -617,25 +633,25 @@ class StationRecord(MonthlyTemperatureRecord):
         self.ann_anoms = []
 
     def invalid(self, v):
-        return v in (MISSING, -MISSING)
+        return abs(v - XMISSING) < 0.1
 
     @property
     def series(self):
         """The series of values in celsius."""
-        if self._celsius is None:
-            c = []
-            for v in self._series:
-                if self.invalid(v):
-                    c.append(XMISSING)
-                else:
-                    c.append(v * 0.1)
-            self._celsius = c
-        return self._celsius
+        return self._series
 
     @property
     def series_as_tenths(self):
-        """Return the time series in 0.1 celsius, integer units."""
-        return self._series
+        """The series in 0.1 celsius, integer units."""
+        if self._tenths is None:
+            t = []
+            for v in self._series:
+                if self.invalid(v):
+                    t.append(MISSING)
+                else:
+                    t.append(float_to_tenths(v))
+            self._tenths = t
+        return self._tenths
 
     @property
     def station(self):
@@ -686,7 +702,10 @@ class StationRecord(MonthlyTemperatureRecord):
         return int(self.uid[-1])
 
     def add_year_of_tenths(self, year, data):
-        self._add_year_of_data(year, data, MISSING)
+        self._add_year_of_data(year, data, XMISSING, convert=tenths_to_float)
+
+    def add_year(self, year, data):
+        self._add_year_of_data(year, data, XMISSING)
 
     def has_data_for_year(self, year):
         for t in self.get_a_year_as_tenths(year):
@@ -722,15 +741,10 @@ class StationRecord(MonthlyTemperatureRecord):
                 for y in range(first_year, last_year + 1)]
 
     def set_series_from_tenths(self, first_month, series):
-        self._set_series(first_month, series, MISSING)
+        self._set_series(first_month, series, XMISSING, convert=tenths_to_float)
 
     def set_series(self, first_month, series):
-        def to_tenths(v):
-            if v > 999.0:
-                return MISSING
-            return int(math.floor(v * 10.0 + 0.5))
-
-        self._set_series(first_month, series, MISSING, convert=to_tenths)
+        self._set_series(first_month, series, XMISSING)
 
     def set_ann_anoms(self, ann_anoms):
         self.ann_anoms[:] = ann_anoms
@@ -748,7 +762,7 @@ class StationRecord(MonthlyTemperatureRecord):
 
     def copy(self):
         r = StationRecord(self.uid)
-        r.set_series_from_tenths(self.first_month, self.series_as_tenths)
+        r.set_series(self.first_month, self.series)
         return r
 
     def report_str(self):

@@ -297,7 +297,7 @@ def get_longest_overlap(sums, wgts, begin, years, records):
         return 0, 0, giss_data.MISSING
     return best_record, best_id, diff
 
-def combine(sums, wgts, begin, years, records):
+def combine(sums, wgts, begin, years, records, new_id=None):
     while records:
         record, rec_id, diff = get_longest_overlap(sums, wgts, begin,
                 years, records)
@@ -413,35 +413,7 @@ def comb_records(stream):
     global comb_log
     comb_log = open('log/comb.log','w')
 
-    for id11, record_set in itertools.groupby(stream, lambda r: r.station_uid):
-        comb_log.write('%s\n' % id11)
-        records = {}
-        for record in record_set:
-            records[record.uid] = record
-        ids = records.keys()
-        while 1:
-            if len(ids) == 1:
-                yield records[ids[0]]
-                break
-            record_dict, begin, end = make_record_dict(records, ids)
-            years = end - begin + 1
-            record, rec_id = get_best(record_dict)
-            del record_dict[rec_id]
-            sums, wgts = fresh_arrays(record, begin, years)
-            new_record = record.copy()
-            new_record.source = record.source
-            new_record.ann_mean = record.ann_mean
-            new_record.ann_anoms = record.ann_anoms
-
-            comb_log.write ("\t%s %s %s -- %s\n" % (rec_id, begin, end,
-                record.source))
-            combine(sums, wgts, begin, years, record_dict)
-            begin,final_data = final_average(sums, wgts, years, begin)
-            new_record.set_series(begin * 12 + 1, final_data)
-            yield new_record
-            ids = record_dict.keys()
-            if not ids:
-                break
+    return do_combine(stream, comb_log, get_best, combine)
 
 
 def adjust_helena(stream):
@@ -628,25 +600,36 @@ def get_longest(records):
             longest_id = rec_id
     return longest_rec, longest_id
 
-def comb_pieces(stream):
-    global pieces_log
-    pieces_log = open('log/pieces.log','w')
+def do_combine(stream, log, select_func, combine_func):
+    """Drive record combination.
 
-    # TODO: Very similar structure to comb_records
+    This is a filter driver function used by ``comb_records`` and
+    ``comb_pieces``.
+
+    :Param stream:
+        The stream of records to filter.
+    :Param log:
+        Open log file file.
+    :Param select_func:
+        A function to call to select the the 'best' records from a set of
+        records belonging to the same station.
+    :Param combine_func:
+        A function to call to perform the data combining.
+
+    """
     for id11, record_set in itertools.groupby(stream, lambda r: r.station_uid):
-        pieces_log.write('%s\n' % id11)
+        log.write('%s\n' % id11)
         records = {}
         for record in record_set:
             records[record.uid] = record
-            stid = record.station_uid
         ids = records.keys()
         while 1:
             if len(ids) == 1:
                 yield records[ids[0]]
                 break
             record_dict, begin, end = make_record_dict(records, ids)
-            record, rec_id = get_longest(record_dict)
             years = end - begin + 1
+            record, rec_id = select_func(record_dict)
             del record_dict[rec_id]
             sums, wgts = fresh_arrays(record, begin, years)
             new_record = record.copy()
@@ -654,15 +637,23 @@ def comb_pieces(stream):
             new_record.ann_mean = record.ann_mean
             new_record.ann_anoms = record.ann_anoms
 
-            pieces_log.write("\t%s %s %s -- %s\n" % (rec_id, begin,
+            log.write("\t%s %s %s -- %s\n" % (rec_id, begin,
                 begin + years -1, record.source))
-            pieces_combine(sums, wgts, begin, years, record_dict, rec_id)
+            combine_func(sums, wgts, begin, years, record_dict, rec_id)
             begin, final_data = final_average(sums, wgts, years, begin)
             new_record.set_series(begin * 12 + 1, final_data)
             yield new_record
             ids = record_dict.keys()
             if not ids:
                 break
+
+
+def comb_pieces(stream):
+    global pieces_log
+    pieces_log = open('log/pieces.log','w')
+
+    return do_combine(stream, pieces_log, get_longest, pieces_combine)
+
 
 def drop_strange(data):
     """Drops data from station records, under control of the file
@@ -743,7 +734,6 @@ def step1(record_source):
         An iterable source of `giss_data.StationRecord` instances.
 
     """
-
     records = comb_records(record_source)
     helena_adjusted = adjust_helena(records)
     combined_pieces = comb_pieces(helena_adjusted)

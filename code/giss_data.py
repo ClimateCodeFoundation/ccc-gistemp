@@ -30,7 +30,7 @@ import read_config
 BASE_YEAR = 1880
 
 #: Integer code used to indicate missing data. This is units of 0.1
-#: celcius.
+#: celsius.
 MISSING = 9999
 
 #: The floating point version of `MISSING`.
@@ -189,7 +189,7 @@ def clear_cache(func):
     """
     def f(self, *args, **kwargs):
         self._tenths = None
-        self._celcius = None
+        self._celsius = None
         self._good_count = None
         self._ann_anoms_good_count = None
         return func(self, *args, **kwargs)
@@ -354,7 +354,7 @@ class MonthlyTemperatureRecord(object):
     This is the base class for both the `StationRecord` and `SubboxRecord`
     classes. It contains a series of average monthly temperatures, which are
     accessible via the `series` property. The series propery always provides
-    an array of floating point values in celcius. This property should
+    an array of floating point values in celsius. This property should
     **always** be treated as read-only; the effect of modifying elements is
     undefined.
 
@@ -383,7 +383,7 @@ class MonthlyTemperatureRecord(object):
         self._good_start_idx = sys.maxint
         self._good_end_idx = 0
         self._series = []
-        self._celcius = None
+        self._celsius = None
         self._tenths = None
         self._good_count = None
         self._ann_anoms_good_count = None
@@ -622,19 +622,19 @@ class StationRecord(MonthlyTemperatureRecord):
     @property
     def series(self):
         """The series of values in celsius."""
-        if self._celcius is None:
+        if self._celsius is None:
             c = []
             for v in self._series:
                 if self.invalid(v):
                     c.append(XMISSING)
                 else:
                     c.append(v * 0.1)
-            self._celcius = c
-        return self._celcius
+            self._celsius = c
+        return self._celsius
 
     @property
     def series_as_tenths(self):
-        """Return the time series in 0.1 celcius, integer units."""
+        """Return the time series in 0.1 celsius, integer units."""
         return self._series
 
     @property
@@ -737,7 +737,7 @@ class StationRecord(MonthlyTemperatureRecord):
 
     @property
     def ann_anoms_good_count(self):
-        """Number of good values in the annual anomolies"""
+        """Number of good values in the annual anomalies"""
         if self._ann_anoms_good_count is None:
             bad = 0
             for v in self.ann_anoms:
@@ -776,7 +776,7 @@ class StationRecord(MonthlyTemperatureRecord):
                 self.first_good_month, self.last_good_month,
                 self.rel_first_good_month, self.rel_last_good_month,
                 )
-        for n in ("series", "anomolies"):
+        for n in ("series", "anomalies"):
             v = getattr(self, n, None)
             if v is None:
                 continue
@@ -913,7 +913,7 @@ class SubboxRecord(MonthlyTemperatureRecord):
                 self.first_good_month, self.last_good_month,
                 self.rel_first_good_month, self.rel_last_good_month,
                 )
-        for n in ("series", "anomolies"):
+        for n in ("series", "anomalies"):
             v = getattr(self, n, None)
             if v is None:
                 continue

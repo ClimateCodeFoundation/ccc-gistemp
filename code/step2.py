@@ -151,7 +151,7 @@ def annual_anomalies(stream):
         if first is not None:
             record.first = first + record.first_year
             record.last = last + record.first_year
-            record.anomolies = annual_anoms[first: last+1]
+            record.anomalies = annual_anoms[first: last+1]
             yield record
 
 def is_rural(station):
@@ -234,7 +234,7 @@ def urban_adjustments(anomaly_stream):
         station = record.station
         all.append(record)
         record.urban_adjustment = None
-        anomalies = record.anomolies
+        anomalies = record.anomalies
         length = len(anomalies)
         # convert anomalies back from int to float;
         # TODO: preserve as float between annual_anomalies and here.

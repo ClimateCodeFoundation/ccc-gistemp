@@ -6,9 +6,10 @@ This is just a stepping stone.
 __docformat__ = "restructuredtext"
 
 
-import struct
 import itertools
+import os
 import re
+import struct
 
 import math
 
@@ -81,7 +82,7 @@ class SubboxWriter(object):
                         b.station_months, b.d, *b.series)
         self.f.writeline(rec)
 
-    def add_record(self, record):
+    def write(self, record):
         if self.meta is None:
             assert hasattr(record, "precipitation_flag"), (
                     "First record must be SubboxMetaData")
@@ -138,7 +139,7 @@ class StationRecordWriter(object):
 
         self.f.writeline(data)
 
-    def add_record(self, record):
+    def write(self, record):
         if self.meta is None:
             assert hasattr(record, "precipitation_flag"), (
                     "First record must be StationMetaData")
@@ -270,7 +271,7 @@ class StationTsWriter(object):
     def __init__(self, path):
         self.f = open(path, "w")
 
-    def add_record(self, record):
+    def write(self, record):
         station = record.station
         self.f.write(' %4d%5d%s%4s%-36s\n' % (
                 station.lat_as_tenths, station.lon_as_tenths,
@@ -330,12 +331,12 @@ class V2MeanWriter(object):
         else:
             return "%5d" % t
 
-    def add_record(self, record):
-        s = self.to_text
+    def write(self, record):
         for year in range(record.first_year, record.last_year + 1):
             if not record.has_data_for_year(year):
                 continue
-            temps = [s(t) for t in record.get_a_year_as_tenths(year)]
+            temps = [self.to_text(t)
+              for t in record.get_a_year_as_tenths(year)]
             self.f.write('%s%04d%s\n' % (record.uid, year, ''.join(temps)))
 
     def close(self):
@@ -585,3 +586,89 @@ def read_tenths(s):
     return round_to_nearest(f * 10)
 
 
+# Each of the stepN_input functions below produces an iterator that
+# yields that data for that step feeding from data files.
+# Each of the stepN_output functions below is effectively a "tee" that
+# writes the data to a file; they each take a data object (an
+# iterator), write each item to a file, and yield each item.
+def step0_input():
+    class Struct:
+        pass
+    input = Struct()
+    input.ushcn_source = USHCNReader(
+            "input/9641C_200907_F52.avg", 'input/ushcn2.tbl')
+    input.ghcn_source = V2MeanReader("input/v2.mean",
+      code.giss_data.BASE_YEAR)
+    input.antarc_source = itertools.chain(
+            AntarcticReader("input/antarc1.txt", "input/antarc1.list", '8'),
+            AntarcticReader("input/antarc3.txt", "input/antarc3.list", '9'),
+            AustroAntarcticReader("input/antarc2.txt",
+                "input/antarc2.list", '7'))
+    input.hohenpeis_source = HohenpeissenbergReader(
+            "input/t_hohenpeissenberg_200306.txt_as_received_July17_2003")
+
+    return input
+
+def step0_output(data):
+    out = V2MeanWriter("work/v2.mean_comb")
+    for thing in data:
+        out.write(thing)
+        yield thing
+    out.close()
+
+def step1_input():
+    return V2MeanReader("work/v2.mean_comb")
+
+def step1_output(data):
+    out = StationTsWriter("work/Ts.txt")
+    for thing in data:
+        out.write(thing)
+        yield thing
+    out.close()
+
+def step2_input():
+    return StationTsReader("work/Ts.txt")
+
+def step2_output(data):
+    out = StationRecordWriter(open("work/Ts.GHCN.CL.PA", "wb"), bos='<')
+    for thing in data:
+        out.write(thing)
+        yield thing
+    out.close()
+
+def step3_input():
+    return StationReader(open("work/Ts.GHCN.CL.PA", "rb"), bos='<')
+
+def step3_output(data):
+    out = SubboxWriter(open('work/SBBX1880.Ts.GHCN.CL.PA.1200', 'wb'),
+      trimmed=False)
+    for thing in data:
+        out.write(thing)
+        yield thing
+    out.close()
+
+def step4_input():
+    while True:
+        yield 'Step 4 dummy value'
+
+def step4_output(data):
+    # The Step 4 output is slightly unusual, it is an iterable of pairs.
+    # We only want to write the records from the right-hand item (the
+    # ocean data).  The left-hand items are land data, already written
+    # by Step 3.
+    out = SubboxWriter(open('work/SBBX.HadR2', 'wb'))
+    for land,ocean in data:
+        out.write(ocean)
+        yield land,ocean
+    out.close()
+
+def step5_input():
+    land = SubboxReader(
+      open(os.path.join('work', 'SBBX1880.Ts.GHCN.CL.PA.1200'), 'rb'))
+    ocean = SubboxReader(open("work/SBBX.HadR2", "rb"))
+
+    return itertools.izip(land, ocean)
+
+def step5_output(data):
+    # Already implicit in Step 5.
+    return data

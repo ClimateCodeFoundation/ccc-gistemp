@@ -127,9 +127,11 @@ def chartsingle(l):
     d = map(scale, d)
     return ','.join(map(str, d))
 
-def chartit(fs, offset):
+import sys
+
+def chartit(fs, out=sys.stdout, offset=0):
     """Convert the list of files *fs* to a Google Chart API url and print it
-    on standard output.
+    on *out*.
 
     *offset* specifies the inter-chart offset, as per the -o option (see
     module docstring).
@@ -139,9 +141,7 @@ def chartit(fs, offset):
     import urllib
 
     url = asgooglechartURL(map(asann, fs), offset=offset)
-    print url
-
-import sys
+    print >>out, url
 
 def main(argv=None):
     import getopt

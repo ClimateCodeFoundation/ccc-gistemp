@@ -250,9 +250,18 @@ class Step4Iterator(object):
             yield box
 
 
-def step4(record_source):
-    """Step 4 of the GISS processing."""
-    return Step4Iterator(record_source)
+def step4(data):
+    """Step 4 of GISTEMP processing.  This is a little unusual compared
+    to the other steps.  The effect of running this step is to update
+    the SBBX.HadR2 file.  The input data is a pair of iterables.
+    It produces a zipped output.
+    
+    """
+    import itertools
+
+    land,ocean = data
+    oceanresult = Step4Iterator(ocean)
+    return itertools.izip(land, oceanresult)
 
 
 class MergeReader(object):

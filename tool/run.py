@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # $URL$
-# $Id: run.py 159 2010-01-12 10:39:07Z drj@pobox.com $
+# $Rev$
 # 
 # run.py -- run steps of the GISTEMP algorithm
 #
@@ -22,22 +22,15 @@ import os
 # http://www.python.org/doc/2.4.4/lib/module-sys.html
 import sys
 
-# Extend sys.path to support access to all the clear climate code.
+# Clear Climate Code
 import extend_path
-import tool.step0
-import tool.step1
-import tool.step2
-import tool.step3
-import tool.step4
-import tool.step5
-
-import code.step5
-
+import giss_io
 
 class Fatal(Exception):
     def __init__(self, msg):
         self.msg = msg
 
+# :todo: remove me
 # Record the original standard output so we can log to it; in steps 2 and 5
 # we'll be changing the value of sys.stdout before calling other modules that
 # use "print" to generate their output.
@@ -53,62 +46,69 @@ def mkdir(path):
         log("... creating directory %s" % path)
         os.makedirs(path)
 
+# Each of the run_stepN functions below takes a data object, its input,
+# and produces a data object, its output.  Ordinarily the data objects
+# are iterators, either produced from the previous step, or an iterator
+# that feeds from a file.
+def run_step0(data):
+    from code import step0
+    if data is None:
+        data = giss_io.step0_input()
+    result = step0.step0(data)
+    return giss_io.step0_output(result)
 
-def run_step(source, sink):
-    for record in source:
-        sink.add_record(record)
-    sink.close()
+def run_step1(data):
+    from code import step1
+    if data is None:
+        data = giss_io.step1_input()
+    result = step1.step1(data)
+    return giss_io.step1_output(result)
 
+def run_step2(data):
+    from code import step2
+    if data is None:
+        data = giss_io.step2_input()
+    result = step2.step2(data)
+    return giss_io.step2_output(result)
 
-def run_step0(options):
-    source = tool.step0.get_step_iter()
-    sink = tool.step0.get_outputs()
-    run_step(source, sink)
+def run_step3(data):
+    from code import step3
+    if data is None:
+        data = giss_io.step3_input()
+    result = step3.step3(data)
+    return giss_io.step3_output(result)
 
+def run_step4(data):
+    from code import step4
+    if data is None:
+        data = giss_io.step4_input()
+    # :todo: push into giss_io.step4_input and always call it?
+    # Step 4 is a little unusual.  Its input is a pair of iterables.
+    # One for the Step 3 output (land data), one for the ocean data.
+    ocean = giss_io.SubboxReader(open('input/SBBX.HadR2', 'rb'))
+    data = (data, ocean)
+    result = step4.step4(data)
+    return giss_io.step4_output(result)
 
-def run_step1(options):
-    source = tool.step1.get_step_iter(options.steps, options.save_work)
-    sink = tool.step1.get_outputs()
-    run_step(source, sink)
+def run_step5(data):
+    from code import step5
+    if data is None:
+        data = giss_io.step5_input()
+    result = step5.step5(data)
+    return vischeck(result)
 
-
-def run_step2(options):
-    source = tool.step2.get_step_iter(options.steps, options.save_work)
-    sink = tool.step2.get_outputs()
-    run_step(source, sink)
-
-
-def run_step3(options):
-    source = tool.step3.get_step_iter(options.steps, options.save_work)
-    sink = tool.step3.get_outputs()
-    run_step(source, sink)
-
-
-def run_step4(options):
-    source = tool.step4.get_step_iter(options.steps, options.save_work)
-    sink = tool.step4.get_outputs()
-    run_step(source, sink)
-
-
-def run_step5(options):
-    inputs = tool.step5.get_inputs(options.steps, options.save_work)
-
-    # Save standard output so we can restore it when we're done with this step.
-    old_stdout = sys.stdout
-
-    code.step5.step5(inputs)
-
+def vischeck(data):
+    # Suck data through pipeline.
+    for _ in data:
+        pass
     log("... running vischeck")
     import vischeck
-    sys.stdout = open(os.path.join('result', 'google-chart.url'), 'w')
-    vischeck.main(['', os.path.join('result', 'GLB.Ts.ho2.GHCN.CL.PA.txt')])
-    sys.stdout.close()
+    vischeck.chartit(
+      [open(os.path.join('result', 'GLB.Ts.ho2.GHCN.CL.PA.txt'))],
+      open(os.path.join('result', 'google-chart.url'), 'w'))
 
     log("See result/google-chart.url")
-
-    # Restore standard output.
-    sys.stdout = old_stdout
-
+    yield "vischeck completed"
 
 def parse_steps(steps):
     steps = steps.strip()
@@ -177,25 +177,29 @@ def main(options, args):
         
         # Record start time now, and ending times for each step.
         start_time = time.time()
-        s = max(step_list)
 
-        if not step_fn.has_key(s):
-            raise Fatal("Can't run step %d" % s)
+        cannot = [s for s in step_list if not step_fn.has_key(s)]
+        if cannot:
+            raise Fatal("Can't run steps %s" % str(cannot))
 
-        log("====> STEPS %d to %d  ====" % (step_list[0], step_list[-1]))
-        # As a special case, if we are running a sequence of steps ending with step4,
-        # we need to run step3 and step4 separately. This is beacuse the steps
-        # join up like this::
-        #
-        #         0 ---> 1 ---> 2 ---> 3 -.
-        #                                  |--> 5
-        #                              4 -'
-        #
-        if s == 4 and 3 in step_list:
-            step_fn[3](options)
-            step_fn[4](options)
+        # Create a message for stdout.
+        if len(step_list) == 1:
+            logit = "STEP %d" % step_list[0]
         else:
-            step_fn[s](options)
+            assert len(step_list) >= 2
+            if step_list == range(step_list[0], step_list[-1]+1):
+                logit = "STEPS %d to %d" % (step_list[0], step_list[-1])
+            else:
+                logit = "STEPS %s" % str(step_list)
+        log("====> %s  ====" % logit)
+        data = None
+        for step in step_list:
+            data = step_fn[step](data)
+        # Consume the data in whatever the last step was, in order to
+        # write its output, and hence suck data through the whole
+        # pipeline.
+        for _ in data:
+            pass
 
         end_time = time.time()
         log("====> Timing Summary ====")

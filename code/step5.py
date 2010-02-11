@@ -32,7 +32,7 @@ import os
 
 
 # See SBBXotoBX.f
-def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991),
+def SBBXtoBX(data, box, log, rland, intrp, base=(1961,1991),
         ignore_land=False):
     """Simultaneously combine the land series and the ocean series and
     combine subboxes into boxes.  *land* and *ocean* should be open
@@ -45,10 +45,7 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991),
     ocean and land data will ignore their land data.
     """
     
-    landsubbox = iter(land)
-    oceansubbox = iter(ocean)
-    land_meta = landsubbox.next()
-    ocean_meta = oceansubbox.next()
+    land_meta,ocean_meta = data.next()
 
     bos ='>'
     boxf = fort.File(box, bos=bos)
@@ -132,8 +129,8 @@ def SBBXtoBX(land, ocean, box, log, rland, intrp, base=(1961,1991),
         wgtc = [0] * (nsubbox*2)
         # Eat the records from land and ocean 100 (nsubbox) at a time.
         # In other words, all 100 subboxes for the box (region).
-        landsub = list(itertools.islice(landsubbox, nsubbox))
-        oceansub = list(itertools.islice(oceansubbox, nsubbox))
+        landsub,oceansub = zip(*itertools.islice(data, nsubbox))
+        # :todo: combine below zip with above zip?
         for i,l,o in zip(range(nsubbox),landsub,oceansub):
             avg[i][land_offset:land_offset+len(l.series)] = l.series
             avg[i+nsubbox][ocean_offset:ocean_offset+len(o.series)] = o.series
@@ -443,21 +440,20 @@ def tavg(data, km, nyrs, base, limit, nr, id, deflt=0.0, XBAD=9999):
     return bias
 
 
-def step5(inputs=()):
-    """Step 5 of the GISS processing.
+def step5(data):
+    """Step 5 of GISTEMP.
 
-    This step take input provided by steps 3 and 4.
+    This step takes input provided by steps 3 and 4 (zipped together).
 
-    :Param land, ocean:
-        These are data sources for the land and ocean sub-box data.
+    :Param data:
+        These are the land and ocean sub-box data, zipped together.
         They need to support the protocol defined by
         `code.giss_data.SubboxSetProtocol`.
 
     """
-    land, ocean = inputs
     box = open(os.path.join('result', 'BX.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
     log = open(os.path.join('log', 'SBBXotoBX.log'), 'w')
-    SBBXtoBX(land, ocean, box, log, rland=100, intrp=0)
+    SBBXtoBX(data, box, log, rland=100, intrp=0)
     # Necessary, because box is an input to the next stage, so the file
     # needs to be fully written.
     box.close()
@@ -466,3 +462,4 @@ def step5(inputs=()):
     zonav.main()
     import annzon
     annzon.main()
+    yield "Step 5 Completed"

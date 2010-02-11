@@ -28,7 +28,6 @@ def get_outputs():
 def main(argv=None):
     record_sink = get_outputs()
     record_source = get_step_iter()
-    record_sink.add_meta(record_source.meta)
 
     for record in record_source:
         record_sink.add_record(record)

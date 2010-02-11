@@ -45,6 +45,10 @@ def open_or_uncompress(filename):
 
 
 class SubboxWriter(object):
+    """Produces a GISTEMP SBBX (subbox) file; typically the output of
+    step3 (and 4), and the input to step 5.
+    """
+
     def __init__(self, rawfile, bos='>', trimmed=True):
         self.trimmed = trimmed
         self.bos = bos
@@ -95,6 +99,14 @@ class SubboxWriter(object):
 
 
 class StationRecordWriter(object):
+    """Writes station records into a binary format that is the usual
+    output of Step 2.  This format is partly documented in the header
+    comment of the program STEP3/to.SBBXgrid.f from the GISTEMP sources,
+    where a comment says "READS NCAR FILES".  NCAR is the National
+    Center for Atmospheric Research (as US government agency).
+
+    Step 3 takes files in this format as input.
+    """
     def __init__(self, rawfile, bos='>'):
         self.bos = bos
         self.f = fort.File(rawfile, bos=self.bos)
@@ -141,6 +153,9 @@ class StationRecordWriter(object):
 
 
 class StationReader(object):
+    """Reads files in the format produced by StationRecordWriter.  Files
+    is this format are the input to Step 3 (and the output from Step 2).
+    """
     def __init__(self, rawfile, bos='>'):
         self.bos = bos
         self.f = fort.File(rawfile, bos=self.bos)
@@ -178,6 +193,10 @@ class StationReader(object):
 
 
 class SubboxReader(object):
+    """Reads GISS subbox files (SBBX).  These files are output by Step
+    3, and consumed by Step 5.  Step 4 both reads and writes a subbox
+    file.
+    """
     def __init__(self, rawfile, bos='>'):
         self.bos = bos
         self.f = fort.File(rawfile, bos=self.bos)
@@ -244,6 +263,10 @@ def StationTsReader(path):
 
 
 class StationTsWriter(object):
+    """Writes a file in Ts.txt format.  The traditional output of
+    step1.
+    """
+
     def __init__(self, path):
         self.f = open(path, "w")
 
@@ -296,6 +319,8 @@ def V2MeanReader(path, year_min=-9999):
 
 
 class V2MeanWriter(object):
+    """Write a file in GHCN v2.mean format."""
+
     def __init__(self, path):
         self.f = open(path, "w")
 

@@ -262,8 +262,11 @@ class StationTsWriter(object):
         self.f.close()
 
 
-def V2MeanReader(path):
-    """Reads a file in GHCN v2.mean format and yields each station."""
+def V2MeanReader(path, year_min=-9999):
+    """Reads a file in GHCN v2.mean format and yields each station.
+    
+    If `year_min` is specified, then only years >= year_min are kept
+    (the default, -9999, effectively keeps all years."""
 
     f = open(path)
     def id12(l):
@@ -279,7 +282,7 @@ def V2MeanReader(path):
             if line != prev_line:
                 year = int(line[12:16])
                 tenths = [int(line[a:a+5]) for a in range(16, 16+12*5, 5)]
-                if year >= code.giss_data.BASE_YEAR:
+                if year >= year_min:
                     record.add_year_of_tenths(year, tenths)
                 prev_line = line
             else:

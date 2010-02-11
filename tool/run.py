@@ -31,11 +31,6 @@ import tool.step3
 import tool.step4
 import tool.step5
 
-import code.step0
-import code.step1
-import code.step2
-import code.step3
-import code.step4
 import code.step5
 
 

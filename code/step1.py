@@ -219,14 +219,12 @@ def add(sums, wgts, diff, begin, record):
         sums[index] += datum - diff
         wgts[index] += 1
 
-def get_longest_overlap(sums, wgts, begin, years, records):
+def get_longest_overlap(new_data, begin, records):
     """Find the record in the *records* dict that has the longest
-    overlap with the accumulated data in *sums* and *wgts* by
-    considering annual anomalies.  An overlap has to be at least
-    MIN_OVERLAP years to count.
+    overlap with the *new_data* by considering annual anomalies.  An
+    overlap has to be at least MIN_OVERLAP years to count.
     """
 
-    new_data = average(sums, wgts, years)
     ann_mean, ann_anoms = monthly_annual(new_data)
     overlap = 0
     # :todo: the records are consulted in an essentially arbitrary
@@ -263,7 +261,7 @@ def get_longest_overlap(sums, wgts, begin, years, records):
 
 def combine(sums, wgts, begin, years, records, log, new_id=None):
     while records:
-        record, rec_id, diff = get_longest_overlap(sums, wgts, begin, years, records)
+        record, rec_id, diff = get_longest_overlap(average(sums, wgts, years), begin, records)
         if invalid(diff):
             log.write("\tno other records okay\n")
             return
@@ -314,12 +312,7 @@ def make_record_dict(records, ids):
         end = record.last_year
         y_min = min(y_min, begin)
         y_max = max(y_max, end)
-        ann_mean, ann_anoms = monthly_annual(record.series)
-        record_dict[rec_id] = giss_data.StationRecord(record.uid)
-        record_dict[rec_id].set_ann_anoms(ann_anoms)
-        record_dict[rec_id].ann_mean = ann_mean
-        record_dict[rec_id].set_series(record.first_month, record.series)
-        record_dict[rec_id].source = record.source
+        record_dict[rec_id] = record
     return record_dict, y_min, y_max
 
 def fresh_arrays(record, begin, years):
@@ -401,8 +394,7 @@ def sigma(list):
     return math.sqrt(sigma_squared/len(list))
 
 # Annoyingly similar to get_longest_overlap
-def pieces_get_longest_overlap(sums, wgts, begin, years, records):
-    new_data = average(sums, wgts, years)
+def pieces_get_longest_overlap(new_data, begin, records):
     ann_mean, ann_anoms = monthly_annual(new_data)
     overlap = 0
     for rec_id, record in records.items():
@@ -507,7 +499,7 @@ def find_quintuples(new_sums, new_wgts,
 
 def pieces_combine(sums, wgts, begin, years, records, log, new_id):
     while records:
-        record, rec_id = pieces_get_longest_overlap(sums, wgts, begin, years, records)
+        record, rec_id = pieces_get_longest_overlap(average(sums, wgts, years), begin, records)
         rec_begin = record.first_year
         rec_end = rec_begin + record.last_year - record.first_year
 
@@ -562,6 +554,9 @@ def do_combine(stream, log, select_func, combine_func):
         records = {}
         for record in record_set:
             records[record.uid] = record
+            ann_mean, ann_anoms = monthly_annual(record.series)
+            record.set_ann_anoms(ann_anoms)
+            record.ann_mean = ann_mean
         ids = records.keys()
         while 1:
             if len(ids) == 1:
@@ -572,17 +567,12 @@ def do_combine(stream, log, select_func, combine_func):
             record, rec_id = select_func(record_dict)
             del record_dict[rec_id]
             sums, wgts = fresh_arrays(record, begin, years)
-            new_record = record.copy()
-            new_record.source = record.source
-            new_record.ann_mean = record.ann_mean
-            new_record.ann_anoms = record.ann_anoms
-
             log.write("\t%s %s %s -- %s\n" % (rec_id, begin,
                 begin + years -1, record.source))
             combine_func(sums, wgts, begin, years, record_dict, log, rec_id)
             begin, final_data = final_average(sums, wgts, years, begin)
-            new_record.set_series(begin * 12 + 1, final_data)
-            yield new_record
+            record.set_series(begin * 12 + 1, final_data)
+            yield record
             ids = record_dict.keys()
             if not ids:
                 break

@@ -371,8 +371,7 @@ def urban_adjustments(anomaly_stream):
                  n2x = iyu2
 
         flag = flags(fit, first + iyoff, last + iyoff)
-        us.record.urban_adjustment = (us.id, fit, first + iyoff, 
-                last + iyoff, n1x, n2x, flag)
+        us.record.urban_adjustment = (fit, first + iyoff, last + iyoff, n1x, n2x, flag)
         yield us.record
 
     nuse = 0
@@ -682,7 +681,6 @@ def flags(fit, iy1, iy2):
         g.nsw0 += 1
     return iflag
 
-#def apply_adjustments(stream, adjustments):
 def apply_adjustments(stream):
     """Applies the urban adjustment records from the iterator
     *adjustments* to the station records in *stream*.  Returns an
@@ -718,7 +716,7 @@ def apply_adjustments(stream):
             m1 = record.rel_first_month + record.good_start_idx
             m2 = record.rel_first_month + record.good_end_idx - 1
             offset = record.good_start_idx # index of first valid month
-            (_, fit, iy1, iy2, iy1e, iy2e, flag) = record.urban_adjustment
+            (fit, iy1, iy2, iy1e, iy2e, flag) = record.urban_adjustment
             a, b = adj(first_year, record, series, fit, iy1e, iy2e, iy1, iy2,
                     flag, m1, m2, offset)
             # a and b are numbers of new first and last valid months
@@ -758,14 +756,10 @@ def adj(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, o
         sl1, sl2 = sl0, sl0
 
     base = m1
-    #print "CC>>", first_year, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offset
-    #print "    ", sl1, sl2, knee, sl0
-    #print "    ", base
 
     m1o, m2o = m1, m2
     m1 = -100
     m0 = 12 * (iy1 - first_year)   # Dec of year iy1
-    #print "    ", m1o, m2o, m1, m0, series[0], series[1], series[-1]
     for iy in range(iy1, iy2 + 1):
         sl = sl1
         if iy > knee:
@@ -791,57 +785,18 @@ def adj(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, o
     return m1, m2
 
 
-class Step2Iterator(object):
-    """An iterator for step 2.
-    
-    An instance of this class acts as an iterator that produces a stream of
-    `giss_data.StationRecord` instances.
-
-    """
-    def __init__(self, record_source):
-        """Constructor:
-
-        :Param record_source:
-            An iterable source of `giss_data.StationRecord` instances.
-
-        """
-        self.record_source = record_source
-
-        #self.first_year = giss_data.BASE_YEAR
-        last_year = giss_data.get_ghcn_last_year()
-        #MTOT = 12 * (last_year - self.first_year + 1)
-        MTOT = 12 * (last_year - giss_data.BASE_YEAR + 1)
-
-        self.meta = giss_data.StationMetaData(
-                mo1=None, kq=1, mavg=6, monm=MTOT, monm4=MTOT + 15,
-                yrbeg=1880, missing_flag=9999, precipitation_flag=-9999,
-                mlast=None, title='GHCN V2 Temperatures (.1 C)')
-
-    def __iter__(self):
-        return self._it()
-
-    def _it(self):
-        # First record is the data-set metadata.
-        yield self.meta
-
-        data = invnt('Ts.GHCN.CL', load_time_series(self.record_source))
-        # At this point we may need to reorder the data so that all the
-        # stations between +60.1 and +90.0 comes first, then all the
-        # stations between +30.1 and +60.0 come next, and so on.  Thus
-        # reflecting how GISTEMP re-orders them when they are split into 6
-        # files.  Doing the reordering makes a tiny amount of difference,
-        # see http://code.google.com/p/ccc-gistemp/issues/detail?id=25
-        #
-        # But if you feel like doing this, you'll need to look at the, now
-        # deleted, split_binary.py program to see exactly how the split
-        # happens.
-
-        anomalies = annual_anomalies(data)
-        adjustments = urban_adjustments(anomalies)
-        adjusted = invnt('Ts.GHCN.CL.PA', apply_adjustments(adjustments))
-        for record in adjusted:
-            yield record
-
-    
 def step2(record_source):
-    return Step2Iterator(record_source)
+    last_year = giss_data.get_ghcn_last_year()
+    MTOT = 12 * (last_year - giss_data.BASE_YEAR + 1)
+
+    yield giss_data.StationMetaData(
+        mo1=None, kq=1, mavg=6, monm=MTOT, monm4=MTOT + 15,
+        yrbeg=1880, missing_flag=9999, precipitation_flag=-9999,
+        mlast=None, title='GHCN V2 Temperatures (.1 C)')
+
+    data = invnt('Ts.GHCN.CL', load_time_series(record_source))
+    anomalies = annual_anomalies(data)
+    adjustments = urban_adjustments(anomalies)
+    adjusted = invnt('Ts.GHCN.CL.PA', apply_adjustments(adjustments))
+    for record in adjusted:
+        yield record

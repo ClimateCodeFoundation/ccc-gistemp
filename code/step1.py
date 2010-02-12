@@ -445,18 +445,16 @@ BUCKET_RADIUS = 10
 pieces_log = None
 
 def sigma(list):
-    sos = sum = count = 0
-    for x in list:
-        if invalid(x):
-            continue
-        sos += x * x
-        sum += x
-        count = count + 1
-    if count == 0:
+    # Remove invalid (missing) data.
+    list = filter(valid, list)
+    if len(list) == 0:
         return giss_data.MISSING
-    else:
-        mean = sum/count
-        return math.sqrt(sos / count - mean * mean)
+    # Two pass method ensures argument to sqrt is always positive.
+    mean = sum(list) / len(list)
+    sigma_squared = 0.0
+    for x in list:
+        sigma_squared += (x-mean)**2
+    return math.sqrt(sigma_squared/len(list))
 
 # Annoyingly similar to get_longest_overlap
 def pieces_get_longest_overlap(sums, wgts, begin, years, records):

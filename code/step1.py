@@ -37,7 +37,6 @@ Also requires the existence of writeable work/ and log/ directories.
 
 import math
 import struct
-import array
 import itertools
 
 import read_config
@@ -63,52 +62,44 @@ def valid(x):
     # return 0 or 1 (or False or True, which it does).
     return not invalid(x)
 
-def sum_valid(seq):
-    """Takes a sequence, *seq*, and sums up all the valid items (using
-    the valid() function).  *sum*,*count* is returned (where *count* is
-    the number of valid items).
-    """
+def valid_mean(seq, min=1):
+    """Takes a sequence, *seq*, and computes the mean of the valid
+    items (using the valid() function).  If there are fewer than *min*
+    valid items, the mean is XMISSING."""
 
     count = 0
-    a = 0.0
+    sum = 0.0
     for x in seq:
         if valid(x):
-            a += x
+            sum += x
             count += 1
-    return a,count
+    if count >= min:
+        return sum/float(count)
+    else:
+        return giss_data.XMISSING
 
-
-def month_anomaly(data):
-    """Convert data to monthly anomalies, by subtracting from every
-    datum the mean for its month.  A pair of (monthly_mean,monthly_anom)
-    is returned.
+def monthly_anomalies(data):
+    """Calculate monthly anomalies, by subtracting from every datum
+    the mean for its month.  A pair of (monthly_mean, monthly_anom) is
+    returned.
     """
 
     years = len(data) // 12
-    #print "monthly_annual-1", years
-    # For each of the 12 months, its mean.
-    monthly_mean = [giss_data.MISSING]*12
-    # Every datum converted to anomaly by subtracting the mean
-    # for its month.
-    monthly_anom = array.array('d', data)
+    monthly_mean = []
+    monthly_anom = []
     for m in range(12):
-        # *row* contains the data for one month of the year.
         row = data[m::12]
-        sum,count = sum_valid(row)
-        #print "monthly_annual-2", sum,count, row
-        if count > 0:
-            monthly_mean[m] = sum / float(count)
-        mean = monthly_mean[m]
-        def asanom(datum):
-            """Convert a single datum to anomaly."""
-            if valid(datum):
-                return datum - mean
-            return giss_data.MISSING
+        mean = valid_mean(row)
+        monthly_mean.append(mean)
         if valid(mean):
-            anom_row = array.array('d', map(asanom, row))
+            def asanom(datum):
+                """Convert a single datum to anomaly."""
+                if valid(datum):
+                    return datum - mean
+                return giss_data.XMISSING
+            monthly_anom.append(map(asanom, row))
         else:
-            anom_row = array.array('d',[giss_data.MISSING]*years)
-        monthly_anom[m::12] = anom_row
+            monthly_anom.append([giss_data.XMISSING]*years)
     return monthly_mean, monthly_anom
 
 def monthly_annual(data):
@@ -119,7 +110,7 @@ def monthly_annual(data):
     """
 
     years = len(data) // 12
-    monthly_mean, monthly_anom = month_anomaly(data)
+    monthly_mean, monthly_anom = monthly_anomalies(data)
 
     # :todo:
     # The seasonal calculation shoud be abstracted into a function.
@@ -127,7 +118,7 @@ def monthly_annual(data):
     # outputs: seasonal_anom, seasonal_mean
     # Average monthly means to make seasonal means,
     # and monthly anomalies to make seasonal anomalies.
-    seasonal_mean = array.array('d', [giss_data.MISSING] * 4)
+    seasonal_mean = []
     seasonal_anom = []
     # compute seasonal anomalies
     for s in range(4):
@@ -135,81 +126,55 @@ def monthly_annual(data):
             months = [11, 0, 1]
         else:
             months = range(s*3-1, s*3+2)
-        sum,count = sum_valid(monthly_mean[m] for m in months)
         # need at least two valid months for a valid season
-        if count > 1:
-            seasonal_mean[s] = sum / float(count)
-        seasonal_anom_row = array.array('d', [giss_data.MISSING] * years)
+        seasonal_mean.append(valid_mean((monthly_mean[m] for m in months),
+                                        min = 2))
         # A list of 3 data series, each being an extract for a
         # particular month
         month_in_season = []
         for m in months:
-            row = monthly_anom[m::12]
+            row = monthly_anom[m] # the list of anomalies for month m
             if m == 11:
-                # For december, we take the december of the previous
+                # For December, we take the December of the previous
                 # year.  Which we do by offsetting the array, and not
-                # using the most recent december.
+                # using the most recent December.
                 row[1:] = row[:-1]
-                row[0] = giss_data.MISSING
+                row[0] = giss_data.XMISSING
             month_in_season.append(row)
+        seasonal_anom_row = []
         for n in range(years):
-            sum = 0.0
-            count = 0
-            for i in range(3):
-                m_anom = month_in_season[i][n]
-                if valid(m_anom):
-                    sum += m_anom
-                    count += 1
-            # need at least two valid months for a valid season
-            if count > 1:
-                seasonal_anom_row[n] = sum / float(count)
+            seasonal_anom_row.append(valid_mean((month_in_season[i][n] for i in range(3)),
+                                                min = 2))
         seasonal_anom.append(seasonal_anom_row)
     
     # Average seasonal means to make annual mean,
     # and average seasonal anomalies to make annual anomalies
     # (note: annual anomalies are December-to-November).
-    sum,count = sum_valid(seasonal_mean)
-    # need 3 valid seasons for a valid year
-    if count > 2:
-        annual_mean = sum / float(count)
-    else:
-        annual_mean = giss_data.MISSING
-    annual_anom = array.array('d',[giss_data.MISSING]*years)
+    annual_mean = valid_mean(seasonal_mean, min = 3)
+    annual_anom = []
     for n in range(years):
-        sum,count = sum_valid(seasonal_anom[s][n] for s in range(4))
-        # need 3 valid seasons for a valid year
-        if count > 2:
-            annual_anom[n] = sum / float(count)
+        annual_anom.append(valid_mean((seasonal_anom[s][n] for s in range(4)),
+                                      min = 3))
     return (annual_mean, annual_anom)
 
 
 MIN_OVERLAP = 4
-comb_log = None
 
-def average(sums, counts, out_data, years):
-    """Where the *counts* array indicates that *sums* has a valid sum,
-    update the corresponding entry in *out_data* with the average
-    (sum/count).
-
-    This function is scheduled for termination, see fresh_average.
+def average(sums, counts, years):
+    """Return an array with sums[i]/counts[i], and XMISSING where
+    counts[i] is zero.
     """
 
     assert len(sums) == years * 12
     assert len(counts) == years * 12
-    assert len(out_data) == years * 12
+
+    data = [giss_data.XMISSING] * (years*12)
 
     for i in range(len(counts)):
         count = counts[i]
         if count != 0:
-            out_data[i] = sums[i] / count
+            data[i] = float(sums[i]) / count
 
-def fresh_average(sums, counts, years):
-    """Same as average, but returns a fresh data array.  The plan is to
-    eliminate average by replacing calls to it with calls to this
-    function.  Then rename this as average."""
-
-    data = [giss_data.MISSING] * (years*12)
-    average(sums, counts, data, years)
     return data
 
 def final_average(sums, wgts, years, begin):
@@ -226,7 +191,7 @@ def final_average(sums, wgts, years, begin):
             y_min = min(y_min, i)
             y_max = max(y_max, i)
     if y_min == 0 and y_max == years - 1:
-        return begin, fresh_average(sums, wgts, years)
+        return begin, average(sums, wgts, years)
     years = y_max - y_min + 1
     begin = begin + y_min
     month_base = y_min * 12
@@ -234,7 +199,7 @@ def final_average(sums, wgts, years, begin):
     sums = sums[month_base:month_limit]
     wgts = wgts[month_base:month_limit]
     assert len(wgts) == 12*years
-    return begin, fresh_average(sums, wgts, years)
+    return begin, average(sums, wgts, years)
 
 def add(sums, wgts, diff, begin, record):
     """Add the data from *record* to the *sums* and *wgts* arrays, first
@@ -261,8 +226,7 @@ def get_longest_overlap(sums, wgts, begin, years, records):
     MIN_OVERLAP years to count.
     """
 
-    #print "get_longest_overlap"
-    new_data = fresh_average(sums, wgts, years)
+    new_data = average(sums, wgts, years)
     ann_mean, ann_anoms = monthly_annual(new_data)
     overlap = 0
     # :todo: the records are consulted in an essentially arbitrary
@@ -294,21 +258,18 @@ def get_longest_overlap(sums, wgts, begin, years, records):
         best_id = rec_id
         best_record = record
     if overlap < MIN_OVERLAP:
-        return 0, 0, giss_data.MISSING
+        return 0, 0, giss_data.XMISSING
     return best_record, best_id, diff
 
-def combine(sums, wgts, begin, years, records, new_id=None):
+def combine(sums, wgts, begin, years, records, log, new_id=None):
     while records:
-        record, rec_id, diff = get_longest_overlap(sums, wgts, begin,
-                years, records)
+        record, rec_id, diff = get_longest_overlap(sums, wgts, begin, years, records)
         if invalid(diff):
-            comb_log.write("\tno other records okay\n")
+            log.write("\tno other records okay\n")
             return
         del records[rec_id]
         add(sums, wgts, diff, begin, record)
-        rec_begin = record.first_year
-        comb_log.write("\t %s %d %d %f\n" %
-          (rec_id, rec_begin, record.last_year - record.first_year + rec_begin - 1, diff))
+        log.write("\t %s %d %d %f\n" % (rec_id, record.first_year, record.last_year - 1, diff))
 
 def get_best(records):
     """Given a set of records (a dict really), return the best one, and
@@ -320,9 +281,8 @@ def get_best(records):
     longest = 0
     for rec_id in sorted(records.keys()):
         record = records[rec_id]
-        source = record.source
         length = record.ann_anoms_good_count
-        rank = ranks[source]
+        rank = ranks[record.source]
         if rank > best:
             best = rank
             best_rec = record
@@ -355,16 +315,10 @@ def make_record_dict(records, ids):
         y_min = min(y_min, begin)
         y_max = max(y_max, end)
         ann_mean, ann_anoms = monthly_annual(record.series)
-        # Let *length* be the number of valid data in ann_anoms.
-        #print rec_id, ann_mean, len(ann_anoms), ':', ann_anoms[:5]
-        length = 0
-        for anom in ann_anoms:
-            length += valid(anom)
         record_dict[rec_id] = giss_data.StationRecord(record.uid)
         record_dict[rec_id].set_ann_anoms(ann_anoms)
         record_dict[rec_id].ann_mean = ann_mean
-        record_dict[rec_id].set_series_from_tenths(record.first_month,
-            record.series_as_tenths)
+        record_dict[rec_id].set_series(record.first_month, record.series)
         record_dict[rec_id].source = record.source
     return record_dict, y_min, y_max
 
@@ -390,11 +344,7 @@ def fresh_arrays(record, begin, years):
     assert offset >= 0
     offset *= 12
 
-    try:
-        sums = [0.0] * nmonths
-    except MemoryError:
-        print "???", nmonths
-        raise
+    sums = [0.0] * nmonths
     # Copy valid data rec_data into sums, assigning 0 for invalid data.
     sums[offset:offset+rec_months] = (valid(x)*x for x in rec_data)
     # Let wgts[i] be 1 where sums[i] is valid.
@@ -410,10 +360,7 @@ def comb_records(stream):
     at most the number of original records (in the case where no
     combining is possible), and each combined record is yielded."""
 
-    global comb_log
-    comb_log = open('log/comb.log','w')
-
-    return do_combine(stream, comb_log, get_best, combine)
+    return do_combine(stream, open('log/comb.log','w'), get_best, combine)
 
 
 def adjust_helena(stream):
@@ -425,7 +372,7 @@ def adjust_helena(stream):
     for record in stream:
         id = record.uid
         if helena_ds.has_key(id):
-            series = list(record.series)
+            series = record.series
             this_year, month, summand = helena_ds[id]
             begin = record.first_year
             # Index of month specified by helena_ds
@@ -442,31 +389,27 @@ def adjust_helena(stream):
 
 MIN_MID_YEARS = 5            # MIN_MID_YEARS years closest to ymid
 BUCKET_RADIUS = 10
-pieces_log = None
 
 def sigma(list):
     # Remove invalid (missing) data.
     list = filter(valid, list)
     if len(list) == 0:
-        return giss_data.MISSING
+        return giss_data.XMISSING
     # Two pass method ensures argument to sqrt is always positive.
     mean = sum(list) / len(list)
-    sigma_squared = 0.0
-    for x in list:
-        sigma_squared += (x-mean)**2
+    sigma_squared = sum((x-mean)**2 for x in list)
     return math.sqrt(sigma_squared/len(list))
 
 # Annoyingly similar to get_longest_overlap
 def pieces_get_longest_overlap(sums, wgts, begin, years, records):
-    new_data = fresh_average(sums, wgts, years)
+    new_data = average(sums, wgts, years)
     ann_mean, ann_anoms = monthly_annual(new_data)
     overlap = 0
-    length = 0
     for rec_id, record in records.items():
         rec_ann_anoms = record.ann_anoms
         rec_years = record.last_year - record.first_year + 1
         rec_begin = record.first_year
-        sum = wgt = 0
+        wgt = 0
         for n in range(rec_years):
             rec_anom = rec_ann_anoms[n]
             if invalid(rec_anom):
@@ -476,7 +419,6 @@ def pieces_get_longest_overlap(sums, wgts, begin, years, records):
             if invalid(anom):
                 continue
             wgt = wgt + 1
-            sum = sum + rec_anom - anom
         if wgt < overlap:
             continue
         overlap = wgt
@@ -497,7 +439,7 @@ def get_actual_endpoints(wgts, begin, years):
 
 def find_quintuples(new_sums, new_wgts,
                     begin, years, record, rec_begin,
-                    new_id, rec_id):
+                    new_id, rec_id, log):
     rec_begin = record.first_year
     rec_end = rec_begin + record.last_year - record.first_year
 
@@ -506,12 +448,12 @@ def find_quintuples(new_sums, new_wgts,
     max_begin = max(actual_begin, rec_begin)
     min_end = min(actual_end, rec_end)
     middle_year = int(.5 * (max_begin + min_end) + 0.5)
-    pieces_log.write("max begin: %s\tmin end: %s\n" % (max_begin, min_end))
+    log.write("max begin: %s\tmin end: %s\n" % (max_begin, min_end))
 
-    new_data = fresh_average(new_sums, new_wgts, years)
+    new_data = average(new_sums, new_wgts, years)
     new_ann_mean, new_ann_anoms = monthly_annual(new_data)
     ann_std_dev = sigma(new_ann_anoms)
-    pieces_log.write("ann_std_dev = %s\n" % ann_std_dev)
+    log.write("ann_std_dev = %s\n" % ann_std_dev)
     new_offset = (middle_year - begin)
     new_len = len(new_ann_anoms)
 
@@ -546,41 +488,41 @@ def find_quintuples(new_sums, new_wgts,
                     sum2 += anom2 + rec_ann_mean
                     count2 += 1
         if count1 >= MIN_MID_YEARS and count2 >= MIN_MID_YEARS:
-            pieces_log.write("overlap success: %s %s\n" % (new_id, rec_id))
+            log.write("overlap success: %s %s\n" % (new_id, rec_id))
             ov_success = 1
             avg1 = sum1 / float(count1)
             avg2 = sum2 / float(count2)
             diff = abs(avg1 - avg2)
-            pieces_log.write("diff = %s\n" % diff)
+            log.write("diff = %s\n" % diff)
             if diff < ann_std_dev:
                 okay_flag = 1
-                pieces_log.write("combination success: %s %s\n" % (new_id, rec_id))
+                log.write("combination success: %s %s\n" % (new_id, rec_id))
             else:
-                pieces_log.write("combination failure: %s %s\n" % (new_id, rec_id))
+                log.write("combination failure: %s %s\n" % (new_id, rec_id))
             break
     if not ov_success:
-        pieces_log.write("overlap failure: %s %s\n" % (new_id, rec_id))
-    pieces_log.write("counts: %s\n" % ((count1, count2),))
+        log.write("overlap failure: %s %s\n" % (new_id, rec_id))
+    log.write("counts: %s\n" % ((count1, count2),))
     return okay_flag
 
-def pieces_combine(sums, wgts, begin, years, records, new_id):
+def pieces_combine(sums, wgts, begin, years, records, log, new_id):
     while records:
         record, rec_id = pieces_get_longest_overlap(sums, wgts, begin, years, records)
         rec_begin = record.first_year
         rec_end = rec_begin + record.last_year - record.first_year
 
-        pieces_log.write("\t %s %d %d\n" % (rec_id, rec_begin, record.last_year - record.first_year + rec_begin - 1))
+        log.write("\t %s %d %d\n" % (rec_id, rec_begin, record.last_year - record.first_year + rec_begin - 1))
 
         is_okay = find_quintuples(sums, wgts,
                                   begin, years, record, rec_begin,
-                                  new_id, rec_id)
+                                  new_id, rec_id, log)
 
         if is_okay:
             del records[rec_id]
             add(sums, wgts, 0.0, begin, record)
-            pieces_log.write("\t %s %d %d\n" % (rec_id, rec_begin, record.last_year - record.first_year + rec_begin - 1))
+            log.write("\t %s %d %d\n" % (rec_id, rec_begin, record.last_year - record.first_year + rec_begin - 1))
         else:
-            pieces_log.write("\t***no other pieces okay***\n")
+            log.write("\t***no other pieces okay***\n")
             return
 
 def get_longest(records):
@@ -637,7 +579,7 @@ def do_combine(stream, log, select_func, combine_func):
 
             log.write("\t%s %s %s -- %s\n" % (rec_id, begin,
                 begin + years -1, record.source))
-            combine_func(sums, wgts, begin, years, record_dict, rec_id)
+            combine_func(sums, wgts, begin, years, record_dict, log, rec_id)
             begin, final_data = final_average(sums, wgts, years, begin)
             new_record.set_series(begin * 12 + 1, final_data)
             yield new_record
@@ -647,10 +589,7 @@ def do_combine(stream, log, select_func, combine_func):
 
 
 def comb_pieces(stream):
-    global pieces_log
-    pieces_log = open('log/pieces.log','w')
-
-    return do_combine(stream, pieces_log, get_longest, pieces_combine)
+    return do_combine(stream, open('log/pieces.log','w'), get_longest, pieces_combine)
 
 
 def drop_strange(data):
@@ -661,7 +600,7 @@ def drop_strange(data):
     changes_dict = read_config.get_changes_dict()
     for record in data:
         changes = changes_dict.get(record.uid, [])
-        series = list(record.series)
+        series = record.series
         begin = record.first_year
         end = begin + (len(series)//12) - 1
         for (kind, year, x) in changes:
@@ -678,7 +617,6 @@ def drop_strange(data):
                         # trim at the start
                         series = series[(year2 - begin + 1)*12:]
                         begin = year2 + 1
-                        #record.first_year = begin
                     continue
 
                 if year2 >= end:
@@ -690,10 +628,10 @@ def drop_strange(data):
                 # remove some years from mid-series
                 nmonths = (year2 + 1 - year1) * 12
                 series[(year1-begin)*12:(year2+1-begin)*12] = [
-                        giss_data.MISSING] * nmonths
+                        giss_data.XMISSING] * nmonths
 
             else: # remove a single month
-                series[(year-begin)*12 + x-1] = giss_data.MISSING
+                series[(year-begin)*12 + x-1] = giss_data.XMISSING
 
         else:
             record.set_series(begin * 12 + 1, series)
@@ -709,7 +647,7 @@ def alter_discont(data):
     alter_dict = read_config.get_alter_dict()
     for record in data:
         if alter_dict.has_key(record.uid):
-            series = list(record.series)
+            series = record.series
             (a_month, a_year, a_num) = alter_dict[record.uid]
             begin = record.first_year
             # Month index of the month in the config file.

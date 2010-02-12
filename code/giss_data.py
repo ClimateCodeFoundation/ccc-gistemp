@@ -578,7 +578,7 @@ class MonthlyTemperatureRecord(object):
         self._first_month = first_month
         self._good_start_idx = sys.maxint
         self._good_end_idx = 0
-        self._series[:] = []
+        self._series = []
         for in_value in series:
             v = convert(in_value)
             if self.invalid(v):

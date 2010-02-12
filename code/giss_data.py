@@ -708,8 +708,8 @@ class StationRecord(MonthlyTemperatureRecord):
         self._add_year_of_data(year, data, XMISSING)
 
     def has_data_for_year(self, year):
-        for t in self.get_a_year_as_tenths(year):
-            if t != MISSING:
+        for t in self.get_a_year(year):
+            if t != XMISSING:
                 return True
 
     def get_a_month_as_tenths(self, month):
@@ -722,11 +722,26 @@ class StationRecord(MonthlyTemperatureRecord):
         except IndexError:
             return MISSING
 
+    def get_a_month(self, month):
+        """Get the value for a single month."""
+        idx = month - self.first_month
+        if idx < 0:
+            return XMISSING
+        try:
+            return self.series[month - self.first_month]
+        except IndexError:
+            return XMISSING
+
     def get_a_year_as_tenths(self, year):
         """Get the time series data for a year."""
         start_month = year * 12 + 1
         return [self.get_a_month_as_tenths(m)
                 for m in range(start_month, start_month + 12)]
+
+    def get_a_year(self, year):
+        """Get the time series data for a year."""
+        start_month = year * 12 + 1
+        return [self.get_a_month(m) for m in range(start_month, start_month + 12)]
 
     def get_set_of_years_as_tenths(self, first_year, last_year):
         """Get a set of year records.
@@ -739,6 +754,17 @@ class StationRecord(MonthlyTemperatureRecord):
         """
         return [self.get_a_year_as_tenths(y)
                 for y in range(first_year, last_year + 1)]
+
+    def get_set_of_years(self, first_year, last_year):
+        """Get a set of year records.
+        
+        :Return:
+            A list of lists, where each sub-list contains 12 temperature values
+            for a given year. This works for any range of years, missing years
+            are filled with the MISSING value.
+
+        """
+        return [self.get_a_year(y) for y in range(first_year, last_year + 1)]
 
     def set_series_from_tenths(self, first_month, series):
         self._set_series(first_month, series, XMISSING, convert=tenths_to_float)

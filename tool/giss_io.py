@@ -349,91 +349,64 @@ class V2MeanWriter(object):
         self.f.close()
 
 
-class AntarcticReader(object):
-    def __init__(self, path, station_path, discriminator):
-        self.f = open(path)
-        self.stations = read_antarc_station_ids(station_path, discriminator)
+antarc_discard_re = re.compile(r'^$|^Get |^[12A-Z]$')
+antarc_temperature_re = re.compile(r'^(.*) .* *temperature')
 
-    def __iter__(self):
-        return self._it()
+def read_antarctic(path, station_path, discriminator):
+    stations = read_antarc_station_ids(station_path, discriminator)
+    record = None
+    for line in open(path):
+        if antarc_discard_re.search(line):
+            continue
+        station_line = antarc_temperature_re.match(line)
+        if station_line:
+            station_name = station_line.group(1)
+            station_name = station_name.replace('\\','')
+            id12 = stations[station_name]
+            if record is not None:
+                yield record
+            record = code.giss_data.StationRecord(id12)
+            continue
+        line = line.strip()
+        if line.find('.') >= 0 and line[0] in '12':
+            year, data = read_antarc_line(line)
+            if year >= code.giss_data.BASE_YEAR:
+                record.add_year(year, data)
 
-    def _it(self):
-        record = None
-        stations = self.stations
-        for line in self.f:
-            if antarc_discard_re.search(line):
-                continue
-            station_line = antarc_temperature_re.match(line)
-            if station_line:
-                station_name = station_line.group(1)
-                station_name = station_name.replace('\\','')
-                id12 = stations[station_name]
-                if record is not None:
-                    yield record
-                record = code.giss_data.StationRecord(id12)
-                continue
-            line = line.strip()
-            if line.find('.') >= 0 and line[0] in '12':
-                year, data = read_antarc_line(line)
-                if year >= code.giss_data.BASE_YEAR:
-                    record.add_year_of_tenths(year, data)
-
-        if record is not None:
-            yield record
-        self.f.close()
-
-
-class AustroAntarcticReader(AntarcticReader):
-    def _it(self):
-        # TODO: We can make the austro and other reader much more common.
-        record = None
-        stations = self.stations
-        for line in self.f:
-            if austral_discard_re.search(line):
-                continue
-            station_line = austral_header_re.match(line)
-            if station_line:
-                station_name = station_line.group(1).strip()
-                id12 = stations[station_name]
-                if record is not None:
-                    yield record
-                record = code.giss_data.StationRecord(id12)
-                continue
-            line = line.strip()
-            if line.find('.') >= 0 and line[0] in '12':
-                year, data = read_antarc_line(line)
-                if year >= code.giss_data.BASE_YEAR:
-                    record.add_year_of_tenths(year, data)
-
-        if record is not None:
-            yield record
-        self.f.close()
+    if record is not None:
+        yield record
 
 
 austral_discard_re = re.compile(r'^$|:')
 austral_header_re = re.compile(r'^\s*(.+?)  .*(E$|E )')
 
+def read_australia(path, station_path, discriminator):
+    stations = read_antarc_station_ids(station_path, discriminator)
+    record = None
+    for line in open(path):
+        if austral_discard_re.search(line):
+            continue
+        station_line = austral_header_re.match(line)
+        if station_line:
+            station_name = station_line.group(1).strip()
+            id12 = stations[station_name]
+            if record is not None:
+                yield record
+            record = code.giss_data.StationRecord(id12)
+            continue
+        line = line.strip()
+        if line.find('.') >= 0 and line[0] in '12':
+            year, data = read_antarc_line(line)
+            if year >= code.giss_data.BASE_YEAR:
+                record.add_year(year, data)
 
-def round_to_nearest(f):
-    """Returns the int which is nearest to the argument float.  Draws
-    are rounded away from zero. If the argument is None, returns
-    None.
-    """
-
-    if f is None:
-        return None
-    if f >= 0:
-        return int(math.floor(f + 0.5))
-    else:
-        return int(math.ceil(f - 0.5))
-
-        
-
+    if record is not None:
+        yield record
 
 def read_antarc_line(line):
     """Convert a single line from the Antarctic/Australasian dataset
     files into a year and a 12-tuple of floats (the temperatures in
-    Centigrade).  Missing values become None.
+    Centigrade).
     """
 
     year = int(line[:4])
@@ -442,7 +415,7 @@ def read_antarc_line(line):
     if line[6] == '.' or line[7] == '-':
         # Some of the datasets are 12f8.1 with missing values as '       -'.
         for i in range(0,12):
-            tuple.append(read_tenths(line[i*8:i*8+8]))
+            tuple.append(read_float(line[i*8:i*8+8]))
     else:
         # Others are xx12f7.1 or xxx12f7.1 with missing values as '       '.
         np = line.find('.')
@@ -450,7 +423,7 @@ def read_antarc_line(line):
             raise ValueError, "Non-data line encountered: '%s'" % line
         position = (np % 7) + 2
         for i in range(0,12):
-            tuple.append(read_tenths(line[i*7+position:i*7+7+position]))
+            tuple.append(read_float(line[i*7+position:i*7+7+position]))
     return (year, tuple)
 
 
@@ -467,84 +440,64 @@ def read_antarc_station_ids(path, discriminator):
     return dict
 
 
-antarc_discard_re = re.compile(r'^$|^Get |^[12A-Z]$')
-antarc_temperature_re = re.compile(r'^(.*) .* *temperature')
-
-
-class USHCNReader(object):
-    def __init__(self, path, station_path, record_discriminator=None):
-        self.f = open_or_uncompress(path)
-        self.record_discriminator = record_discriminator
-        self.stations = read_USHCN_stations(station_path)
-        self.us_only = {}
-        for id12 in self.stations.itervalues():
-            self.us_only[id12] = None
-
-    def __iter__(self):
-        return self._it()
-
+def read_USHCN(path, stations):
     # TODO: This is reading data similar to other line based records,
     #       but the algorithm is somewhat different. See examples that
     #       use itertools.groupby.
     # NOTE: Sometimes, there are two sets of data for a station.
     #       Where the same year appears in both data sets, the second year's
     #       data is used. I do not know whether this is intentional or not.
-    def _it(self):
-        def fill_record():
-            for year, temps in sorted(years_data.iteritems()):
-                record.add_year_of_tenths(year, temps)
-            return record
+    def fill_record():
+        for year, temps in sorted(years_data.iteritems()):
+            record.add_year(year, temps)
+        return record
 
-        record = None
-        stations = self.stations
-        years_data = {}
-        for line in self.f:
-            if line[6] != '3': # 3 indicates mean temperatures
-                continue
-            USHCN_station = int(line[0:6])
-            id12 = stations[USHCN_station]
-            year = int(line[7:11])
-            if year < code.giss_data.BASE_YEAR: # discard data before 1880
-                continue
-            if record is None or id12[:11] != record.station_uid:
-                if record is not None:
-                    yield fill_record()
-                record = code.giss_data.StationRecord(id12)
-                years_data = {}
+    record = None
+    for line in open_or_uncompress(path):
+        if line[6] != '3': # 3 indicates mean temperatures
+            continue
+        USHCN_station = int(line[0:6])
+        id12 = stations[USHCN_station]
+        year = int(line[7:11])
+        if year < code.giss_data.BASE_YEAR: # discard data before 1880
+            continue
+        if record is None or id12[:11] != record.station_uid:
+            if record is not None:
+                yield fill_record()
+            record = code.giss_data.StationRecord(id12)
+            years_data = {}
 
-            temps = []
-            valid = False
-            for m in range(0,12):
-                temp_fahrenheit = int(line[m*7+11:m*7+17])
-                flag = line[m*7+17]
-                if ((flag in 'EQ') or              # interpolated data
-                    (temp_fahrenheit == -9999)) :  # absent data
-                    temp = code.giss_data.MISSING
-                else:
-                    # tenths of degree centigrade
-                    temp = round_to_nearest((temp_fahrenheit - 320) * 5/9.0)
-                    valid = True
-                temps.append(temp)
-            if valid: # some valid data found
-                # We cannot add using 'add_year_of_tenths' because that breaks
-                # things when years are duplicated in the data; (see not
-                # above). The record is actually filled using ``fil_record``.
-                #record.add_year_of_tenths(year, temps)
-                years_data.setdefault(year, [])
-                years_data[year] = temps
+        temps = []
+        valid = False
+        for m in range(0,12):
+            temp_fahrenheit = int(line[m*7+11:m*7+17])
+            flag = line[m*7+17]
+            if ((flag in 'EQ') or              # interpolated data
+                (temp_fahrenheit == -9999)) :  # absent data
+                temp = code.giss_data.XMISSING
+            else:
+                # tenths of degrees F to degrees C
+                temp = (temp_fahrenheit - 320) * 5/90.0
+                valid = True
+            temps.append(temp)
+        if valid: # some valid data found
+            # We cannot add using 'add_year_of_tenths' because that breaks
+            # things when years are duplicated in the data; (see not
+            # above). The record is actually filled using ``fil_record``.
+            years_data.setdefault(year, [])
+            years_data[year] = temps
 
-        if record is not None:
-            yield fill_record()
-        self.f.close()
+    if record is not None:
+        yield fill_record()
 
 
-def read_USHCN_stations(path):
+def read_USHCN_stations(ushcn_v1_station_path, ushcn_v2_station_path):
     """Reads the USHCN station list and returns a dictionary
     mapping USHCN station ID to 12-digit station ID.
     """
 
     stations = {}
-    for line in open(path):
+    for line in open(ushcn_v1_station_path):
         (USHCN_id, WMO_id, duplicate) = line.split()
         USHCN_id = int(USHCN_id)
         if WMO_id[0:3] != '425': # non-US country_code
@@ -553,43 +506,41 @@ def read_USHCN_stations(path):
             raise ValueError, "station in ushcn.tbl with non-zero duplicate: '%s'" % line
         stations[USHCN_id] = WMO_id + '0'
     # some USHCNv2 station IDs convert to USHCNv1 station IDs:
-    for line in open('input/ushcnV2_cmb.tbl'):
+    for line in open(ushcn_v2_station_path):
         (v2_station,_,v1_station,_) = line.split()
         stations[int(v2_station)] = stations[int(v1_station)]
     return stations
 
 
-def HohenpeissenbergReader(path):
+def read_hohenpeissenberg(path):
     """reads the Hohenpeissenberg data from
     input/t_hohenpeissenberg_200306.txt_as_received_July17_2003
     which has a header line and then one line per year from 1781.
     We only want data from 1880 to 2002.
     """
-    f = open(path)
 
     record = code.giss_data.StationRecord('617109620002')
-    for line in f:
+    for line in open(path):
         if line[0] in '12':
             year = int(line[:4])
             if year < 1880 or year > 2002:
                 continue
             data = line.split()
-            temps = map(read_tenths, data[1:13])
+            temps = map(read_float, data[1:13])
             assert len(temps) == 12
-            record.add_year_of_tenths(year, temps)
-    yield record
+            record.add_year(year, temps)
+    return record
 
 
-def read_tenths(s):
-    """Returns the integer nearest to the argument string times 10.
-    If float conversion fails, returns MISSING.
+def read_float(s):
+    """Returns the float converted from the argument string.
+    If float conversion fails, returns XMISSING.
     """
 
     try:
-        f = float(s)
+        return float(s)
     except:
-        return code.giss_data.MISSING
-    return round_to_nearest(f * 10)
+        return code.giss_data.XMISSING
 
 
 # Each of the stepN_input functions below produces an iterator that
@@ -601,16 +552,14 @@ def step0_input():
     class Struct:
         pass
     input = Struct()
-    input.ushcn_source = USHCNReader(
-            "input/9641C_200907_F52.avg", 'input/ushcn2.tbl')
-    input.ghcn_source = V2MeanReader("input/v2.mean",
-      code.giss_data.BASE_YEAR)
+    input.ushcn_stations = read_USHCN_stations('input/ushcn2.tbl', 'input/ushcnV2_cmb.tbl')
+    input.ushcn_source = read_USHCN("input/9641C_200907_F52.avg", input.ushcn_stations)
+    input.ghcn_source = V2MeanReader("input/v2.mean", code.giss_data.BASE_YEAR)
     input.antarc_source = itertools.chain(
-            AntarcticReader("input/antarc1.txt", "input/antarc1.list", '8'),
-            AntarcticReader("input/antarc3.txt", "input/antarc3.list", '9'),
-            AustroAntarcticReader("input/antarc2.txt",
-                "input/antarc2.list", '7'))
-    input.hohenpeis_source = HohenpeissenbergReader(
+            read_antarctic("input/antarc1.txt", "input/antarc1.list", '8'),
+            read_antarctic("input/antarc3.txt", "input/antarc3.list", '9'),
+            read_australia("input/antarc2.txt", "input/antarc2.list", '7'))
+    input.hohenpeissenberg = read_hohenpeissenberg(
             "input/t_hohenpeissenberg_200306.txt_as_received_July17_2003")
 
     return input

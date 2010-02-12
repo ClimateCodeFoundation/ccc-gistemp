@@ -617,30 +617,36 @@ def step0_input():
 
 def step0_output(data):
     out = V2MeanWriter("work/v2.mean_comb")
-    for thing in data:
-        out.write(thing)
-        yield thing
-    out.close()
+    try:
+        for thing in data:
+            out.write(thing)
+            yield thing
+    finally:
+        out.close()
 
 def step1_input():
     return V2MeanReader("work/v2.mean_comb")
 
 def step1_output(data):
     out = StationTsWriter("work/Ts.txt")
-    for thing in data:
-        out.write(thing)
-        yield thing
-    out.close()
+    try:
+        for thing in data:
+            out.write(thing)
+            yield thing
+    finally:
+        out.close()
 
 def step2_input():
     return StationTsReader("work/Ts.txt")
 
 def step2_output(data):
     out = StationRecordWriter(open("work/Ts.GHCN.CL.PA", "wb"), bos='<')
-    for thing in data:
-        out.write(thing)
-        yield thing
-    out.close()
+    try:
+        for thing in data:
+            out.write(thing)
+            yield thing
+    finally:
+        out.close()
 
 def step3_input():
     return StationReader(open("work/Ts.GHCN.CL.PA", "rb"), bos='<')
@@ -648,10 +654,12 @@ def step3_input():
 def step3_output(data):
     out = SubboxWriter(open('work/SBBX1880.Ts.GHCN.CL.PA.1200', 'wb'),
       trimmed=False)
-    for thing in data:
-        out.write(thing)
-        yield thing
-    out.close()
+    try:
+        for thing in data:
+            out.write(thing)
+            yield thing
+    finally:
+        out.close()
 
 def step4_input():
     while True:
@@ -663,10 +671,12 @@ def step4_output(data):
     # ocean data).  The left-hand items are land data, already written
     # by Step 3.
     out = SubboxWriter(open('work/SBBX.HadR2', 'wb'))
-    for land,ocean in data:
-        out.write(ocean)
-        yield land,ocean
-    out.close()
+    try:
+        for land,ocean in data:
+            out.write(ocean)
+            yield land,ocean
+    finally:
+        out.close()
 
 def step5_input():
     land = SubboxReader(

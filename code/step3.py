@@ -55,110 +55,45 @@ from warnings import warn
 w = len(struct.pack('=I', 0))
 
 
-class Stations:
-    """A representation of a collection of station data.  Concretely a
-    station is a temperature recording station situated at some point on
-    the Earth; abstractly each station is a series of numeric values
-    with some associated metadata, including location.
+def inbox(station_records, lats, latn, longw, longe):
+    """An iterator that yields the records for every station within the box
+    bounded by the lines of latitude lats (to the south), latn (to the
+    north), and the meridians at longw (to the west), and longe (to the
+    east).
 
-    Each instance has the following public members:
-    kq - the KQ quantity from the header record.
-    mavg - the MAVG flag from the header record.
-    monm - maximum length of any time record.
-    recsize - INFO(5) from the header record.  Probably not much use.
-    yrbeg - YRBEG from the header record.  The year of first data.
-    bad - the XBAD value used in the data.
-    trace - INFO(8) from the header record.
-    scale - the output scale derived from KQ.  Equivalent to SCL in the
-        Fortran code.
-    km - number of records per year, derived from MAVG.
+    In order to accommodate boxes that overlap the meridian at -180
+    it is permissible for either longw to be < -180 or for longe to
+    be > +180.
+
+    For stations exactly on the boundary the
+    "lower-left" rule is used.  Stations are returned if they lie on
+    the southern boundary or the western boundary except for
+    corners; stations lying exactly on a corner are only returned if
+    it is the south-west corner.  Note therefore that to include a
+    station situated exactly at the North Pole a latn value slightly
+    larger than 90 should be used.
     """
 
-    def __init__(self, infile, km, meta):
-        """infile should be a sequence of file objects.  Each file
-        object should be opened in binary onto a trimmed NCAR file,
-        identical in format to the input files that GISTEMP's
-        to.SBBXgrid.f program expects.
-        
-        Historically (and in emulation of the GISS GISTEMP code) there
-        were be 6 zonal files, but now only one is usually supplied.
-        The "for f infile" loop is a relic, but still kept.
-        """
-        (self.reader, ) = infile
-        self.meta = meta
-        self.station_records = None
+    assert lats <= latn
+    assert longw <= longe
 
-        # This computation of scale isn't clearly correct, for example,
-        # are KQ values bigger than 20 really supposed to be silently
-        # accepted?  But it is what the Fortran code does.
-        self.scale = 1.0 # SCL in Fortran code
-        # Scale values, see to.SBBXgrid.f line 107
-        # Python array has a leading initial 0.0 entry to make the
-        # indexing work.
-        scale = [0.0] + 3*[0.1] + 9*[0.0] + [0.1] + 7*[0.0]
-        # Compute scale, to.SBBXgrid.f lines 133 and following
-        if self.kq < len(scale) :
-            self.scale = scale[self.kq]
-        if self.scale == 0 :
-            raise 'Program not ready for quantity %d' % stations.kq
+    for record in station_records:
+        st = record.station
+        lat = st.lat_fixed_1
+        lon = st.lon_fixed_1
 
-        self.km = km
+        # See to.SBBXgrid.f lines 213 and following
+        if lon > longe:
+            lon -= 360
+        elif lon < longw:
+            lon += 360
 
-    def __getattr__(self, name):
-        return getattr(self.meta, name)
-
-    def all(self):
-        """An iterator that yields every station record."""
-        if self.station_records is not None:
-            for record in self.station_records:
-                yield record
-            return
-
-        station_records = []
-        for record in self.reader:
-            station_records.append(record)
+        if (lats < lat < latn) and (longw < lon < longe):
             yield record
-        self.station_records = station_records
-
-    def inbox(self, lats, latn, longw, longe):
-        """An iterator that yields every station within the box bounded
-        by the lines of latitude lats (to the south), latn (to the
-        north), and the meridians at longw (to the west), and longe (to
-        the east).
-
-        In order to accommodate boxes that overlap the meridian at -180
-        it is permissible for either longw to be < -180 or for longe to
-        be > +180.
-
-        For stations exactly on the boundary the
-        "lower-left" rule is used.  Stations are returned if they lie on
-        the southern boundary or the western boundary except for
-        corners; stations lying exactly on a corner are only returned if
-        it is the south-west corner.  Note therefore that to include a
-        station situated exactly at the North Pole a latn value slightly
-        larger than 90 should be used.
-        """
-
-        assert lats <= latn
-        assert longw <= longe
-
-        for record in self.all():
-            st = record.station
-            lat = st.lat_fixed_1
-            lon = st.lon_fixed_1
-
-            # See to.SBBXgrid.f lines 213 and following
-            if lon > longe:
-                lon -= 360
-            elif lon < longw:
-                lon += 360
-
-            if (lats < lat < latn) and (longw < lon < longe):
-                yield record
-            if lats == lat and longw <= lon < longe:
-                yield record
-            if longw == lon and lats <= lat < latn:
-                yield record
+        if lats == lat and longw <= lon < longe:
+            yield record
+        if longw == lon and lats <= lat < latn:
+            yield record
 
 
 def incircle(iterable, arc, lat, lon):
@@ -381,7 +316,7 @@ def tavg(km, XBAD, bias, data, nyrs, base, limit, nr, nc, deflt=0.0):
     return
 
 
-def iter_subbox_grid(stations, monm, radius=1200,
+def iter_subbox_grid(station_records, meta, monm, radius=1200,
         base_year=(1951,1980), audit=None,
         just_subbox=()):
     """(This is the equivalent of to.SBBXgrid.f) Convert the input file,
@@ -437,7 +372,7 @@ def iter_subbox_grid(stations, monm, radius=1200,
 
     BAD = giss_data.MISSING
     XBAD = giss_data.XMISSING
-    km = stations.km
+    km = meta.km
 
     regions = list(eqarea.gridsub())
     if audit:
@@ -472,7 +407,7 @@ def iter_subbox_grid(stations, monm, radius=1200,
         extent[0] = box[0] - ddlat
         extent[1] = box[1] + ddlat
 
-        regionstations = list(stations.inbox(*extent))
+        regionstations = list(inbox(station_records, *extent))
         if audit:
             print 'UNSORTED LIST'
             for station in regionstations:
@@ -518,8 +453,8 @@ def iter_subbox_grid(stations, monm, radius=1200,
             # Combine data.  See to.SBBXgrid.f lines 301 to 376
             # Note: stations.monm is equivalent to MONM0 in the Fortran code.
             # It is the maximum length of any station record.
-            wt = [0.0]*stations.monm
-            avg = [XBAD]*stations.monm
+            wt = [0.0]*meta.monm
+            avg = [XBAD]*meta.monm
             if len(station) == 0:
                 box_obj = giss_data.SubboxRecord(
                     lat_S=latlon[0], lat_N=latlon[1], lon_W=latlon[2],
@@ -554,8 +489,8 @@ def iter_subbox_grid(stations, monm, radius=1200,
             for i in range(1,len(station)):
                 # TODO: A StationMethod method to produce a padded data series
                 #       would be good here. Hence we could just do:
-                #           dnew = station[i].padded_series(stations.monm)
-                dnew = [XBAD]*stations.monm
+                #           dnew = station[i].padded_series(meta.monm)
+                dnew = [XBAD]*meta.monm
                 aa, bb = station[i].rel_first_month, station[i].rel_last_month
                 dnew[aa - 1:bb] = station[i].series_as_tenths
                 # index, 0-based, of first year with data
@@ -581,15 +516,15 @@ def iter_subbox_grid(stations, monm, radius=1200,
             # See to.SBBXgrid.f line 354
             # This is conditional in the Fortran code, but in practice
             # NFB is always bigger than 0, so TAVG always gets called.
-            tavg(km, XBAD, bias, avg, len(avg)//km, base_year[0]-stations.yrbeg,
+            tavg(km, XBAD, bias, avg, len(avg)//km, base_year[0]-meta.yrbeg,
                 # :todo: remove dummy 99s
-                base_year[1]-stations.yrbeg+1, 99, 99)
+                base_year[1]-meta.yrbeg+1, 99, 99)
             # Subtract BIAS, then scale and write the result to disk
             m = 0
-            for y in range(stations.monm//km):
+            for y in range(meta.monm//km):
                 for k in range(km):
                     if avg[m] < XBAD:
-                        avg[m] = stations.scale*(avg[m]-bias[k])
+                        avg[m] = meta.scale*(avg[m]-bias[k])
                     m += 1
                     # :todo: increment LENC
             box_obj = giss_data.SubboxRecord(n=monm,
@@ -600,23 +535,24 @@ def iter_subbox_grid(stations, monm, radius=1200,
     print >>log
 
 
+# TODO: This is probably broken now. Is it still needed. [Paul O]
 # Mostly for debugging.
 # Can be expensive.  about 50 CPU seconds on drj's MacBook.
 # Note: checksubbox(0.06) emits one warning, for the Amundsen--Scott
 # station at the South Pole.
-def checksubboxsmall(r, stations=None, grid=None):
+def checksubboxsmall(r, station_records=None, grid=None):
     """Check that for the grid, which defaults to that returned by
-    eqarea.grid8k(), every station in each grid box is within r of
-    the box centre.  stations should be a Stations instance, and
-    defaults to fst().
+    eqarea.grid8k(), every station in each grid box is within r of the box
+    centre.  station_records should be a list of station records, and defaults
+    to fst().
 
     r is given as an arc-length in radians.
 
     This check is useful because the GISTEMP code assigns a positive
-    weight to stations that are in a subbox but not within the
-    critical distance; we currently dispense with these stations
-    altogether, only considering stations within the critical
-    distance, but we expect there to be no stations outside the
+    weight to station records that are in a subbox but not within the
+    critical distance; we currently dispense with these station records
+    altogether, only considering station records within the critical
+    distance, but we expect there to be no station records outside the
     critical distance but in the subbox.  In other words, we expect
     that r is large with respect to the subbox.  This actually
     checks this is so.
@@ -627,74 +563,76 @@ def checksubboxsmall(r, stations=None, grid=None):
 
     if grid is None:
         grid = eqarea.grid8k()
-    if stations is None:
-        stations = fst()
+    if station_records is None:
+        station_records = fst()
 
     for box in grid:
-        # All stations in box
-        l = list(stations.inbox(*box))
+        # All station records in box
+        l = list(inbox(station_records, *box))
         # Filtered by the radius r
         c = list(incircle(l, r, *eqarea.centre(box)))
         if len(c) != len(l):
             warn('box with centre %s has stations outside distance %f' %
                 (eqarea.centre(box), r))
 
+# TODO: This is broken by Paul O's changes. Is it still needed?
 # Mostly for debugging and development.  Avoid public use.
 def fst(file='Ts.GHCN.CL.PA'):
     """Load station data from file and
-    return a Stations instance.
+    return a StationRecords instance.
     """
 
-    return Stations([file])
-
-
-class Step3Iterator(object):
-    def __init__(self, record_source, radius=1200, year_begin=1880,
-            audit=None, subbox=()):
-        # Ensure record_source is a true generator, so we can pop off the
-        # leading meta data before handing the station records to the next
-        # phase.
-        record_source = iter(record_source)
-        m = record_source.next()
-        self.meta = giss_data.SubboxMetaData(m.mo1, m.kq, m.mavg, m.monm,
-                m.monm + 7, m.yrbeg, m.missing_flag, m.precipitation_flag,
-                m.title)
-
-        # Only monthly data supported, indicated by self.meta.mavg == 6, hence
-        # km = 12. Load all the station records into a `Stations` instance.
-        # TODO: The names `Stations` is slightly misleading.
-        assert self.meta.mavg == 6
-        km = 12
-        stations = Stations([record_source], km, self.meta)
-
-        # Output series cannot begin earlier than input series.
-        year_begin = max(year_begin, self.meta.yrbeg)
-        monm = (self.meta.yrbeg + (self.meta.monm // km) - year_begin) * km
-
-        units = '(C)'
-        if stations.kq == 2:
-            units = '(mm)'
-        title = "%20.20s ANOM %-4s CR %4dKM %s-present" % (self.meta.title,
-                units, radius, year_begin)
-        self.meta.mo1 = 1
-        self.meta.title = title.ljust(80)
-
-        self.box_source = iter_subbox_grid(stations, monm,
-                radius=radius, base_year=(1951,1980), audit=None,
-                just_subbox=subbox)
-
-    def __iter__(self):
-        return self._it()
-
-    def _it(self):
-        yield self.meta
-        for box in self.box_source:
-            yield box
+    return StationRecords([file])
 
 
 def step3(record_source, radius=1200, year_begin=1880, audit=None, subbox=()):
     """Step 3 of the GISS processing.
 
     """
-    return Step3Iterator(record_source,
-            radius=radius, year_begin=year_begin, audit=audit, subbox=subbox)
+    station_records = [record for record in record_source]
+    m, station_records = station_records[0], station_records[1:]
+    meta = giss_data.SubboxMetaData(m.mo1, m.kq, m.mavg, m.monm,
+            m.monm + 7, m.yrbeg, m.missing_flag, m.precipitation_flag,
+            m.title)
+
+    # Only monthly data supported, indicated by meta.mavg == 6, hence
+    # km = 12. Load all the station records into a `StationRecords` instance.
+    assert meta.mavg == 6
+
+    # This computation of scale isn't clearly correct, for example,
+    # are KQ values bigger than 20 really supposed to be silently
+    # accepted?  But it is what the Fortran code does.
+    scale = 1.0 # SCL in Fortran code
+    # Scale values, see to.SBBXgrid.f line 107
+    # Python array has a leading initial 0.0 entry to make the
+    # indexing work.
+    scale = [0.0] + 3*[0.1] + 9*[0.0] + [0.1] + 7*[0.0]
+    # Compute scale, to.SBBXgrid.f lines 133 and following
+    if meta.kq < len(scale) :
+        scale = scale[meta.kq]
+    if scale == 0 :
+        raise 'Program not ready for quantity %d' % meta.kq
+
+    # Add the scale and km value to the metadata.
+    meta.scale = scale
+    meta.km = 12
+
+    # Output series cannot begin earlier than input series.
+    year_begin = max(year_begin, meta.yrbeg)
+    monm = (meta.yrbeg + (meta.monm // meta.km) - year_begin) * meta.km
+
+    units = '(C)'
+    if meta.kq == 2:
+        units = '(mm)'
+    title = "%20.20s ANOM %-4s CR %4dKM %s-present" % (meta.title,
+            units, radius, year_begin)
+    meta.mo1 = 1
+    meta.title = title.ljust(80)
+
+    box_source = iter_subbox_grid(station_records, meta, monm,
+            radius=radius, base_year=(1951,1980), audit=None,
+            just_subbox=subbox)
+
+    yield meta
+    for box in box_source:
+        yield box

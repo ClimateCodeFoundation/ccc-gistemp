@@ -42,10 +42,11 @@ USHCN data:
 
 import itertools
 import giss_data
+import parameters
 
 def calc_monthly_USHCN_offsets(u_record, g_record):
-    u_years = u_record.get_set_of_years(1980, u_record.last_year)
-    g_years = g_record.get_set_of_years(1980, u_record.last_year)
+    u_years = u_record.get_set_of_years(parameters.USHCN_offset_start_year, u_record.last_year)
+    g_years = g_record.get_set_of_years(parameters.USHCN_offset_start_year, u_record.last_year)
     reversed_year_pairs = list(reversed(zip(u_years, g_years)))
 
     diffs = [0.0] * 12
@@ -57,7 +58,7 @@ def calc_monthly_USHCN_offsets(u_record, g_record):
             if giss_data.XMISSING not in (u_temp, g_temp):
                 sum += u_temp - g_temp
                 count += 1
-                if count == 10:
+                if count == parameters.USHCN_offset_max_months:
                     break
         if count > 0:
             diffs[month] = sum / count
@@ -80,12 +81,9 @@ def adjust_USHCN(ushcn_records, ghcn_records, us_stations):
             return t - d
         return t
 
-    # For each USHCN record look for a corresponding GHCN record. Matching
-    # GHCN records have the same station_uid and a discriminator of zero.
-    # Hence we can generate a lookup key by: ``u_record.station_uid + "0"``.
+    # For each USHCN record look for a corresponding GHCN record.
     to_remove = []
-    for u_key, u_record in ushcn_records.iteritems():
-        key = u_record.station_uid + "0"
+    for key, u_record in ushcn_records.iteritems():
         g_record = ghcn_records.get(key, None)
         if g_record is None:
             print "NO MODS", u_record.uid
@@ -104,7 +102,7 @@ def adjust_USHCN(ushcn_records, ghcn_records, us_stations):
             else:
                 new_data.extend(temps)
         g_record.set_series(u_record.first_year * 12 + 1, new_data)
-        to_remove.append(u_key)
+        to_remove.append(key)
         us_only.pop(key, None)
 
     for k in to_remove:

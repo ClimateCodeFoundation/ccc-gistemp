@@ -41,6 +41,7 @@ import itertools
 
 import read_config
 import giss_data
+import parameters
 
 
 # TODO: Make valid/invalid checking a giss_data function.
@@ -158,8 +159,6 @@ def monthly_annual(data):
     return (annual_mean, annual_anom)
 
 
-MIN_OVERLAP = 4
-
 def average(sums, counts, years):
     """Return an array with sums[i]/counts[i], and XMISSING where
     counts[i] is zero.
@@ -221,8 +220,7 @@ def add(sums, wgts, diff, begin, record):
 
 def get_longest_overlap(new_data, begin, records):
     """Find the record in the *records* dict that has the longest
-    overlap with the *new_data* by considering annual anomalies.  An
-    overlap has to be at least MIN_OVERLAP years to count.
+    overlap with the *new_data* by considering annual anomalies.
     """
 
     ann_mean, ann_anoms = monthly_annual(new_data)
@@ -247,7 +245,7 @@ def get_longest_overlap(new_data, begin, records):
                 continue
             wgt += 1
             sum += (rec_ann_mean + rec_anom) - (ann_mean + anom)
-        if wgt < MIN_OVERLAP:
+        if wgt < parameters.station_combine_min_overlap:
             continue
         if wgt < overlap:
             continue
@@ -255,7 +253,7 @@ def get_longest_overlap(new_data, begin, records):
         diff = sum / wgt
         best_id = rec_id
         best_record = record
-    if overlap < MIN_OVERLAP:
+    if overlap < parameters.station_combine_min_overlap:
         return 0, 0, giss_data.XMISSING
     return best_record, best_id, diff
 
@@ -380,9 +378,6 @@ def adjust_helena(stream):
             del helena_ds[id]
         yield record
 
-MIN_MID_YEARS = 5            # MIN_MID_YEARS years closest to ymid
-BUCKET_RADIUS = 10
-
 def sigma(list):
     # Remove invalid (missing) data.
     list = filter(valid, list)
@@ -456,7 +451,7 @@ def find_quintuples(new_sums, new_wgts,
 
     ov_success = 0
     okay_flag = 0
-    for rad in range(1, BUCKET_RADIUS + 1):
+    for rad in range(1, parameters.station_combine_bucket_radius + 1):
         count1 = sum1 = 0
         count2 = sum2 = 0
         for i in range(0, rad + 1):
@@ -479,7 +474,7 @@ def find_quintuples(new_sums, new_wgts,
                 if valid(anom2):
                     sum2 += anom2 + rec_ann_mean
                     count2 += 1
-        if count1 >= MIN_MID_YEARS and count2 >= MIN_MID_YEARS:
+        if count1 >= parameters.station_combine_min_mid_years and count2 >= parameters.station_combine_min_mid_years:
             log.write("overlap success: %s %s\n" % (new_id, rec_id))
             ov_success = 1
             avg1 = sum1 / float(count1)

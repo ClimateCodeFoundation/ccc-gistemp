@@ -167,7 +167,9 @@ def plot(arg, mode, inp, out, meta):
     plotheight = ytop - ybottom
 
     out.write("""<svg width='%dpx' height='%dpx'
-      xmlns="http://www.w3.org/2000/svg" version="1.1">\n""" %
+      xmlns="http://www.w3.org/2000/svg"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      version="1.1">\n""" %
       (plotwidth+100, plotheight+100))
 
     # Style
@@ -236,6 +238,12 @@ def plot(arg, mode, inp, out, meta):
         out.write("  <text alignment-baseline='middle'"
           " x='-8' y='%.1f'>%.0f</text>\n" %
           (-y, (y+ybottom)/float(vs)))
+    # Vertical label
+    out.write("  <defs><path id='pvlabel' d='M-%d -20l0 -400'/></defs>\n" %
+      (3.5*fs-8))
+    out.write("  <text text-anchor='start'>"
+      "<textPath xlink:href='#pvlabel'>"
+      u"Temperature (\N{DEGREE SIGN}C)</textPath></text>\n")
     # End of vertical axis group.
     out.write("</g>\n")
     # End of "axes" group.
@@ -418,6 +426,7 @@ class Usage(Exception):
     pass
         
 def main(argv=None):
+    import codecs
     # http://www.python.org/doc/2.4.4/lib/module-getopt.html
     import getopt
     import sys
@@ -445,6 +454,8 @@ def main(argv=None):
             outfile = sys.stdout
         else:
             outfile = open(outfile, 'w')
+        # See http://drj11.wordpress.com/2007/05/14/python-how-is-sysstdoutencoding-chosen/#comment-3770
+        outfile = codecs.getwriter('utf-8')(outfile)
         if infile == '-':
             infile = sys.stdin
         else:

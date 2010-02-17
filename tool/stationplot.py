@@ -399,8 +399,6 @@ def asdict(arg, inp, mode):
 
     # Clear Climate Code, tool directory
     import v2index
-    # Clear Climate Code, code directory
-    from code.step1 import month_anomaly
 
     v2 = v2index.File(inp)
 
@@ -409,6 +407,8 @@ def asdict(arg, inp, mode):
         for id12,series in v2.get(id):
             data,begin = from_lines(series)
             if mode == 'anom':
+                # Clear Climate Code, code directory
+                from code.step1 import month_anomaly
                 _,data = month_anomaly(data)
             table[id12] = (data,begin)
 

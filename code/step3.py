@@ -9,22 +9,11 @@
 """ 
 Python code reproducing the STEP3 part of the GISTEMP algorithm.
 
-python code/step3.py [-a N] [-s X,Y,Z]
-
--a N
-  Restrict to subbox N and producing audit information
-
--s X,Y,Z
-  Restrict to the list of subboxes
-
 Work in progress.
 
 The code is derived from the Fortran GISTEMP code.
 
 Python notes:
-
-Much of the binary IO uses the struct module.  A quick review will
-help.
 
 I feel obliged to tell you that the Python expression N * list gives a
 new list that conists of list repeated N times.  This is used every
@@ -40,19 +29,12 @@ import eqarea
 # Clear Climate Code
 import giss_data
 
-# http://www.python.org/doc/2.3.5/lib/module-getopt.html
-import getopt
 # http://www.python.org/doc/2.3.5/lib/module-math.html
 import math
 # http://www.python.org/doc/2.3.5/lib/module-struct.html
-import struct
-# http://www.python.org/doc/2.3.5/lib/module-sys.html
 import sys
 # http://www.python.org/doc/2.3.5/lib/module-warnings.html
 from warnings import warn
-
-# The width of a standard word according to Python's struct module.
-w = len(struct.pack('=I', 0))
 
 
 def inbox(station_records, lats, latn, longw, longe):
@@ -154,7 +136,8 @@ def incircle(iterable, arc, lat, lon):
             # See to.SBBXgrid.f line 285
             d = math.sqrt(2*(1-cosd))
             d /= arc
-            yield (1-d, record)
+            record.wti = 1 - d
+            yield record
 
 
 def sort(l, cmp):
@@ -316,9 +299,8 @@ def tavg(km, XBAD, bias, data, nyrs, base, limit, nr, nc, deflt=0.0):
     return
 
 
-def iter_subbox_grid(station_records, meta, monm, radius=1200,
-        base_year=(1951,1980), audit=None,
-        just_subbox=()):
+def iter_subbox_grid(station_records, meta, radius=1200,
+        base_year=(1951,1980)):
     """(This is the equivalent of to.SBBXgrid.f) Convert the input file,
     infile, into gridded datasets which are output on the file (-like)
     object box_out.
@@ -335,8 +317,6 @@ def iter_subbox_grid(station_records, meta, monm, radius=1200,
 
     log = sys.stdout
 
-    # trimmed input files will be assumed.
-
     # Parameters.  These are a mixture of computed constants, and
     # parameters that influence the behaviour of the algorithm.  Many of
     # the parameters are tempting to change, but some of the code might
@@ -349,6 +329,11 @@ def iter_subbox_grid(station_records, meta, monm, radius=1200,
     # Critical radius as an angle of arc
     arc = radius / earth.radius
 
+    # Note the computation of DDLAT (on line 463 of to.SBBXgrid.f), it is the
+    # angle (in degrees) subtended by an arc of length RCRIT (on a spherical
+    # earth's surface). We already have that in radians in the variable arc.
+    ddlat = arc * 180 / math.pi
+
     # number of boxes
     nbox = 80
     # number of subboxes within each box
@@ -356,76 +341,41 @@ def iter_subbox_grid(station_records, meta, monm, radius=1200,
 
     # Much of the Fortran code assumes that various "parameters" have
     # particular fixed values (probably accidentally).  I don't trust the
-    # Python code to avoid similar assumptions.  So assert the
-    # "parameter" values here.  Just in case anyone tries changing them.
-    # Note to people reading comment becuse the assert fired:  Please
-    # don't assume that the code will "just work" when you change one of
-    # the parameter values.  It's supposed to, but it might not.
+    # Python code to avoid similar assumptions.  So assert the "parameter"
+    # values here.  Just in case anyone tries changing them. Note to people
+    # reading comment because the assert fired:  Please don't assume that the
+    # code will "just work" when you change one of the parameter values.  It's
+    # supposed to, but it might not.
     assert nbox == 80
     assert nsubbox == 100
 
-    # area of subbox in squared kilometres
-    # Recall area of sphere is 4*pi*(r**2)
-    # Should equivalent to to.SBBXgrid.f line 113 (but with a different
-    # precision)
-    km2persubbox = (4*math.pi*earth.radius**2) / (nbox * nsubbox)
-
-    BAD = giss_data.MISSING
-    XBAD = giss_data.XMISSING
-    km = meta.km
-
     regions = list(eqarea.gridsub())
-    if audit:
-        just_subbox = [audit]
-    if just_subbox:
-        # Restrict processing to region containing single gridbox of
-        # interest.
-        n = list(set(map(lambda x: x//100, just_subbox)))
-        if len(n) > 1:
-            raise Exception('Sorry, only works within one region currently.')
-        regions = map(lambda x: regions[x], n)
-
+    #for region in regions[:4]:
     for region in regions:
-        box = region[0]
+        box, subboxes = region[0], list(region[1])
+
         # Extend box according to the algorithm used in subroutine
         # GRIDEA.  See to.SBBXgrid.f lines 484 and following.
         # (that is, by half a box east and west and by a sufficient
         # amount north and south to incorporate radius).
-        extent = [0]*4  # Just a dummy list of the right size
-        extent[2] = box[2] - 0.5*(box[3]-box[2])
-        extent[3] = box[3] + 0.5*(box[3]-box[2])
+        extent = [0] * 4  # Just a dummy list of the right size
+        extent[2] = box[2] - 0.5 * (box[3] - box[2])
+        extent[3] = box[3] + 0.5 * (box[3] - box[2])
         if box[0] <= -90 or box[1] >= 90:
             # polar
             extent[2] = -180.0
             extent[3] = +180.0
+
         # In the GISS Fortran code the box is extended north and south
-        # by DDLAT degrees.  Note the computation of DDLAT (on line 463
-        # of to.SBBXgrid.f), it is the angle (in degrees) subtended by
-        # an arc of length RCRIT (on a spherical earth's surface).
-        # We already have that in radians in the variable arc.
-        ddlat = arc*180/math.pi
+        # by DDLAT degrees.
         extent[0] = box[0] - ddlat
         extent[1] = box[1] + ddlat
 
-        regionstations = list(inbox(station_records, *extent))
-        if audit:
-            print 'UNSORTED LIST'
-            for station in regionstations:
-                print station.id
+        region_records = list(inbox(station_records, *extent))
         # Descending sort by number of good records
         # Sadly we cannot use Python's sort method here, we must use an
         # emulation of the GISS Fortran.
-        sort(regionstations, lambda x,y: y.good_count - x.good_count)
-        if audit:
-            print 'SORTED LIST'
-            for station in regionstations:
-                print station.id
-
-        subboxes = list(region[1])
-        if just_subbox:
-            # Select subboxes for processing.
-            l = map(lambda x: x % 100, just_subbox)
-            subboxes = map(lambda x: subboxes[x], l)
+        sort(region_records, lambda x,y: y.good_count - x.good_count)
 
         # Used to generate the "subbox at" rows in the log.
         lastcentre = (None, None)
@@ -439,99 +389,85 @@ def iter_subbox_grid(station_records, meta, monm, radius=1200,
             log.write('%+06.1f' % centre[1])
             log.flush()
             lastcentre = centre
-            # Of possible stations in this region, filter for those within
-            # radius of subbox centre.  Note that it is important that
-            # the ordering within the regionstations list is retained
-            # (in order to match the GISS code).
-            # *station* is a list of (wt, station) pairs:
-            station = list(incircle(regionstations, arc, *centre))
-            # Split list of pairs into pair of lists
-            wti = map(lambda x: x[0], station)
-            station = map(lambda x: x[1], station)
-            nstmns = 0
-            nstcmb = 0
+            # Of possible station records for this region, filter for those
+            # from stations within radius of subbox centre.  Note that it is
+            # important that the ordering within the region_records list is
+            # retained (in order to match the GISS code).
+            incircle_records = list(incircle(region_records, arc, *centre))
             # Combine data.  See to.SBBXgrid.f lines 301 to 376
-            # Note: stations.monm is equivalent to MONM0 in the Fortran code.
+            # Note: meta.monm is equivalent to MONM0 in the Fortran code.
             # It is the maximum length of any station record.
-            wt = [0.0]*meta.monm
-            avg = [XBAD]*meta.monm
-            if len(station) == 0:
+            avg = [giss_data.XMISSING] * meta.monm
+
+            if len(incircle_records) == 0:
                 box_obj = giss_data.SubboxRecord(
                     lat_S=latlon[0], lat_N=latlon[1], lon_W=latlon[2],
-                    lon_E=latlon[3], stations=nstcmb, station_months=nstmns,
-                    d=XBAD, series=avg)
+                    lon_E=latlon[3], stations=0, station_months=0,
+                    d=giss_data.XMISSING, series=avg)
                 log.write('*')
                 log.flush()
                 yield box_obj
                 continue
+
             # Initialise data with first station
             # See to.SBBXgrid.f lines 315 to 330
-            nstmns = station[0].good_count
+            record = incircle_records[0]
+            nstmns = record.good_count
             nstcmb = 1
-            id0 = [station[0].station.uid]
-            if audit:
-                print "%+06.2f%+06.2f%+07.2f%+07.2f %s %r" % (subbox[0], subbox[1],
-                    subbox[2], subbox[3], station[0].station.uid, wti[0])
+
             # :todo: increment use count here. NUSEID
-            wmax = wti[0]
-            wtm = km * [wti[0]]
-            bias = km * [0.0]
-            #offset = station[0].databeg PAO
-            r = station[0]
-            offset = r.rel_first_month - 1
-            avg[offset:offset + len(r.series_as_tenths)] = r.series_as_tenths
-            a = r.series_as_tenths # just a temporary
+            wmax = record.wti
+            wtm = meta.km * [record.wti]
+            bias = meta.km * [0.0]
+            offset = record.rel_first_month - 1
+            a = record.series_as_tenths # just a temporary
+            avg[offset:offset + len(a)] = a
+            wt = [0.0] * meta.monm
             for i in range(len(a)):
-                if a[i] < BAD :
-                    wt[i + offset] = wti[0]
+                if a[i] < giss_data.MISSING :
+                    wt[i + offset] = record.wti
+
             # Add in the remaining stations
             # See to.SBBXgrid.f lines 331 and following
-            for i in range(1,len(station)):
+            for record in incircle_records[1:]:
                 # TODO: A StationMethod method to produce a padded data series
                 #       would be good here. Hence we could just do:
-                #           dnew = station[i].padded_series(meta.monm)
-                dnew = [XBAD]*meta.monm
-                aa, bb = station[i].rel_first_month, station[i].rel_last_month
-                dnew[aa - 1:bb] = station[i].series_as_tenths
-                # index, 0-based, of first year with data
-                #nf1 = station[i].databeg // km
-                # TODO: I think first_year/last_year (+1) should work here.
-                nf1 = (station[i].rel_first_month - 1) // km
-                # one more than the index of last year with data
-                #nl1 = 1 + (station[i].dataend-1) // km
-                nl1 = 1 + station[i].rel_last_month // km
-                if audit:
-                    print "ADD %s %r" % (station[i].id, wti[i])
-                nsm = combine(km, XBAD, bias, avg, wt, dnew, nf1, nl1,
-                        wti[i], wtm, station[i].uid)
+                #           dnew = record.padded_series(meta.monm)
+                dnew = [giss_data.XMISSING] * meta.monm
+                aa, bb = record.rel_first_month, record.rel_last_month
+                dnew[aa - 1:bb] = record.series_as_tenths
+                nsm = combine(meta.km, giss_data.XMISSING, bias, avg, wt, dnew,
+                        record.rel_first_year, record.rel_last_year + 1,
+                        record.wti, wtm, record.uid)
                 nstmns += nsm
                 if nsm == 0:
                     continue
                 nstcmb += 1
-                # TODO: What is id0 used for?
-                id0.append(station[i].uid)
+
                 # :todo: increment use count here
-                if wmax < wti[i]:
-                    wmax = wti[i]
+                if wmax < record.wti:
+                    wmax = record.wti
+
             # See to.SBBXgrid.f line 354
             # This is conditional in the Fortran code, but in practice
             # NFB is always bigger than 0, so TAVG always gets called.
-            tavg(km, XBAD, bias, avg, len(avg)//km, base_year[0]-meta.yrbeg,
+            tavg(meta.km, giss_data.XMISSING, bias, avg, len(avg)//meta.km, base_year[0]-meta.yrbeg,
                 # :todo: remove dummy 99s
                 base_year[1]-meta.yrbeg+1, 99, 99)
-            # Subtract BIAS, then scale and write the result to disk
+            # Subtract BIAS, then scale.
             m = 0
-            for y in range(meta.monm//km):
-                for k in range(km):
-                    if avg[m] < XBAD:
-                        avg[m] = meta.scale*(avg[m]-bias[k])
+            for y in range(meta.monm // meta.km):
+                for k in range(meta.km):
+                    if avg[m] < giss_data.XMISSING:
+                        avg[m] = meta.scale * (avg[m] - bias[k])
                     m += 1
                     # :todo: increment LENC
-            box_obj = giss_data.SubboxRecord(n=monm,
+            box_obj = giss_data.SubboxRecord(n=meta.monm,
                     lat_S=latlon[0], lat_N=latlon[1], lon_W=latlon[2],
                     lon_E=latlon[3], stations=nstcmb, station_months=nstmns,
-                    d=radius*(1-wmax), series=avg[:monm])
+                    d=radius*(1-wmax), series=avg[:meta.monm])
             yield box_obj
+
     print >>log
 
 
@@ -585,7 +521,7 @@ def fst(file='Ts.GHCN.CL.PA'):
     return StationRecords([file])
 
 
-def step3(record_source, radius=1200, year_begin=1880, audit=None, subbox=()):
+def step3(record_source, radius=1200, year_begin=1880):
     """Step 3 of the GISS processing.
 
     """
@@ -618,8 +554,10 @@ def step3(record_source, radius=1200, year_begin=1880, audit=None, subbox=()):
     meta.km = 12
 
     # Output series cannot begin earlier than input series.
+    # TODO: The ``year_begin`` argument seems to have no effect,
+    #       other than what appears in the ``title`` below.
+    #       This might have been inroduced during Jan/Feb 2010.
     year_begin = max(year_begin, meta.yrbeg)
-    monm = (meta.yrbeg + (meta.monm // meta.km) - year_begin) * meta.km
 
     units = '(C)'
     if meta.kq == 2:
@@ -629,9 +567,8 @@ def step3(record_source, radius=1200, year_begin=1880, audit=None, subbox=()):
     meta.mo1 = 1
     meta.title = title.ljust(80)
 
-    box_source = iter_subbox_grid(station_records, meta, monm,
-            radius=radius, base_year=(1951,1980), audit=None,
-            just_subbox=subbox)
+    box_source = iter_subbox_grid(station_records, meta, radius=radius,
+            base_year=(1951,1980))
 
     yield meta
     for box in box_source:

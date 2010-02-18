@@ -50,6 +50,30 @@ BAD = 9999
 class Error(Exception):
     """Some sort of error."""
 
+class Config:
+    """A record of the configuration parameters used to style the plot.
+    Just a struct really."""
+
+config = Config()
+config.fontsize = 16
+# Pixels per year.
+config.xscale = 6
+# Pixels per degree C.
+config.yscale = 10
+
+def derive_config(config):
+    """Some configuration parameters are derived from others if they
+    haven't been set."""
+
+    def titlesize(c):
+        c.titlesize = 1.25*c.fontsize
+
+    d = dict(titlesize=titlesize)
+    for attr,fn in d.items():
+        if not hasattr(config, attr):
+            fn(config)
+
+
 # The hex colours come from
 # http://www.personal.psu.edu/cab38/ColorBrewer/ColorBrewer.html
 # (and reordered)
@@ -148,22 +172,13 @@ def plot(arg, mode, inp, out, meta):
     # Bounds of the box that displays data.  In SVG viewBox format.
     databox = (minyear, lowest, limyear-minyear, highest-lowest)
 
-    # Vertical scale.  The data y-coordinate is multipled by vs to get
-    # to pixels (then possibly shifted up or down).  This is thus the
-    # number of pixels per degree C.
-    vs = 10
-    # Horizontal scale.  The data x-coordinate is multiplied by hs to
-    # get to pixels (then possibly shifted left or right).  This is thus
-    # the number of pixels per year.
-    hs = 6
-
-    plotwidth = databox[2] * hs
+    plotwidth = databox[2] * config.xscale
 
     # Bottom edge and top edge of plot area, after data has been scaled.
     # Forcing them to be integers means our plot can be aligned on
     # integer coordinates.
-    ybottom = math.floor((lowest-0.05)*vs)
-    ytop = math.ceil((highest+0.05)*vs)
+    ybottom = math.floor((lowest-0.05)*config.yscale)
+    ytop = math.ceil((highest+0.05)*config.yscale)
     plotheight = ytop - ybottom
 
     out.write("""<svg width='%dpx' height='%dpx'
@@ -192,7 +207,8 @@ def plot(arg, mode, inp, out, meta):
     # In this section 0,0 is at top left of chart, and +ve y is down.
     if title:
         out.write("  <g id='title'>\n")
-        out.write("  <text font-size='20' x='0' y='-4'>%s</text>\n" % title)
+        out.write("  <text font-size='%.1f' x='0' y='-4'>%s</text>\n" %
+          (config.titlesize, title))
         out.write("  </g>\n")
 
     # Transform so that (0,0) on chart is lower left
@@ -201,8 +217,8 @@ def plot(arg, mode, inp, out, meta):
     # oriented as per SVG default.  +ve y is down.
 
     # Start of "axes" group.  In this group we are 1-1 with SVG pixels;
-    # (0,0) is at plot lower left, and +ve is down.  Use vs and xs to
-    # scale to/and from data coordinates.
+    # (0,0) is at plot lower left, and +ve is down.  Use yscale and
+    # xscale to scale to/and from data coordinates.
     out.write("<g id='axes'>\n")
     w = limyear - minyear
     # Ticks on the horizontal axis.
@@ -214,20 +230,18 @@ def plot(arg, mode, inp, out, meta):
     overshoot = 16
     out.write("  <path d='" +
       ''.join(map(lambda x: 'M%d %.1fl0 %.1f' %
-      (x*hs, overshoot, -(plotheight+overshoot)), tickat)) +
+      (x*config.xscale, overshoot, -(plotheight+overshoot)), tickat)) +
       "' />\n")
     # Labels.
-    # Font size.  Couldn't get this to work in the style element, so it's
-    # here as an attribute on each <text>
-    fs = 16
     for x in tickat:
         out.write("  <text text-anchor='middle'"
           " font-size='%.1f' x='%d' y='%d'>%d</text>\n" %
-          (fs, x*hs, overshoot, minyear+x))
-    out.write("  <g id='vaxis' font-size='%.1f' text-anchor='end'>" % fs)
+          (config.fontsize, x*config.xscale, overshoot, minyear+x))
+    out.write("  <g id='vaxis' font-size='%.1f' text-anchor='end'>" %
+      config.fontsize)
     # Ticks on the vertical axis.
     # Ticks every 5 degrees C
-    every = 5*vs
+    every = 5*config.yscale
     s = (-ybottom) % every
     tickat = map(lambda x:x+s, range(0, int(plotheight+1-s), every))
     out.write("  <path d='" +
@@ -237,10 +251,10 @@ def plot(arg, mode, inp, out, meta):
         # Note: "%.0f' % 4.999 == '5'
         out.write("  <text alignment-baseline='middle'"
           " x='-8' y='%.1f'>%.0f</text>\n" %
-          (-y, (y+ybottom)/float(vs)))
+          (-y, (y+ybottom)/float(config.yscale)))
     # Vertical label
     out.write("  <defs><path id='pvlabel' d='M-%d -20l0 -400'/></defs>\n" %
-      (3.5*fs-8))
+      (3.5*config.fontsize-8))
     out.write("  <text text-anchor='start'>"
       "<textPath xlink:href='#pvlabel'>"
       u"Temperature (\N{DEGREE SIGN}C)</textPath></text>\n")
@@ -253,9 +267,10 @@ def plot(arg, mode, inp, out, meta):
     out.write("<g transform='scale(1, -1)'>\n")
     # Transform so that plot lower left is at (0,0):
     out.write("<g transform='translate(0,%.0f)'>\n" % -ybottom)
-    # Transform by (hs,vs) so that outside this group we're in (SVG)
+    # Transform by (xscale,yscale) so that outside this group we're in (SVG)
     # pixels.
-    out.write("<g transform='scale(%.2f,%.2f)'>\n" % (hs, vs))
+    out.write("<g transform='scale(%.2f,%.2f)'>\n" %
+      (config.xscale, config.yscale))
     # Transform so that databox left ends up at x=0
     out.write("<g transform='translate(%d,0)'>\n" % (-minyear))
     out.write("""<rect x='%d' y='%.1f' width='%d' height='%.1f'
@@ -422,6 +437,24 @@ def asdict(arg, inp, mode):
 
     return table
 
+def update_config(config, v):
+    """*config* is a configuration object used to store parameters.  *v*
+    is an argument string of the form "parm1=value1;parm2=value2;...".
+    Each "parm=value" pair sets an attribute of the config object.
+    """
+
+    l = v.split(';')
+    for binding in l:
+        attr,value = binding.split('=')
+        attr = attr.strip()
+        value = value.strip()
+        try:
+            value = int(value)
+        except ValueError:
+            value = float(value)
+        setattr(config, attr, value)
+    return config
+
 class Usage(Exception):
     pass
         
@@ -438,10 +471,12 @@ def main(argv=None):
         infile = 'input/v2.mean'
         metafile = 'input/v2.inv'
         mode = 'temp'
-        opt,arg = getopt.getopt(argv[1:], 'ao:d:m:')
+        opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:')
         if not arg:
             raise Usage('At least one identifier must be supplied.')
         for k,v in opt:
+            if k == '-c':
+                update_config(config, v)
             if k == '-a':
                 mode = 'anom'
             if k == '-o':
@@ -461,10 +496,12 @@ def main(argv=None):
         else:
             infile = open(infile)
         metafile = open(metafile)
+        derive_config(config)
         return plot(arg, mode=mode, inp=infile, out=outfile, meta=metafile)
     except (getopt.GetoptError, Usage), e:
         sys.stdout.write('%s\n' % str(e))
         sys.stdout.write(__doc__)
+        return 99
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

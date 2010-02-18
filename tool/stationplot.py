@@ -63,6 +63,7 @@ class Config:
     Just a struct really."""
 
 config = Config()
+config.debug = False
 config.fontsize = 16
 # Pixels per year.
 config.xscale = 6
@@ -205,12 +206,13 @@ def plot(arg, mode, inp, out, meta, timewindow=None):
     # Style
     out.write("""<defs>
   <style type="text/css">
+    .debug { %s }
     path { stroke-width: 0.1; fill: none }
     path.singleton { stroke-width: 0.2; stroke-linecap: round }
     g#axes path { stroke-width:1; fill:none; stroke: #888 }
     g#axes text { fill: black; font-family: Verdana }
     g#title text { fill: black; font-family: Verdana }
-""")
+""" % ('display: none', '')[config.debug])
     assert len(datadict) <= len(colour_list)
     for id12,colour in zip(datadict, colour_list):
         out.write("    g#record%s { stroke: %s }\n" % (id12, colour))
@@ -288,7 +290,7 @@ def plot(arg, mode, inp, out, meta, timewindow=None):
       (config.xscale, config.yscale))
     # Transform so that databox left ends up at x=0
     out.write("<g transform='translate(%d,0)'>\n" % (-minyear))
-    out.write("""<rect x='%d' y='%.1f' width='%d' height='%.1f'
+    out.write("""<rect class='debug' x='%d' y='%.1f' width='%d' height='%.1f'
       stroke='pink' fill='none' opacity='0.30' />\n""" % databox)
 
     for id12,series in datadict.items():

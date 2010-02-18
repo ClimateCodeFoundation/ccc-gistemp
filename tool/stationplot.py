@@ -15,19 +15,27 @@
 # 21544218001 tallest aspect ratio
 
 """
-Usage: python stationplot.py [-d v2.mean] [-o file.svg] [-a] station-id
+Usage: python stationplot.py [options] station-id
+
+The options are:
+  [-a] [-d v2.mean] [-o file.svg] [-t YYYY,YYYY]
 
 Tool to plot the records for a station.  Stations have an 11-digit
 identifier, and in the GHCN file v2.mean they have a single digit added, the
 duplicate marker, to form a 12-digit record identifier.  One station may
 have several "duplicate" records associated with it.
 
-Anomalies can be plotted (each datum has the mean for that month
-subtracted from it) by using the -a option.
-
 Specifying an 11-digit identifier will plot all the duplicates
 associated with that station; a 12-digit indentifier will plot only a
 single record.
+
+Anomalies can be plotted (each datum has the mean for that month
+subtracted from it) by using the -a option.
+
+The -t option will restrict the time axis so that only records between
+the beginning of the first year and the beginning of the second year are
+displayed (in other words, the second year is excluded from the
+displayed range).
 
 Normally the output is an SVG document written to the file plot.svg.
 The -o option can be used to change where it written ("-o -" specifies stdout).
@@ -125,12 +133,17 @@ def aplot(series):
             continue
         yield list(block)
 
-def plot(arg, mode, inp, out, meta):
+def plot(arg, mode, inp, out, meta, timewindow=None):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
     name, location) is takem from the `meta` file (usually v2.inv).
     `mode` should be 'temp' to plot temperatures, or 'anom' to plot
-    monthly anomalies.
+    monthly anomalies.  `timewindow` restricts the plot to a particular
+    range of times: None means that the entire time range is plotted;
+    otherwise, it should be a pair of numbers (y1,y2) and only records
+    that have a time t where y1 <= t < y2 are displayed.  Normally y1
+    and y2 are years in which case records from the beginning of y1 up
+    to the beginning of y2 are displayed.
     """
 
     import struct
@@ -138,12 +151,12 @@ def plot(arg, mode, inp, out, meta):
     def valid(datum):
         return datum != BAD
 
-    table = asdict(arg, inp, mode)
-    if not table:
+    datadict = asdict(arg, inp, mode)
+    if not datadict:
         raise Error('No data found for %s' % (', '.join(arg)))
         
     if meta:
-        meta = get_meta(table, meta)
+        meta = get_meta(datadict, meta)
         title = []
         for id11,d in meta.items():
             title.append('%s %+06.2f%+07.2f  %s' %
@@ -155,7 +168,9 @@ def plot(arg, mode, inp, out, meta):
     limyear = -9999
     highest = -9999
     lowest = 9999
-    for _,(data,begin) in table.items():
+    if timewindow:
+        datadict = window(datadict, timewindow)
+    for _,(data,begin) in datadict.items():
         minyear = min(minyear, begin)
         limyear = max(limyear, begin+len(data)//12)
         valid_data = filter(valid, data)
@@ -196,8 +211,8 @@ def plot(arg, mode, inp, out, meta):
     g#axes text { fill: black; font-family: Verdana }
     g#title text { fill: black; font-family: Verdana }
 """)
-    assert len(table) <= len(colour_list)
-    for id12,colour in zip(table, colour_list):
+    assert len(datadict) <= len(colour_list)
+    for id12,colour in zip(datadict, colour_list):
         out.write("    g#record%s { stroke: %s }\n" % (id12, colour))
     out.write("  </style>\n</defs>\n")
 
@@ -276,13 +291,38 @@ def plot(arg, mode, inp, out, meta):
     out.write("""<rect x='%d' y='%.1f' width='%d' height='%.1f'
       stroke='pink' fill='none' opacity='0.30' />\n""" % databox)
 
-    for id12,series in table.items():
+    for id12,series in datadict.items():
         out.write("<g id='record%s'>\n" % id12)
         for segment in aplot(series):
             out.write(aspath(segment)+'\n')
         out.write("</g>\n")
     out.write("</g>\n" * 6)
     out.write("</svg>\n")
+
+def window(datadict, timewindow):
+    """Restrict the data series in *datadict* to be between the two
+    times specified in the timewindow pair.  A fresh dict is returned.
+    """
+
+    t1,t2 = timewindow
+    # The window must be on a year boundary to preserve the fact that
+    # data is a multiple of 12 long.
+    assert int(t1) == t1
+    assert int(t2) == t2
+    d = {}
+    for id12,(data,begin) in datadict.items():
+        if t2 <= begin:
+            continue
+        end = begin+len(data)//12
+        if end <= t1:
+            continue
+        if t2 < end:
+            data = data[:12*(t2-end)]
+        if begin < t1:
+            data = data[12*(t1-begin):]
+            begin = t1
+        d[id12] = (data,begin)
+    return d
 
 def get_meta(l, meta):
     """For the 11-digit stations identifiers in `l`, get the metadata
@@ -455,6 +495,14 @@ def update_config(config, v):
         setattr(config, attr, value)
     return config
 
+def parse_topt(v):
+    """Parse the t option which restricts the years to a particular
+    range.  *v* is a string that is 2 (4-digit) years separated by a
+    comma.  A pair of years is returned.
+    """
+
+    return map(int, v.split(','))
+
 class Usage(Exception):
     pass
         
@@ -471,7 +519,8 @@ def main(argv=None):
         infile = 'input/v2.mean'
         metafile = 'input/v2.inv'
         mode = 'temp'
-        opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:')
+        timewindow = None
+        opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:t:')
         if not arg:
             raise Usage('At least one identifier must be supplied.')
         for k,v in opt:
@@ -485,6 +534,8 @@ def main(argv=None):
                 infile = v
             if k == '-m':
                 metafile = v
+            if k == '-t':
+                timewindow = parse_topt(v)
         if outfile == '-':
             outfile = sys.stdout
         else:
@@ -497,7 +548,8 @@ def main(argv=None):
             infile = open(infile)
         metafile = open(metafile)
         derive_config(config)
-        return plot(arg, mode=mode, inp=infile, out=outfile, meta=metafile)
+        return plot(arg, mode=mode, timewindow=timewindow,
+          inp=infile, out=outfile, meta=metafile)
     except (getopt.GetoptError, Usage), e:
         sys.stdout.write('%s\n' % str(e))
         sys.stdout.write(__doc__)

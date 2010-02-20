@@ -6,7 +6,6 @@
 #
 # Nick Barnes, Ravenbrook Limited, 2010-02-15
 
-#!/usr/bin/env python
 """Parameters controlling the GISTEMP algorithm.
 
 Various numeric parameters controlling each phase of the algorithm are

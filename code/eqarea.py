@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-# $Id: //info.ravenbrook.com/project/ccc/master/code/eqarea.py#7 $
+# $URL$
+# $Rev$
+
 """Routines for computing an equal area grid.
 
 Specifically, Sergej's equal area 8000 element grid of the Earth (or

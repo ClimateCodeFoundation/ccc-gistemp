@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-# $Id: //info.ravenbrook.com/project/ccc/master/code/fort.py#3 $
+# $URL$
+# $Rev$
 
 """Handle (binary) Fortran files in Python.  A binary Fortran file can
 be opened using the open method of this module; a File object is

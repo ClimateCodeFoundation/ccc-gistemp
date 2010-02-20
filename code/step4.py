@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# $URL$
+# $Rev$
+
 """Python version of convert1.HadR2_mod4.py.
 
 Without arguments this will look for ``input/SBBX.HadR2`` and all the

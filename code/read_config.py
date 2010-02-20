@@ -1,6 +1,6 @@
 #! /usr/bin/env python
-# $URL: https://ccc-gistemp.googlecode.com/svn/trunk/code/step1.py $
-# $Rev: 193 $
+# $URL$
+# $Rev$
 # 
 # read_config.py
 #

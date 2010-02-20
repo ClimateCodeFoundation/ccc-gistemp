@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# $URL$
+# $Rev$
+
 """Some useful support for Python scripts.
 
 This module contains some useful functions for script writing. Since the CCC

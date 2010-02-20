@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# $URL$
+# $Rev$
+
 """Classes for GISTEMP data.
 
 Primarily, the classes herein support temperature records, which

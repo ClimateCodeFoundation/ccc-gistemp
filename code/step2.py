@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-# $URL: https://ccc-gistemp.googlecode.com/svn/trunk/code/invnt.py $
-# $Rev: 162 $
+# $URL$
+# $Rev$
 #
 # step2.py
 #
@@ -234,16 +234,12 @@ def urban_adjustments(anomaly_stream):
             if valid(anomalies[i]):
                 anomalies[i] *= 0.1
 
-        # throw away some precision in lat/lon for compatibility with Fortran
-        lat = 0.1 * math.floor(station.lat * 10 + 0.5)
-        lon = 0.1 * math.floor(station.lon * 10 + 0.5)
-
         d = Struct()
         d.anomalies = anomalies
-        d.cslat = math.cos(lat * pi180)
-        d.snlat = math.sin(lat * pi180)
-        d.cslon = math.cos(lon * pi180)
-        d.snlon = math.sin(lon * pi180)
+        d.cslat = math.cos(station.lat * pi180)
+        d.snlat = math.sin(station.lat * pi180)
+        d.cslon = math.cos(station.lon * pi180)
+        d.snlon = math.sin(station.lon * pi180)
         d.id = record.uid
         d.first_year = record.first - iyoff
         d.last_year = d.first_year + length - 1

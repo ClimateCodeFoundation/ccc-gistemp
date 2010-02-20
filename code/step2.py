@@ -18,14 +18,14 @@ import itertools
 import earth
 import giss_data
 
-BAD = 9999
-
 def invalid(x):
-    """Test for invalid datum ("equal" to the BAD value, for some
+    """Test for invalid datum ("equal" to the giss_data.XMISSING value, for some
     definition of "equal").
     """
 
-    return abs(x - BAD) < 0.1
+    assert isinstance(x,float)
+    assert (x == giss_data.XMISSING or (x < 100.0 and x > -100.0))
+    return x == giss_data.XMISSING
 
 def valid(x):
     """Test for valid datum.  See invalid()."""
@@ -103,7 +103,7 @@ def annual_anomalies(stream):
 
     for record in stream:
         station = record.station
-        series = record.series_as_tenths
+        series = record.series
         monthly_means = []
         for m in range(12):
             month_data = filter(valid, series[m::12])
@@ -132,13 +132,12 @@ def annual_anomalies(stream):
                     season_anomalies.append(total[s]/count[s])
             # valid annual anomaly requires at least 3 valid seasons
             if len(season_anomalies) > 2:
-                v = (10.0 * sum(season_anomalies)) / len(season_anomalies)
-                annual_anoms.append(int(round(v)))
+                annual_anoms.append(sum(season_anomalies) / len(season_anomalies))
                 if first is None:
                     first = y
                 last = y
             else:
-                annual_anoms.append(BAD)
+                annual_anoms.append(giss_data.XMISSING)
         
         if first is not None:
             record.first = first + record.first_year
@@ -160,8 +159,9 @@ g = Struct()
 g.xcrit = 2.0 / 3.0
 g.x0 = 1950
 g.lshort = 7
-g.slplim = 1.0
-g.slpx = 0.5
+g.slplim = 0.1
+g.slpx = 0.05
+g.slpxx = 0.02
 
 g.log = None
 
@@ -226,16 +226,9 @@ def urban_adjustments(anomaly_stream):
         station = record.station
         all.append(record)
         record.urban_adjustment = None
-        anomalies = record.anomalies
-        length = len(anomalies)
-        # convert anomalies back from int to float;
-        # TODO: preserve as float between annual_anomalies and here.
-        for i in range(length):
-            if valid(anomalies[i]):
-                anomalies[i] *= 0.1
-
+        length = len(record.anomalies)
         d = Struct()
-        d.anomalies = anomalies
+        d.anomalies = record.anomalies
         d.cslat = math.cos(station.lat * pi180)
         d.snlat = math.sin(station.lat * pi180)
         d.cslon = math.cos(station.lon * pi180)
@@ -417,8 +410,8 @@ def combine_neighbors(us, iyrm, iyoff, neighbors, minimum_overlap):
 
     weights = [0.0] * iyrm
     counts = [0] * iyrm
-    urban_series = [BAD] * iyrm
-    combined = [BAD] * iyrm
+    urban_series = [giss_data.XMISSING] * iyrm
+    combined = [giss_data.XMISSING] * iyrm
 
     urban_series[us.first_year - 1:us.last_year] = us.anomalies
     g.log.write("urb stnID:%s # rur:%4d ranges:%5d%5d.\n" % (
@@ -441,7 +434,7 @@ def combine_neighbors(us, iyrm, iyoff, neighbors, minimum_overlap):
         g.log.write("add stn%5d range:%5d-%4d %5d %s\n" % (
                     i + 2, rs.first_year + iyoff, rs.last_year + iyoff, rs.recLen,
                     rs.id))
-        dnew = [BAD] * iyrm
+        dnew = [giss_data.XMISSING] * iyrm
         dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
         nsm, ncom = cmbine(combined, weights, counts, dnew, rs.first_year,
             rs.last_year, rs.weight, minimum_overlap)
@@ -597,7 +590,7 @@ def trend2(xc, a, dataLen, xmid, min):
             sxa0 += x * v_a
 
     if count0 < min or count1 < min: 
-       return BAD, BAD, BAD, BAD
+       return giss_data.XMISSING, giss_data.XMISSING, giss_data.XMISSING, giss_data.XMISSING
 
     count = count0 + count1
     denom = (count * sxx0 * sxx1
@@ -628,8 +621,26 @@ def trend2(xc, a, dataLen, xmid, min):
 def flags(fit, iy1, iy2):
     """Calculates flags concerning a two-part linear fit.  Also
     accumulate statistics.  Not well documented or understood, but
-    note that in adj(), below, the two-part fit will be disregarded if 
-    the flag value is not either 0 or 100.
+    note that in adjust(), below, the two-part fit will be disregarded
+    if the flag value is not either 0 or 100.
+
+    Possible flag parts:
+    1 if either side is "short" (less than lshort)
+    20 if left gradient is "too steep" (abs value greater than slplim)
+    10 if right gradient is "too steep" (abs value greater than slplim)
+    100 if gradient difference is "too steep" (abs greater than slplim)
+    100 if gradient difference is "a bit steep" (abs greater than slpx)
+    1000 if gradients have different sign and both "steep" (abs greater than slpxx)
+
+    So two-part fit is only used if all of these conditions are true:
+
+    - left leg is longer than lshort
+    - right leg is longer than lshort
+    - left gradient is abs less than slplim
+    - right gradient is abs less than slplim
+    - difference between gradients is abs less than slplim
+    - either gradients have same sign or
+             at least one gradient is abs less than slpxx
     """
 
     (sl1, sl2, knee, sl) = fit
@@ -662,7 +673,7 @@ def flags(fit, iy1, iy2):
         g.nok += 1
     if iflag == 100:
         g.nokx += 1
-    if sl1 * sl2 < 0.0 and abs(sl1) > 0.2 and abs(sl2) > 0.2:
+    if sl1 * sl2 < 0.0 and abs(sl1) > g.slpxx and abs(sl2) > g.slpxx:
         iflag += 1000
         g.nswitch += 1
     if iflag == 1000:
@@ -693,7 +704,7 @@ def apply_adjustments(stream):
 
     for record in stream:
         station = record.station
-        series = record.series_as_tenths
+        series = record.series
         report_name = "%s%c%c%c%3s" % (
                       station.name, station.US_brightness,
                       station.pop, station.GHCN_brightness, station.uid[:3])
@@ -704,7 +715,7 @@ def apply_adjustments(stream):
             m2 = record.rel_first_month + record.good_end_idx - 1
             offset = record.good_start_idx # index of first valid month
             (fit, iy1, iy2, iy1e, iy2e, flag) = record.urban_adjustment
-            a, b = adj(first_year, record, series, fit, iy1e, iy2e, iy1, iy2,
+            a, b = adjust(first_year, record, series, fit, iy1e, iy2e, iy1, iy2,
                     flag, m1, m2, offset)
             # a and b are numbers of new first and last valid months
             log.write(" %s  %s saved\n" % (report_station, report_name))
@@ -714,14 +725,12 @@ def apply_adjustments(stream):
             bb = b - a + 1
             log.write("ADJ %s %s %s %s %s\n" % (report_name, len(series), len(series),
                 aa, bb))
-            record.set_series_from_tenths(a-1 + first_year * 12 + 1,
-                    series[aa + offset:aa + offset + bb])
+            record.set_series(a-1 + first_year * 12 + 1, series[aa + offset:aa + offset + bb])
             record.begin = ((a-1) / 12) + first_year
             record.first = record.begin
             record.end = ((b-1) / 12) + first_year
             record.last = record.last_year
-            log.write("%s %s\n" % (len(record.series_as_tenths),
-                len(record.series_as_tenths)))
+            log.write("%s %s\n" % (len(record.series), len(record.series)))
             yield record
             log.write(" %s  %s saved\n" % (report_station, report_name))
         else:
@@ -736,7 +745,7 @@ def apply_adjustments(stream):
                 # unadjusted urban station: skip
                 log.write(" %s  %s skipped\n" % (report_station, report_name))
 
-def adj(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offset):
+def adjust(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offset):
     (sl1, sl2, knee, sl0) = fit
     if iflag not in (0, 100):
         # Use linear approximation
@@ -756,7 +765,7 @@ def adj(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, o
             iya = iy1a
         if iy > iy2a:
             iya = iy2a
-        iadj = int(round((iya - knee) * sl - (iy2a - knee) * sl2))
+        adj = (iya - knee) * sl - (iy2a - knee) * sl2
         for m in range(m0, m0 + 12):
             mIdx = m - base
             if mIdx < 0:
@@ -764,7 +773,7 @@ def adj(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, o
             if m >= m1o and m <= m2o and valid(series[mIdx + offset]):
                 if m1 < 0:
                     m1 = m
-                series[mIdx+offset] = series[mIdx+offset] + iadj
+                series[mIdx+offset] = series[mIdx+offset] + adj
                 m2 = m
 
         m0 = m0 + 12

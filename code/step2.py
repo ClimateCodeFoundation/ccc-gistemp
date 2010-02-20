@@ -17,14 +17,13 @@ import itertools
 
 import earth
 import giss_data
+import parameters
 
 def invalid(x):
     """Test for invalid datum ("equal" to the giss_data.XMISSING value, for some
     definition of "equal").
     """
 
-    assert isinstance(x,float)
-    assert (x == giss_data.XMISSING or (x < 100.0 and x > -100.0))
     return x == giss_data.XMISSING
 
 def valid(x):
@@ -37,60 +36,12 @@ def valid(x):
 
 def drop_short_records(record_source):
     """Drop records which don't have at least one month index
-    with at least *minimum_monthly_max* valid data.
-
-    Logs to log/short.station.list and log/station.log as we go; these
-    files may not be necessary, and their formats are a little
-    awkward, but retained for now for testing against Fortran.
+    with at least *parameters.station_drop_minimum_months* valid data.
     """
-    minimum_monthly_max = 20
-
-    station_log = open('log/station.log', "w")
-    short_station_log = open('log/short.station.list', "w")
-
-    mult = 0
-    last_station_uid = None
     for record in record_source:
-        if record.station_uid == last_station_uid:
-            mult += 1
-        else:
-            mult = 0
-            last_station_uid = record.station_uid
-
-        station = record.station
         mmax = max(record.get_monthly_valid_counts())
-        station_log.write("%12d%12d%12d%12d%12d%12d\n" % (
-                mult, record.short_id, mmax, minimum_monthly_max,
-                record.rel_first_month + record.good_start_idx,
-                record.rel_first_month + record.good_end_idx - 1))
-        if mmax >= minimum_monthly_max:
+        if mmax >= parameters.station_drop_minimum_months:
             yield record
-        else:
-            short_station_log.write("%12d  %30s%c%c%c%3s dropped\n" %
-                    (record.short_id, station.name,
-                    station.US_brightness,
-                    station.pop, station.GHCN_brightness,
-                    record.uid[:3]))
-
-
-def invnt(name, stream):
-    """Turns the data *stream* into a station list, in log/*name*.station.list,
-    while passing the stream through unchanged.  Probably unnecessary, as the
-    .station.list files are not used by any other code, but retained for now for
-    testing against Fortran.
-    """
-    
-    log = open('log/%s.station.list' % name,'w')
-    for record in stream:
-        station = record.station
-        log.write("work/%s %9d %-30s lat,lon (.1deg)%5d%6d %s%s%s cc=%3s\n" % (
-                  name, int(record.uid[3:12]), station.name,
-                  math.floor(station.lat * 10.0 + 0.5),
-                  math.floor(station.lon * 10.0 + 0.5),
-                  station.pop, station.US_brightness,
-                  station.GHCN_brightness, record.uid[:3]))
-        yield record
-    log.close()
 
 def annual_anomalies(stream):
     """Iterates over the station record *stream*, updating urban
@@ -102,7 +53,6 @@ def annual_anomalies(stream):
     """
 
     for record in stream:
-        station = record.station
         series = record.series
         monthly_means = []
         for m in range(12):
@@ -156,12 +106,6 @@ class Struct(object):
 
 # "Global" parameters of the urban_adjustments phase.
 g = Struct()
-g.xcrit = 2.0 / 3.0
-g.x0 = 1950
-g.lshort = 7
-g.slplim = 0.1
-g.slpx = 0.05
-g.slpxx = 0.02
 
 g.log = None
 
@@ -190,12 +134,6 @@ def urban_adjustments(anomaly_stream):
      """
 
     g.log = open('log/PApars.GHCN.CL.1000.20.log','w')
-
-    full_radius = 1000.0
-    minimum_overlap = 20
-    minimum_rural_neighbors = 3
-
-    g.ncrit = 20
 
     g.nstat = g.sumch = g.nyrs = g.nstap = g.nyrsp = g.sumchp = 0
     g.nsl1 = g.nsl2 = g.ndsl = g.nswitch = g.nsw0 = g.nok = g.nokx = g.nsta = 0
@@ -279,9 +217,9 @@ def urban_adjustments(anomaly_stream):
         while True:
             if needNewNeighbours:
                 if usingFullRadius:
-                    radius = full_radius
+                    radius = parameters.urban_adjustment_full_radius
                 else:
-                    radius = full_radius / 2
+                    radius = parameters.urban_adjustment_full_radius / 2
                 neighbors = get_neighbours(us, rural_stations, radius)
                 if not neighbors:
                     if usingFullRadius:
@@ -294,14 +232,14 @@ def urban_adjustments(anomaly_stream):
                     continue
 
                 counts, urban_series, combined = combine_neighbors(
-                        us, iyrm, iyoff, neighbors, minimum_overlap)
+                        us, iyrm, iyoff, neighbors)
                 iy1 = 1
                 needNewNeighbours = False
 
             quorate_count, first, last, quorate_period_total, length = prepare_series(
-                iy1, iyrm, combined, urban_series, counts, f, iyoff, x, minimum_rural_neighbors)
+                iy1, iyrm, combined, urban_series, counts, f, iyoff, x)
 
-            if quorate_count < g.ncrit:
+            if quorate_count < parameters.urban_adjustment_min_years:
                 if usingFullRadius:
                     f79.write("%s  good years: %4d   total years: %4d"
                               " too little rural-neighbors-overlap"
@@ -313,15 +251,14 @@ def urban_adjustments(anomaly_stream):
                 needNewNeighbours = True
                 continue
 
-            if float(quorate_count) >= g.xcrit * (last - first + 1. - .1):
+            if float(quorate_count) >= parameters.urban_adjustment_proportion_good * (last - first + 0.9):
                 break
 
-            # not enough good years for the given range (<66%)
-            # the  - 0.1 is to prevent equality with potential uncertainty
-            # due to hardware rounding or compiler behaviour.
-            # nick barnes, ravenbrook limited, 2008 - 09 - 10
-            # try to save cases in which the gaps are in the early part:
-            iy1 = int(last - (quorate_count - 1) / g.xcrit)
+            # Not enough good years for the given range.  Try to save
+            # cases in which the gaps are in the early part, by
+            # dropping that part and going around to prepare_series
+            # again.
+            iy1 = int(last - (quorate_count - 1) / parameters.urban_adjustment_proportion_good)
             if iy1 < first + 1:
                 iy1 = first + 1                  # avoid infinite loop
             f79.write("%s drop early years %4d-%4d\n" % (
@@ -334,7 +271,7 @@ def urban_adjustments(anomaly_stream):
         #===  c subtract urban station and call a curve fitting program
         fit = getfit(length, x, f)
         # find extended range
-        iyxtnd = int(round(quorate_count / g.xcrit)) - (last - first + 1)
+        iyxtnd = int(round(quorate_count / parameters.urban_adjustment_proportion_good)) - (last - first + 1)
         g.log.write(" possible range increase %11d %11d %11d\n" % (
                     iyxtnd, quorate_count, last - first + 1))
         n1x = first + iyoff
@@ -398,7 +335,7 @@ def get_neighbours(us, rural_stations, radius):
     return neighbors
 
 
-def combine_neighbors(us, iyrm, iyoff, neighbors, minimum_overlap):
+def combine_neighbors(us, iyrm, iyoff, neighbors):
     """Combines the neighbor stations *neighbors*, weighted according
     to their distances from the urban station *us*, to give a combined
     annual anomaly series.  Returns a tuple: (*counts*,
@@ -437,7 +374,7 @@ def combine_neighbors(us, iyrm, iyoff, neighbors, minimum_overlap):
         dnew = [giss_data.XMISSING] * iyrm
         dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
         nsm, ncom = cmbine(combined, weights, counts, dnew, rs.first_year,
-            rs.last_year, rs.weight, minimum_overlap)
+            rs.last_year, rs.weight)
         g.log.write(" data added:  %11d  overlap: %11d  years\n" % (nsm, ncom))
         if nsm != 0:
             rs.uses += 1
@@ -445,17 +382,16 @@ def combine_neighbors(us, iyrm, iyoff, neighbors, minimum_overlap):
     return counts, urban_series, combined
 
 
-def prepare_series(iy1, iyrm, combined, urban_series, counts, f, iyoff, x, minimum_rural_neighbors):
+def prepare_series(iy1, iyrm, combined, urban_series, counts, f, iyoff, x):
     """Prepares for the linearity fitting by populating the arrays *f*
-    and *x* with coordinates.  *x* gets a year number (based at
-    *g.x0*), and *f* gets the difference between the combined rural
-    station anomaly series *combined* and the urban station series
-    *urban_series*.  The arrays are only populated with valid years,
-    from the first quorate year onwards.  A valid year is one in which
-    both the urban station and the combined rural series have valid
-    data.  A quorate year is a year in which there are at least
-    *minimum_rural_neighbors* contributing (obtained from the *counts*
-    series).
+    and *x* with coordinates.  *x* gets a year number and *f* gets the
+    difference between the combined rural station anomaly series
+    *combined* and the urban station series *urban_series*.  The
+    arrays are only populated with valid years, from the first quorate
+    year onwards.  A valid year is one in which both the urban station
+    and the combined rural series have valid data.  A quorate year is
+    a year in which there are at least *parameters.urban_adjustment_min_rural_stations*
+    contributing (obtained from the *counts* series).
 
     Also returns a 5-tuple: (*c*, *f*, *l*, *t*, *v*). *c* is a count
     of the valid quorate years.  *f* is the first such year.  *l* is
@@ -467,7 +403,7 @@ def prepare_series(iy1, iyrm, combined, urban_series, counts, f, iyoff, x, minim
 
     for iy in xrange(iy1 - 1, iyrm):
         if valid(combined[iy]) and valid(urban_series[iy]):
-            if counts[iy] >= minimum_rural_neighbors:
+            if counts[iy] >= parameters.urban_adjustment_min_rural_stations:
                 last = iy + 1
                 quorate_count += 1
                 if first == 0:
@@ -477,17 +413,16 @@ def prepare_series(iy1, iyrm, combined, urban_series, counts, f, iyoff, x, minim
 
             f[i] = combined[iy] - urban_series[iy]
             total += f[i]
-            x[i] = iy + iyoff + 1 - g.x0
+            x[i] = iy + iyoff + 1
             i += 1
-            if counts[iy] >= minimum_rural_neighbors:
+            if counts[iy] >= parameters.urban_adjustment_min_rural_stations:
                  length = i
                  quorate_period_total = total
 
     return quorate_count, first, last, quorate_period_total, length
 
     
-def cmbine(combined, weights, counts, data, first, last, weight,
-        minimum_overlap):
+def cmbine(combined, weights, counts, data, first, last, weight):
     """Adds the array *data* with weight *weight* into the array of
     weighted averages *combined*, with total weights *weights* and
     combined counts *counts* (that is, entry *combined[i]* is the
@@ -496,7 +431,7 @@ def cmbine(combined, weights, counts, data, first, last, weight,
     *data* before combining.
 
     Only combines in the range [*first*, *last*); only combines valid
-    values from *data*, and if there are fewer than *minimum_overlap*
+    values from *data*, and if there are fewer than *parameters.rural_station_min_overlap*
     entries valid in both arrays then it doesn't combine at all.
 
     Returns (*n*,*c*), where *n* is the number of entries combined and
@@ -516,7 +451,7 @@ def cmbine(combined, weights, counts, data, first, last, weight,
         avg_sum += v_avg
         sumn += v_new
 
-    if ncom < minimum_overlap:
+    if ncom < parameters.rural_station_min_overlap:
         return nsm, ncom
     bias = (avg_sum - sumn) / float(ncom)
 
@@ -540,17 +475,16 @@ def getfit(length, x, f):
     """
 
     # Todo: incorporate trend2 into this.
-    nhalf = length / 2
     rmsmin = 1.e20
 
-    for n in xrange(6, length - 5 + 1):
-        xknee = x[n - 1]
+    for n in xrange(parameters.urban_adjustment_min_leg,
+                    length - parameters.urban_adjustment_min_leg):
+        xknee = x[n]
         sl1, sl2, rms, sl = trend2(x, f, length, xknee, 2)
         
         if rms < rmsmin:
              rmsmin = rms
-             xmin = xknee + g.x0
-             fit = (sl1, sl2, xmin, sl)
+             fit = (sl1, sl2, xknee, sl)
 
     return fit
 
@@ -625,22 +559,22 @@ def flags(fit, iy1, iy2):
     if the flag value is not either 0 or 100.
 
     Possible flag parts:
-    1 if either side is "short" (less than lshort)
-    20 if left gradient is "too steep" (abs value greater than slplim)
-    10 if right gradient is "too steep" (abs value greater than slplim)
-    100 if gradient difference is "too steep" (abs greater than slplim)
-    100 if gradient difference is "a bit steep" (abs greater than slpx)
-    1000 if gradients have different sign and both "steep" (abs greater than slpxx)
+    1 if either side is "short" (less than urban_adjustment_short_leg)
+    20 if left gradient is "too steep" (abs value greater than urban_adjustment_steep_leg)
+    10 if right gradient is "too steep" (abs value greater than urban_adjustment_steep_leg)
+    100 if gradient difference is "too steep" (abs greater than urban_adjustment_steep_leg)
+    100 if gradient difference is "a bit steep" (abs greater than urban_adjustment_leg_difference)
+    1000 if gradients have different sign and both "steep" (abs greater than urban_adjustment_reverse_gradient)
 
     So two-part fit is only used if all of these conditions are true:
 
-    - left leg is longer than lshort
-    - right leg is longer than lshort
-    - left gradient is abs less than slplim
-    - right gradient is abs less than slplim
-    - difference between gradients is abs less than slplim
+    - left leg is longer than urban_adjustment_short_leg
+    - right leg is longer than urban_adjustment_short_leg
+    - left gradient is abs less than urban_adjustment_steep_leg
+    - right gradient is abs less than urban_adjustment_steep_leg
+    - difference between gradients is abs less than urban_adjustment_steep_leg
     - either gradients have same sign or
-             at least one gradient is abs less than slpxx
+             at least one gradient is abs less than urban_adjustment_reverse_gradient
     """
 
     (sl1, sl2, knee, sl) = fit
@@ -654,26 +588,26 @@ def flags(fit, iy1, iy2):
 
     # classify : iflag: +1 for short legs etc
     iflag = 0
-    if knee < iy1 + g.lshort or knee > iy2 - g.lshort:
+    if knee < iy1 + parameters.urban_adjustment_short_leg or knee > iy2 - parameters.urban_adjustment_short_leg:
         iflag += 1
         g.nshort += 1
-    if abs(sl1) > g.slplim:
+    if abs(sl1) > parameters.urban_adjustment_steep_leg:
         iflag += 20
         g.nsl1 += 1
-    if abs(sl2) > g.slplim:
+    if abs(sl2) > parameters.urban_adjustment_steep_leg:
         iflag += 10
         g.nsl2 += 1
-    if abs(sl2 - sl1) > g.slplim:
+    if abs(sl2 - sl1) > parameters.urban_adjustment_steep_leg:
         iflag += 100
         g.ndsl += 1
-    if abs(sl2 - sl1) > g.slpx:
+    if abs(sl2 - sl1) > parameters.urban_adjustment_leg_difference:
         iflag += 100
 
     if iflag == 0:
         g.nok += 1
     if iflag == 100:
         g.nokx += 1
-    if sl1 * sl2 < 0.0 and abs(sl1) > g.slpxx and abs(sl2) > g.slpxx:
+    if sl1 * sl2 < 0.0 and abs(sl1) > parameters.urban_adjustment_reverse_gradient and abs(sl2) > parameters.urban_adjustment_reverse_gradient:
         iflag += 1000
         g.nswitch += 1
     if iflag == 1000:
@@ -790,9 +724,9 @@ def step2(record_source):
         yrbeg=1880, missing_flag=9999, precipitation_flag=-9999,
         mlast=None, title='GHCN V2 Temperatures (.1 C)')
 
-    data = invnt('Ts.GHCN.CL', drop_short_records(record_source))
+    data = drop_short_records(record_source)
     anomalies = annual_anomalies(data)
     adjustments = urban_adjustments(anomalies)
-    adjusted = invnt('Ts.GHCN.CL.PA', apply_adjustments(adjustments))
+    adjusted = apply_adjustments(adjustments)
     for record in adjusted:
         yield record

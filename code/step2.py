@@ -35,14 +35,9 @@ def valid(x):
     return not invalid(x)
 
 
-def load_time_series(record_source):
-    """ Reads the data file work/Ts.txt, output by step 1, and returns
-    an iterator of the contents.
-
-    Each item in the iterator is a pair (station, series).  station contains
-    station information, and series contains the temperature series,
-    as a list of monthly values.  Each value is an integer in tenths
-    of degrees C.
+def drop_short_records(record_source):
+    """Drop records which don't have at least one month index
+    with at least *minimum_monthly_max* valid data.
 
     Logs to log/short.station.list and log/station.log as we go; these
     files may not be necessary, and their formats are a little
@@ -98,19 +93,16 @@ def invnt(name, stream):
     log.close()
 
 def annual_anomalies(stream):
-    """Iterates over the station record *stream*, returning an
-    iterator giving an annual anomaly series for each station as
-    (station, anoms).  The algorithm is as follows: compute monthly
-    averages, then monthly anomalies, then seasonal anomalies (means
-    of monthly anomalies for at least two months) then annual
-    anomalies (means of seasonal anomalies for at least three
-    seasons).
+    """Iterates over the station record *stream*, updating urban
+    stations with attributes .first, .last, and .anomalies.  The
+    algorithm is as follows: compute monthly averages, then monthly
+    anomalies, then seasonal anomalies (means of monthly anomalies for
+    at least two months) then annual anomalies (means of seasonal
+    anomalies for at least three seasons).
     """
 
-    all = []
     for record in stream:
         station = record.station
-        all.append(record)
         series = record.series_as_tenths
         monthly_means = []
         for m in range(12):
@@ -174,9 +166,9 @@ g.slpx = 0.5
 g.log = None
 
 def urban_adjustments(anomaly_stream):
-    """Takes an iterator of station annual anomaly records (*station*,
-    *series*) and produces an iterator of urban adjustment parameters
-    records.  The urban adjustment parameters describe a two-part
+    """Takes an iterator of station records and adds an attribute
+    .urban_adjustment to urban stations, which gives urban adjustment
+    parameters.  The urban adjustment parameters describe a two-part
     linear fit to the difference in annual anomalies between an urban
     station and the set of nearby rural stations.
 
@@ -682,9 +674,8 @@ def flags(fit, iy1, iy2):
     return iflag
 
 def apply_adjustments(stream):
-    """Applies the urban adjustment records from the iterator
-    *adjustments* to the station records in *stream*.  Returns an
-    iterator of adjusted station records.
+    """Applies the urban adjustments to the station records in
+    *stream*.  Returns an iterator of adjusted station records.
 
     Rural stations are passed unchanged.  Urban stations without an
     adjustment record are discarded.  Urban stations with an
@@ -794,7 +785,7 @@ def step2(record_source):
         yrbeg=1880, missing_flag=9999, precipitation_flag=-9999,
         mlast=None, title='GHCN V2 Temperatures (.1 C)')
 
-    data = invnt('Ts.GHCN.CL', load_time_series(record_source))
+    data = invnt('Ts.GHCN.CL', drop_short_records(record_source))
     anomalies = annual_anomalies(data)
     adjustments = urban_adjustments(anomalies)
     adjusted = invnt('Ts.GHCN.CL.PA', apply_adjustments(adjustments))

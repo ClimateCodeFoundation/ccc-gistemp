@@ -107,3 +107,22 @@ rural_station_min_overlap = 20
 urban adjustment parameters, do not combine a candidate rural record
 if it has fewer than this number years of overlap."""
 
+gridding_min_overlap = 20
+"""When combining station records to give a grid record, do not
+combine a candidate station record if it has fewer than this number of
+years of overlap with the combined grid record."""
+
+gridding_radius = 1200.0
+"""The radius in kilometres used to find and weight station records to
+give a grid record."""
+
+gridding_reference_first_year = 1951
+"""When gridding, temperature series are turned into anomaly series by
+subtracting monthly means computed over a reference period.  This is
+the first year of that reference period."""
+
+gridding_reference_last_year = 1980
+"""When gridding, temperature series are turned into anomaly series by
+subtracting monthly means computed over a reference period.  This is
+the last year of that reference period."""
+

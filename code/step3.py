@@ -420,7 +420,7 @@ def iter_subbox_grid(station_records, meta, radius=1200,
             wtm = meta.km * [record.wti]
             bias = meta.km * [0.0]
             offset = record.rel_first_month - 1
-            a = record.series_as_tenths # just a temporary
+            a = record.series # just a temporary
             avg[offset:offset + len(a)] = a
             wt = [0.0] * meta.monm
             for i in range(len(a)):
@@ -435,7 +435,7 @@ def iter_subbox_grid(station_records, meta, radius=1200,
                 #           dnew = record.padded_series(meta.monm)
                 dnew = [giss_data.XMISSING] * meta.monm
                 aa, bb = record.rel_first_month, record.rel_last_month
-                dnew[aa - 1:bb] = record.series_as_tenths
+                dnew[aa - 1:bb] = record.series
                 nsm = combine(meta.km, giss_data.XMISSING, bias, avg, wt, dnew,
                         record.rel_first_year, record.rel_last_year + 1,
                         record.wti, wtm, record.uid)
@@ -459,7 +459,7 @@ def iter_subbox_grid(station_records, meta, radius=1200,
             for y in range(meta.monm // meta.km):
                 for k in range(meta.km):
                     if avg[m] < giss_data.XMISSING:
-                        avg[m] = meta.scale * (avg[m] - bias[k])
+                        avg[m] -= bias[k]
                     m += 1
                     # :todo: increment LENC
             box_obj = giss_data.SubboxRecord(n=meta.monm,

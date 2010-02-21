@@ -61,8 +61,8 @@ def inbox(station_records, lats, latn, longw, longe):
 
     for record in station_records:
         st = record.station
-        lat = st.lat_fixed_1
-        lon = st.lon_fixed_1
+        lat = st.lat
+        lon = st.lon
 
         # See to.SBBXgrid.f lines 213 and following
         if lon > longe:
@@ -117,7 +117,7 @@ def incircle(iterable, arc, lat, lon):
 
     for record in iterable:
         st = record.station
-        s_lat, s_lon = st.lat_fixed_1, st.lon_fixed_1
+        s_lat, s_lon = st.lat, st.lon
         # A possible improvement in speed (which the corresponding
         # Fortran code does) would be to store the trig values of
         # the station location in the station object.

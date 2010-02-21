@@ -343,16 +343,6 @@ class Station(object):
         self.idontknow = idontknow
 
     @property
-    def lat_fixed_1(self):
-        """The latitude rounded to 1 decimal place."""
-        return 0.1 * math.floor(self.lat * 10 + 0.5)
-
-    @property
-    def lon_fixed_1(self):
-        """The longitude rounded to 1 decimal place."""
-        return 0.1 * math.floor(self.lon * 10 + 0.5)
-
-    @property
     def lat_as_tenths(self):
         """The latitude as a integer number of 0.1 degrees."""
         return int(math.floor(self.lat * 10 + 0.5))

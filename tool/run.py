@@ -127,7 +127,7 @@ def parse_steps(steps):
             sys.exit("Do not understand steps arg %r" % steps)
 
 
-def parse_options():
+def parse_options(arglist):
     import optparse
     usage = "usage: %prog [options]"
     parser = optparse.OptionParser(usage)
@@ -138,7 +138,7 @@ def parse_options():
     parser.add_option("--no-work_files", "--suppress-work-files",
             action="store_false", default=True, dest="save_work",
             help="Do not save intermediate files in the work sub-directory")
-    options, args = parser.parse_args()
+    options, args = parser.parse_args(arglist)
     if len(args) != 0:
         parser.error("Unexpected arguments")
 
@@ -146,9 +146,14 @@ def parse_options():
     return options, args
 
 
-def main(options, args):
+def main(argv=None):
+    import sys
     # http://www.python.org/doc/2.4.4/lib/module-time.html
     import time
+
+    if argv is None:
+        argv = sys.argv
+    options, args = parse_options(argv[1:])
 
     step_list = options.steps
     try:
@@ -213,5 +218,4 @@ def main(options, args):
 
 
 if __name__ == '__main__':
-    options, args = parse_options()
-    sys.exit(main(options, args))
+    sys.exit(main())

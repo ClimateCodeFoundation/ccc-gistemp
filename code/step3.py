@@ -321,7 +321,7 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
             for record in incircle_records[1:]:
                 # TODO: A StationMethod method to produce a padded data series
                 #       would be good here. Hence we could just do:
-v                #           new = record.padded_series(max_months)
+                #           new = record.padded_series(max_months)
                 new = [giss_data.XMISSING] * max_months
                 aa, bb = record.rel_first_month, record.rel_last_month
                 new[aa - 1:bb] = record.series

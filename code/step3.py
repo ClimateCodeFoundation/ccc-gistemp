@@ -122,8 +122,7 @@ def incircle(iterable, arc, lat, lon):
         cosd = (sinlats*sinlat +
             coslats*coslat*(coslons*coslon + sinlons*sinlon))
         if cosd > cosarc:
-            # Calculate weight based on chord length
-            d = math.sqrt(2*(1-cosd)) # arc length on unit sphere
+            d = math.sqrt(2*(1-cosd)) # chord length on unit sphere
             d /= arc
             record.weight = 1 - d
             yield record
@@ -247,22 +246,18 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
 
     # Critical radius as an angle of arc
     arc = radius / earth.radius
-
-    # ddlat is the angle (in degrees) subtended by an arc of length
-    # radius (on a spherical earth's surface).
-    ddlat = arc * 180 / math.pi
+    arcdeg = arc * 180 / math.pi
 
     regions = list(eqarea.gridsub())
     for region in regions:
         box, subboxes = region[0], list(region[1])
 
-        # Extend box, by half a box east and west and by ddlat north
+        # Extend box, by half a box east and west and by arc north
         # and south.
-        extent = [0] * 4  # Just a dummy list of the right size
-        extent[0] = box[0] - ddlat
-        extent[1] = box[1] + ddlat
-        extent[2] = box[2] - 0.5 * (box[3] - box[2])
-        extent[3] = box[3] + 0.5 * (box[3] - box[2])
+        extent = [box[0] - arcdeg,
+                  box[1] + arcdeg,
+                  box[2] - 0.5 * (box[3] - box[2]),
+                  box[3] + 0.5 * (box[3] - box[2])]
         if box[0] <= -90 or box[1] >= 90:
             # polar
             extent[2] = -180.0

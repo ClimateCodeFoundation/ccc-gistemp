@@ -495,6 +495,31 @@ def trend2(xc, a, dataLen, xmid, min):
 
     return sl1, sl2, rms, sl
 
+def good_two_part_fit(fit, iy1, iy2):
+    """Decide whether to apply a the two-part fit.
+
+    If the two-part fit is not good, the linear fit is used instead.
+    The two-part fit is good if all of these conditions are true:
+
+    - left leg is longer than urban_adjustment_short_leg
+    - right leg is longer than urban_adjustment_short_leg
+    - left gradient is abs less than urban_adjustment_steep_leg
+    - right gradient is abs less than urban_adjustment_steep_leg
+    - difference between gradients is abs less than urban_adjustment_steep_leg
+    - either gradients have same sign or
+             at least one gradient is abs less than urban_adjustment_reverse_gradient
+    """
+
+    (sl1, sl2, knee, sl) = fit
+    return ((knee >= iy1 + parameters.urban_adjustment_short_leg) and
+            (knee <= iy2 - parameters.urban_adjustment_short_leg) and
+            (abs(sl1) <= parameters.urban_adjustment_steep_leg) and
+            (abs(sl2) <= parameters.urban_adjustment_steep_leg) and
+            (abs(sl2 - sl1) <= parameters.urban_adjustment_steep_leg) and
+            ((sl1 * sl2 >= 0) or
+             (abs(sl1) <= parameters.urban_adjustment_reverse_gradient) or
+             (abs(sl2) <= parameters.urban_adjustment_reverse_gradient)))
+
 def flags(fit, iy1, iy2):
     """Calculates flags concerning a two-part linear fit.
     In adjust(), below, the two-part fit will be disregarded
@@ -595,7 +620,10 @@ def apply_adjustments(stream):
 
 def adjust(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offset):
     (sl1, sl2, knee, sl0) = fit
-    if iflag not in (0, 100):
+    if iflag in (0, 100):
+        assert good_two_part_fit(fit, iy1a, iy2a)
+    else:
+        assert not good_two_part_fit(fit, iy1a, iy2a)
         # Use linear approximation
         sl1, sl2 = sl0, sl0
 

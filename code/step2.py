@@ -43,57 +43,58 @@ def drop_short_records(record_source):
         if mmax >= parameters.station_drop_minimum_months:
             yield record
 
-def annual_anomalies(stream):
-    """Iterates over the station record *stream*, updating urban
-    stations with attributes .first, .last, and .anomalies.  The
-    algorithm is as follows: compute monthly averages, then monthly
-    anomalies, then seasonal anomalies (means of monthly anomalies for
-    at least two months) then annual anomalies (means of seasonal
-    anomalies for at least three seasons).
+def annual_anomaly(record):
+    """Updates the station record *record* with attributes .first,
+    .last, and .anomalies.  The algorithm is as follows: compute
+    monthly averages, then monthly anomalies, then seasonal anomalies
+    (means of monthly anomalies for at least two months) then annual
+    anomalies (means of seasonal anomalies for at least three
+    seasons).
     """
 
-    for record in stream:
-        series = record.series
-        monthly_means = []
-        for m in range(12):
-            month_data = filter(valid, series[m::12])
-            # neglect December of final year, as we do not use its season.
-            if m == 11 and valid(series[-1]):
-                month_data = month_data[:-1]
-            monthly_means.append(float(sum(month_data)) / len(month_data))
-        annual_anoms = []
-        first = None
-        for y in range(len(series)/12):
-            # Seasons are Dec-Feb, Mar-May, Jun-Aug, Sep-Nov.  Dec from previous year.
-            total = [0.0] * 4 # total monthly anomaly for each season
-            count = [0] * 4   # number of valid months in each season
-            for m in range(-1, 11):
-                index = y * 12 + m
-                if index >= 0: # no Dec value in year -1
-                    datum = series[index]
-                    if valid(datum):
-                        season = (m+1) // 3 # season number 0-3
-                        total[season] += datum - monthly_means[(m + 12) % 12]
-                        count[season] += 1
-            season_anomalies = [] # list of valid seasonal anomalies
-            for s in range(4):
-                # valid seasonal anomaly requires at least 2 valid months
-                if count[s] > 1:
-                    season_anomalies.append(total[s]/count[s])
-            # valid annual anomaly requires at least 3 valid seasons
-            if len(season_anomalies) > 2:
-                annual_anoms.append(sum(season_anomalies) / len(season_anomalies))
-                if first is None:
-                    first = y
-                last = y
-            else:
-                annual_anoms.append(giss_data.XMISSING)
-        
-        if first is not None:
-            record.first = first + record.first_year
-            record.last = last + record.first_year
-            record.anomalies = annual_anoms[first: last+1]
-            yield record
+    series = record.series
+    monthly_means = []
+    for m in range(12):
+        month_data = filter(valid, series[m::12])
+        # neglect December of final year, as we do not use its season.
+        if m == 11 and valid(series[-1]):
+            month_data = month_data[:-1]
+        monthly_means.append(float(sum(month_data)) / len(month_data))
+    annual_anoms = []
+    first = None
+    for y in range(len(series)/12):
+        # Seasons are Dec-Feb, Mar-May, Jun-Aug, Sep-Nov.  Dec from previous year.
+        total = [0.0] * 4 # total monthly anomaly for each season
+        count = [0] * 4   # number of valid months in each season
+        for m in range(-1, 11):
+            index = y * 12 + m
+            if index >= 0: # no Dec value in year -1
+                datum = series[index]
+                if valid(datum):
+                    season = (m+1) // 3 # season number 0-3
+                    total[season] += datum - monthly_means[(m + 12) % 12]
+                    count[season] += 1
+        season_anomalies = [] # list of valid seasonal anomalies
+        for s in range(4):
+            # valid seasonal anomaly requires at least 2 valid months
+            if count[s] > 1:
+                season_anomalies.append(total[s]/count[s])
+        # valid annual anomaly requires at least 3 valid seasons
+        if len(season_anomalies) > 2:
+            annual_anoms.append(sum(season_anomalies) / len(season_anomalies))
+            if first is None:
+                first = y
+            last = y
+        else:
+            annual_anoms.append(giss_data.XMISSING)
+    
+    if first is None:
+        record.anomalies = None
+    else:
+        record.first = first + record.first_year
+        record.last = last + record.first_year
+        record.anomalies = annual_anoms[first: last+1]
+    
 
 def is_rural(station):
     """Test whether the station described by *station* is rural.
@@ -103,11 +104,6 @@ def is_rural(station):
 
 class Struct(object):
     pass
-
-# "Global" parameters of the urban_adjustments phase.
-g = Struct()
-
-g.log = None
 
 def urban_adjustments(anomaly_stream):
     """Takes an iterator of station records and adds an attribute
@@ -133,21 +129,8 @@ def urban_adjustments(anomaly_stream):
         adjustment record.
      """
 
-    g.log = open('log/PApars.GHCN.CL.1000.20.log','w')
-
-    g.nstat = g.sumch = g.nyrs = g.nstap = g.nyrsp = g.sumchp = 0
-    g.nsl1 = g.nsl2 = g.ndsl = g.nswitch = g.nsw0 = g.nok = g.nokx = g.nsta = 0
-    g.nshort = 0
-
     f = [0.0] * 900
     x = [0.0] * 900
-
-    # Open output files for some extra logging
-    #
-    # Station usage stats
-    f77 = open("log/PApars.statn.use.GHCN.CL.1000.20", "w")
-    # Isolated urban stations
-    f79 = open("log/PApars.noadj.stations.list", "w")
 
     last_year = giss_data.get_ghcn_last_year()
     iyoff = giss_data.BASE_YEAR - 1
@@ -164,6 +147,9 @@ def urban_adjustments(anomaly_stream):
         station = record.station
         all.append(record)
         record.urban_adjustment = None
+        annual_anomaly(record)
+        if record.anomalies is None:
+            continue
         length = len(record.anomalies)
         d = Struct()
         d.anomalies = record.anomalies
@@ -183,22 +169,13 @@ def urban_adjustments(anomaly_stream):
             urban_stations.append(d)
             urban_lkup[record] = d
 
-    nstau = len(urban_stations)        # total number of bright / urban or dim / sm.town stations
-    nstar = len(rural_stations)        # total number of dark / rural stations
-    g.log.write(" number of rural/urban stations %11d %11d\n" % (nstar, nstau))
-
     # Sort the rural stations according to the length of the time record
     # (ignoring gaps).
     for i, st in enumerate(rural_stations):
         st.recLen = len([v for v in st.anomalies if valid(v)])
         st.index = i
-        g.log.write(" rural station: %11d  id: %s  #ok %11d\n" % (
-                    i + 1, st.id, st.recLen))
     rural_stations.sort(key=lambda s:s.recLen)
     rural_stations.reverse()
-    for i, st in enumerate(rural_stations):
-        g.log.write(" rural station: %11d  id: %s  #ok %11d\n" % (
-                    i + 1, st.id, st.recLen))
 
     # Combine time series for rural stations around each urban station
     for record in all:
@@ -224,8 +201,6 @@ def urban_adjustments(anomaly_stream):
                 if not neighbors:
                     if usingFullRadius:
                         dropStation = True
-                        g.log.write(' no rural neighbors for %s\n' % us.id)
-                        f79.write(" no rural neighbors for %s\n" % (us.id))
                         break
                     usingFullRadius = True
                     needNewNeighbours = True
@@ -241,10 +216,6 @@ def urban_adjustments(anomaly_stream):
 
             if quorate_count < parameters.urban_adjustment_min_years:
                 if usingFullRadius:
-                    f79.write("%s  good years: %4d   total years: %4d"
-                              " too little rural-neighbors-overlap"
-                              " - drop station 9999\n" % (
-                        us.id, quorate_count, last - first + 1))
                     dropStation = True
                     break
                 usingFullRadius = True
@@ -261,8 +232,6 @@ def urban_adjustments(anomaly_stream):
             iy1 = int(last - (quorate_count - 1) / parameters.urban_adjustment_proportion_good)
             if iy1 < first + 1:
                 iy1 = first + 1                  # avoid infinite loop
-            f79.write("%s drop early years %4d-%4d\n" % (
-                    us.id, 1 + iyoff, iy1 - 1 + iyoff))
 
         if dropStation:
             yield record
@@ -272,8 +241,6 @@ def urban_adjustments(anomaly_stream):
         fit = getfit(length, x, f)
         # find extended range
         iyxtnd = int(round(quorate_count / parameters.urban_adjustment_proportion_good)) - (last - first + 1)
-        g.log.write(" possible range increase %11d %11d %11d\n" % (
-                    iyxtnd, quorate_count, last - first + 1))
         n1x = first + iyoff
         n2x = last + iyoff
         if iyxtnd < 0:
@@ -291,22 +258,6 @@ def urban_adjustments(anomaly_stream):
         flag = flags(fit, first + iyoff, last + iyoff)
         us.record.urban_adjustment = (fit, first + iyoff, last + iyoff, n1x, n2x, flag)
         yield us.record
-
-    nuse = 0
-    for rs in rural_stations:
-        if rs.uses > 0:
-            f77.write(" used station  %s %11d  times\n" % (
-                rs.id, rs.uses))
-            nuse += 1
-    f77.write("%12d  rural stations were used\n" % (nuse))
-    g.log.write(" %-10s %4d %10.7f     %10.7f\n" % (
-                "all", g.nsta,-g.sumch/g.nsta,-10.*g.sumch/g.nyrs))
-    g.log.write(" %-11s %8d  %10.7f    %10.7f\n" % (
-                "urb warm", g.nstap,-g.sumchp/g.nstap,-10.*g.sumchp/g.nyrsp))
-    g.log.write(" %-11s %11d %11d %11d %11d %11d %11d\n" % (
-                "# short,sl1,sl2,dsl,ok", g.nshort,g.nsl1,g.nsl2,g.ndsl,g.nok,g.nokx))
-    g.log.write(" %-11s  %11d %11d\n" % ("switches: all , else ok", g.nswitch,g.nsw0))
-
 
 
 def get_neighbours(us, rural_stations, radius):
@@ -351,8 +302,6 @@ def combine_neighbors(us, iyrm, iyoff, neighbors):
     combined = [giss_data.XMISSING] * iyrm
 
     urban_series[us.first_year - 1:us.last_year] = us.anomalies
-    g.log.write("urb stnID:%s # rur:%4d ranges:%5d%5d.\n" % (
-                us.id, len(neighbors), us.first_year + iyoff, us.last_year + iyoff))
 
     # start with the neighbor with the longest time record
     rs = neighbors[0]
@@ -363,19 +312,13 @@ def combine_neighbors(us, iyrm, iyoff, neighbors):
         if valid(rs.anomalies[m]):
             weights[m + rs.first_year - 1] = rs.weight
             counts[m + rs.first_year - 1] = 1
-    g.log.write("longest rur range:%5d-%4d%6d%s\n" % (
-                rs.first_year + iyoff, rs.last_year + iyoff, rs.recLen, rs.id))
 
     # add in the remaining stations
     for i, rs in enumerate(neighbors[1:]):
-        g.log.write("add stn%5d range:%5d-%4d %5d %s\n" % (
-                    i + 2, rs.first_year + iyoff, rs.last_year + iyoff, rs.recLen,
-                    rs.id))
         dnew = [giss_data.XMISSING] * iyrm
         dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
         nsm, ncom = cmbine(combined, weights, counts, dnew, rs.first_year,
             rs.last_year, rs.weight)
-        g.log.write(" data added:  %11d  overlap: %11d  years\n" % (nsm, ncom))
         if nsm != 0:
             rs.uses += 1
 
@@ -553,9 +496,8 @@ def trend2(xc, a, dataLen, xmid, min):
     return sl1, sl2, rms, sl
 
 def flags(fit, iy1, iy2):
-    """Calculates flags concerning a two-part linear fit.  Also
-    accumulate statistics.  Not well documented or understood, but
-    note that in adjust(), below, the two-part fit will be disregarded
+    """Calculates flags concerning a two-part linear fit.
+    In adjust(), below, the two-part fit will be disregarded
     if the flag value is not either 0 or 100.
 
     Possible flag parts:
@@ -578,40 +520,22 @@ def flags(fit, iy1, iy2):
     """
 
     (sl1, sl2, knee, sl) = fit
-    g.nsta += 1
-    g.sumch += sl * (iy2 - iy1 + 1)
-    g.nyrs += (iy2 - iy1 + 1)
-    if sl < 0.0:
-        g.nstap += 1
-        g.nyrsp += (iy2 - iy1 + 1)
-        g.sumchp += sl * (iy2 - iy1 + 1)
 
     # classify : iflag: +1 for short legs etc
     iflag = 0
     if knee < iy1 + parameters.urban_adjustment_short_leg or knee > iy2 - parameters.urban_adjustment_short_leg:
         iflag += 1
-        g.nshort += 1
     if abs(sl1) > parameters.urban_adjustment_steep_leg:
         iflag += 20
-        g.nsl1 += 1
     if abs(sl2) > parameters.urban_adjustment_steep_leg:
         iflag += 10
-        g.nsl2 += 1
     if abs(sl2 - sl1) > parameters.urban_adjustment_steep_leg:
         iflag += 100
-        g.ndsl += 1
     if abs(sl2 - sl1) > parameters.urban_adjustment_leg_difference:
         iflag += 100
 
-    if iflag == 0:
-        g.nok += 1
-    if iflag == 100:
-        g.nokx += 1
     if sl1 * sl2 < 0.0 and abs(sl1) > parameters.urban_adjustment_reverse_gradient and abs(sl2) > parameters.urban_adjustment_reverse_gradient:
         iflag += 1000
-        g.nswitch += 1
-    if iflag == 1000:
-        g.nsw0 += 1
     return iflag
 
 def apply_adjustments(stream):
@@ -652,21 +576,14 @@ def apply_adjustments(stream):
             a, b = adjust(first_year, record, series, fit, iy1e, iy2e, iy1, iy2,
                     flag, m1, m2, offset)
             # a and b are numbers of new first and last valid months
-            log.write(" %s  %s saved\n" % (report_station, report_name))
-            log.write(" %s  %s adjusted %s %s\n" % (report_station, report_name,
-                (m1, m2), (a, b)))
             aa = a - m1
             bb = b - a + 1
-            log.write("ADJ %s %s %s %s %s\n" % (report_name, len(series), len(series),
-                aa, bb))
             record.set_series(a-1 + first_year * 12 + 1, series[aa + offset:aa + offset + bb])
             record.begin = ((a-1) / 12) + first_year
             record.first = record.begin
             record.end = ((b-1) / 12) + first_year
             record.last = record.last_year
-            log.write("%s %s\n" % (len(record.series), len(record.series)))
             yield record
-            log.write(" %s  %s saved\n" % (report_station, report_name))
         else:
             if is_rural(station):
                 # Just remove leading/trailing invalid values for rural stations.
@@ -674,10 +591,7 @@ def apply_adjustments(stream):
                 record.begin = record.first
                 record.end = record.last
                 yield record
-                log.write(" %s  %s saved\n" % (report_station, report_name))
-            else:
-                # unadjusted urban station: skip
-                log.write(" %s  %s skipped\n" % (report_station, report_name))
+
 
 def adjust(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offset):
     (sl1, sl2, knee, sl0) = fit
@@ -725,8 +639,7 @@ def step2(record_source):
         mlast=None, title='GHCN V2 Temperatures (.1 C)')
 
     data = drop_short_records(record_source)
-    anomalies = annual_anomalies(data)
-    adjustments = urban_adjustments(anomalies)
+    adjustments = urban_adjustments(data)
     adjusted = apply_adjustments(adjustments)
     for record in adjusted:
         yield record

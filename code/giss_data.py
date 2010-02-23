@@ -23,9 +23,6 @@ the `StationMetaData` and `SubboxMetaData` classes.
 __docformat__ = "restructuredtext"
 
 import sys
-import copy
-import math
-import datetime
 
 import read_config
 
@@ -33,34 +30,21 @@ import read_config
 #: used in calculations.
 BASE_YEAR = 1880
 
-#: Integer code used to indicate missing data. This is units of 0.1
-#: celsius.
-MISSING = 9999
+#: The value that is used to indicate a bad or missing data point.
+XMISSING = 9999.0
 
-#: The floating point version of `MISSING`.
-XMISSING = float(MISSING)
-
-# In converting all the underlying temperature values from integral to
-# floats (as part of converting the whole algorithm to floats), I am
-# temporarily retaining most of the same object interfaces, but the
-# implementations need to convert frequently between integral
-# tenth-degrees and float degrees.  For all plausible integers i,
-# float_to_tenths(tenths_to_float(i)) == i.
-# Nick Barnes 2010-02-11
-
-def tenths_to_float(t):
-    if t == MISSING:
-        return XMISSING
-    return t * 0.1
-
-def float_to_tenths(f):
-    if abs(f - XMISSING) < 0.01:
-        return MISSING
-    return int(round(f * 10.0))
 
 _stations = None
 _v2_sources = None
 _ghcn_last_year = None
+
+def invalid(v):
+    return abs(v - XMISSING) < 0.1
+
+
+def valid(v):
+    return not invalid(v)
+
 
 def _load_v2_inv():
     """Load the v2.inv file.
@@ -210,7 +194,6 @@ def clear_cache(func):
 
     """
     def f(self, *args, **kwargs):
-        self._tenths = None
         self._good_count = None
         self._ann_anoms_good_count = None
         return func(self, *args, **kwargs)
@@ -245,7 +228,7 @@ class StationMetaData(object):
         often referred to in other code as variously bad, BAD, XBAD.
 
         This should become unimportant over time in the CCC code, which should
-        stick to always using the `MISSING` value.
+        stick to always using the `XMISSING` value.
     :Ivar precipitation_flag:
         Probably defines a special value that serves a similar purppose to
         the `missing_flag`. This does not seem to be used by any CCC code.
@@ -342,16 +325,6 @@ class Station(object):
         self.US_brightness = US_brightness
         self.idontknow = idontknow
 
-    @property
-    def lat_as_tenths(self):
-        """The latitude as a integer number of 0.1 degrees."""
-        return int(math.floor(self.lat * 10 + 0.5))
-
-    @property
-    def lon_as_tenths(self):
-        """The longitude as a integer number of 0.1 degrees."""
-        return int(math.floor(self.lon * 10 + 0.5))
-
            
 # TODO: Needs some review. Among things to think about:
 #
@@ -374,7 +347,7 @@ class MonthlyTemperatureRecord(object):
     1 AD has a month number of 13, February is 14, etc.
     
     Within series, some leading months and some trailing months may be set to
-    the `MISSING` value. The `good_start_idx` and `good_end_idx` members define
+    the `XMISSING` value. The `good_start_idx` and `good_end_idx` members define
     the Python range within the series that excludes these missing value.
 
     The GISTEMP/CCC code only uses data that starts from `BASE_YEAR` (1880).
@@ -394,16 +367,12 @@ class MonthlyTemperatureRecord(object):
         self._good_start_idx = sys.maxint
         self._good_end_idx = 0
         self._series = []
-        self._tenths = None
         self._good_count = None
         self._ann_anoms_good_count = None
 
     def is_empty(self):
         """Test whether the record contains data."""
         return len(self._series) == 0
-
-    def valid(self, v):
-        return not self.invalid(v)
 
     @property
     def n(self):
@@ -537,7 +506,7 @@ class MonthlyTemperatureRecord(object):
         if self._good_count is None:
             bad_count = 0
             for v in self._series:
-                bad_count += self.invalid(v)
+                bad_count += invalid(v)
             self._good_count = len(self._series) - bad_count
         return self._good_count
 
@@ -545,7 +514,7 @@ class MonthlyTemperatureRecord(object):
         """Strip leading and trailing invalid values.
         
         Adjusts the record so that the series starts and ends with a good (not
-        `MISSING`) value. If there are no good values, the series will be
+        `XMISSING`) value. If there are no good values, the series will be
         emptied.
         
         """
@@ -565,18 +534,17 @@ class MonthlyTemperatureRecord(object):
         """
         monthly_valid = [0] * 12
         for i, v in enumerate(self._series):
-            monthly_valid[(self.first_month + i - 1) % 12] += self.valid(v)
+            monthly_valid[(self.first_month + i - 1) % 12] += valid(v)
         return monthly_valid
 
-    def _set_series(self, first_month, series, missing, convert=lambda x:x):
+    def _set_series(self, first_month, series):
         self._first_month = first_month
         self._good_start_idx = sys.maxint
         self._good_end_idx = 0
         self._series = []
-        for in_value in series:
-            v = convert(in_value)
-            if self.invalid(v):
-                self._series.append(missing)
+        for v in series:
+            if invalid(v):
+                self._series.append(XMISSING)
             else:
                 self._good_start_idx = min(self._good_start_idx,
                         len(self._series))
@@ -584,25 +552,24 @@ class MonthlyTemperatureRecord(object):
                 self._good_end_idx = max(self._good_end_idx, len(self._series))
     _set_series = clear_cache(_set_series)
 
-    def _add_year_of_data(self, year, data, missing, convert=lambda x:x):
+    def add_year(self, year, data):
         if self.first_month != sys.maxint:
             # We have data already, so we may need to pad with missing months
             # Note: This assumes the series is a whole number of years.
             gap = year - self.last_year - 1
             if gap > 0:
-                self._series.extend([missing] * gap * 12)
+                self._series.extend([XMISSING] * gap * 12)
         start_month = year * 12 + 1
         self._first_month = min(self.first_month, start_month)
-        for in_value in data:
-            v = convert(in_value)
-            if self.invalid(v):
-                self._series.append(missing)
+        for v in data:
+            if invalid(v):
+                self._series.append(XMISSING)
             else:
                 self._good_start_idx = min(self._good_start_idx,
                         len(self._series))
                 self._series.append(v)
                 self._good_end_idx = max(self._good_end_idx, len(self._series))
-    _add_year_of_data = clear_cache(_add_year_of_data)
+    add_year = clear_cache(add_year)
 
 
 class StationRecord(MonthlyTemperatureRecord):
@@ -626,26 +593,10 @@ class StationRecord(MonthlyTemperatureRecord):
         self.source = v2_sources().get(uid, "UNKNOWN")
         self.ann_anoms = []
 
-    def invalid(self, v):
-        return abs(v - XMISSING) < 0.1
-
     @property
     def series(self):
         """The series of values in celsius."""
         return self._series
-
-    @property
-    def series_as_tenths(self):
-        """The series in 0.1 celsius, integer units."""
-        if self._tenths is None:
-            t = []
-            for v in self._series:
-                if self.invalid(v):
-                    t.append(MISSING)
-                else:
-                    t.append(float_to_tenths(v))
-            self._tenths = t
-        return self._tenths
 
     @property
     def station(self):
@@ -695,26 +646,10 @@ class StationRecord(MonthlyTemperatureRecord):
         """
         return int(self.uid[-1])
 
-    def add_year_of_tenths(self, year, data):
-        self._add_year_of_data(year, data, XMISSING, convert=tenths_to_float)
-
-    def add_year(self, year, data):
-        self._add_year_of_data(year, data, XMISSING)
-
     def has_data_for_year(self, year):
         for t in self.get_a_year(year):
             if t != XMISSING:
                 return True
-
-    def get_a_month_as_tenths(self, month):
-        """Get the value for a single month."""
-        idx = month - self.first_month
-        if idx < 0:
-            return MISSING
-        try:
-            return self.series_as_tenths[month - self.first_month]
-        except IndexError:
-            return MISSING
 
     def get_a_month(self, month):
         """Get the value for a single month."""
@@ -726,28 +661,10 @@ class StationRecord(MonthlyTemperatureRecord):
         except IndexError:
             return XMISSING
 
-    def get_a_year_as_tenths(self, year):
-        """Get the time series data for a year."""
-        start_month = year * 12 + 1
-        return [self.get_a_month_as_tenths(m)
-                for m in range(start_month, start_month + 12)]
-
     def get_a_year(self, year):
         """Get the time series data for a year."""
         start_month = year * 12 + 1
         return [self.get_a_month(m) for m in range(start_month, start_month + 12)]
-
-    def get_set_of_years_as_tenths(self, first_year, last_year):
-        """Get a set of year records.
-        
-        :Return:
-            A list of lists, where each sub-list contains 12 temperature values
-            for a given year. This works for any range of years, missing years
-            are filled with the MISSING value.
-
-        """
-        return [self.get_a_year_as_tenths(y)
-                for y in range(first_year, last_year + 1)]
 
     def get_set_of_years(self, first_year, last_year):
         """Get a set of year records.
@@ -755,16 +672,13 @@ class StationRecord(MonthlyTemperatureRecord):
         :Return:
             A list of lists, where each sub-list contains 12 temperature values
             for a given year. This works for any range of years, missing years
-            are filled with the MISSING value.
+            are filled with the XMISSING value.
 
         """
         return [self.get_a_year(y) for y in range(first_year, last_year + 1)]
 
-    def set_series_from_tenths(self, first_month, series):
-        self._set_series(first_month, series, XMISSING, convert=tenths_to_float)
-
     def set_series(self, first_month, series):
-        self._set_series(first_month, series, XMISSING)
+        self._set_series(first_month, series)
 
     def set_ann_anoms(self, ann_anoms):
         self.ann_anoms[:] = ann_anoms
@@ -775,10 +689,9 @@ class StationRecord(MonthlyTemperatureRecord):
         if self._ann_anoms_good_count is None:
             bad = 0
             for v in self.ann_anoms:
-                bad += self.invalid(v)
+                bad += invalid(v)
             self._ann_anoms_good_count = len(self.ann_anoms) - bad
         return self._ann_anoms_good_count
-
 
     def copy(self):
         r = StationRecord(self.uid)
@@ -893,16 +806,13 @@ class SubboxRecord(MonthlyTemperatureRecord):
         self.d = d
         self.set_series(series)
 
-    def invalid(self, v):
-        return abs(v - XMISSING) < 0.1
-
     @property
     def series(self):
         """The series of values in celsius."""
         return self._series
 
     def set_series(self, series):
-        self._set_series(BASE_YEAR * 12, series, XMISSING)
+        self._set_series(BASE_YEAR * 12, series)
 
     def pad_with_missing(self, n):
         while self.n < n:

@@ -18,13 +18,74 @@ import code.giss_data
 import code.read_config
 
 
+#: Integer code used to indicate missing data.
+#:
+#: This is units of 0.1 celsius. This code is only used when
+#: reading or writing input and working files.
+MISSING = 9999
+
+
+# For all plausible integers i, float_to_tenths(tenths_to_float(i)) == i.
+def tenths_to_float(t):
+    if t == MISSING:
+        return code.giss_data.XMISSING
+    return t * 0.1
+
+
+def float_to_tenths(f):
+    if abs(f - code.giss_data.XMISSING) < 0.01:
+        return MISSING
+    return int(round(f * 10.0))
+
+
+# TODO: How does this differ from float_to_tenths.
+#       Answer:
+#           float_to_tenths(-0.95) == -10
+#           as_tenths(-0.95) == -9
+def as_tenths(v):
+    return int(math.floor(v * 10 + 0.5))
+
+
+# TODO: Probably should be a generator.
+def convert_to_tenths(celsius_series):
+    """Convert a series of celsius value to integer tenths of a degree.
+
+    :Param celsius_series:
+        A list or iterable of floating point value, where each value
+        represents a temperature in celsius.
+
+    :Return:
+        A new list of integer values.
+
+    """
+    t = []
+    for v in celsius_series:
+        if v >= code.giss_data.XMISSING:
+            t.append(MISSING)
+        else:
+            t.append(float_to_tenths(v))
+    return t
+
+
+# TODO: Probably should be a generator.
+def convert_tenths_to_float(tenths_series):
+    """The inverse of `convert_to_tenths`."""
+    t = []
+    for v in tenths_series:
+        if v == MISSING:
+            t.append(code.giss_data.XMISSING)
+        else:
+            t.append(tenths_to_float(v))
+    return t
+
+
 def open_or_uncompress(filename):
     """Opens the text file `filename` for reading.  If this fails then
     it attempts to find a compressed version of the file by appending
     '.gz' to the name and opening that (uncompressing it on
     the fly).
-    """
 
+    """
     try:
         return open(filename)
     except IOError:
@@ -131,10 +192,10 @@ class StationRecordWriter(object):
                       s.name, s.US_brightness, s.pop, s.GHCN_brightness,
                       s.uid[:3])
 
-            fmt = "%di" % len(r.series_as_tenths)
-            data = struct.pack(self.bos + fmt, *r.series_as_tenths)
-            data += struct.pack(self.bos + "iiii36sii", s.lat_as_tenths,
-                    s.lon_as_tenths, r.short_id, s.elevation, compound_name,
+            fmt = "%di" % len(r.series)
+            data = struct.pack(self.bos + fmt, *convert_to_tenths(r.series))
+            data += struct.pack(self.bos + "iiii36sii", as_tenths(s.lat),
+                    as_tenths(s.lon), r.short_id, s.elevation, compound_name,
                     rel_first_month, rel_last_month)
 
         self.f.writeline(data)
@@ -149,7 +210,7 @@ class StationRecordWriter(object):
             self.buf_record = record
 
     def close(self):
-        self._flush(code.giss_data.MISSING, code.giss_data.MISSING)
+        self._flush(MISSING, MISSING)
         self.f.close()
 
 
@@ -259,7 +320,7 @@ def StationTsReader(path):
             # temperature values, as a set of contiguous years.
             for line in lines:
                 data = [int(v) for v in line.split()]
-                record.add_year_of_tenths(data[0], data[1:])
+                record.add_year(data[0], convert_tenths_to_float(data[1:]))
             yield record
 
 
@@ -274,10 +335,10 @@ class StationTsWriter(object):
     def write(self, record):
         station = record.station
         self.f.write(' %4d%5d%s%4s%-36s\n' % (
-                station.lat_as_tenths, station.lon_as_tenths,
+                as_tenths(station.lat), as_tenths(station.lon),
                 record.uid, station.elevation, station.name))
 
-        data = record.series_as_tenths
+        data = convert_to_tenths(record.series)
         for y, offset in enumerate(range(0, record.n, 12)):
             months = ["%5d" % v for v in data[offset: offset + 12]]
             self.f.write('%4d%s\n' % (y + record.first_year, ''.join(months)))
@@ -300,7 +361,7 @@ def V2MeanReader(path, year_min=-9999):
     def v2_int(s):
         v = int(s)
         if v == -9999:
-            return code.giss_data.MISSING
+            return MISSING
         return v
 
     for (id, lines) in itertools.groupby(f, id12):
@@ -313,7 +374,7 @@ def V2MeanReader(path, year_min=-9999):
                 year = int(line[12:16])
                 tenths = [v2_int(line[a:a+5]) for a in range(16, 16+12*5, 5)]
                 if year >= year_min:
-                    record.add_year_of_tenths(year, tenths)
+                    record.add_year(year, convert_tenths_to_float(tenths))
                 prev_line = line
             else:
                 print ("NOTE: repeated record found: Station %s year %s;"
@@ -332,7 +393,7 @@ class V2MeanWriter(object):
         self.f = open(path, "w")
 
     def to_text(self, t):
-        if t == code.giss_data.MISSING:
+        if t == MISSING:
             return "-9999"
         else:
             return "%5d" % t
@@ -342,7 +403,7 @@ class V2MeanWriter(object):
             if not record.has_data_for_year(year):
                 continue
             temps = [self.to_text(t)
-              for t in record.get_a_year_as_tenths(year)]
+                    for t in convert_to_tenths(record.get_a_year(year))]
             self.f.write('%s%04d%s\n' % (record.uid, year, ''.join(temps)))
 
     def close(self):
@@ -481,7 +542,7 @@ def read_USHCN(path, stations):
                 valid = True
             temps.append(temp)
         if valid: # some valid data found
-            # We cannot add using 'add_year_of_tenths' because that breaks
+            # We cannot add using 'add_year' because that breaks
             # things when years are duplicated in the data; (see not
             # above). The record is actually filled using ``fil_record``.
             years_data.setdefault(year, [])

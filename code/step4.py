@@ -297,9 +297,6 @@ class MergeReader(object):
         trace(0, " Interpolating to Sergei's subbox grid")
         moff = (self.iyr1 - IYRBEG) * 12
         boxes = self.reader
-        # TODO: Use giss_data.MISSING
-        bad = self.meta.missing_flag
-        xbad = float(bad)
         sst = self.sst
         clim = self.clim
         for n in range(8000):
@@ -335,12 +332,12 @@ class MergeReader(object):
                 ts = 0.0
                 for j in range(js -1, jn):
                     for i in range(iw - 1, ie):
-                        if sst[i][j][m-1] < -1.77 or clim[i][j][month] == xbad:
+                        if sst[i][j][m-1] < -1.77 or clim[i][j][month] == giss_data.XMISSING:
                             continue
                         kt += 1
                         ts += sst[i][j][m-1] - clim[i][j][month]
                 
-                box.set_value(m + moff - 1, bad)
+                box.set_value(m + moff - 1, giss_data.XMISSING)
                 if kt > 0:
                     box.set_value(m + moff - 1, ts / kt)
 

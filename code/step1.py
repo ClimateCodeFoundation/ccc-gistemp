@@ -461,11 +461,11 @@ def find_quintuples(new_sums, new_wgts,
                 index1 = i * sign + new_offset
                 index2 = i * sign + rec_offset
                 if index1 < 0 or index1 >= new_len:
-                    anom1 = giss_data.MISSING
+                    anom1 = giss_data.XMISSING
                 else:
                     anom1 = new_ann_anoms[index1]
                 if index2 < 0 or index2 >= rec_len:
-                    anom2 = giss_data.MISSING
+                    anom2 = giss_data.XMISSING
                 else:
                     anom2 = rec_ann_anoms[index2]
                 if valid(anom1):

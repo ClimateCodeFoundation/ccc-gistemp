@@ -106,11 +106,17 @@ class Struct(object):
     pass
 
 def urban_adjustments(anomaly_stream):
-    """Takes an iterator of station records and adds an attribute
-    .urban_adjustment to urban stations, which gives urban adjustment
-    parameters.  The urban adjustment parameters describe a two-part
-    linear fit to the difference in annual anomalies between an urban
-    station and the set of nearby rural stations.
+    """Takes an iterator of station records and applies an adjustment
+    to urban stations to compensate for urban temperature effects.
+    Returns an iterator of station records.  Rural stations are passed
+    unchanged.  Urban stations which cannot be adjusted are discarded.
+
+    The adjustment follows a linear or two-part linear fit to the
+    difference in annual anomalies between the urban station and the
+    combined set of nearby rural stations.  The linear fit is to allow
+    for a linear effect at the urban station.  The two-part linear fit
+    is to allow for a model of urban effect which starts or stops at
+    some point during the time series.
 
     The algorithm is essentially as follows:
 
@@ -120,25 +126,26 @@ def urban_adjustments(anomaly_stream):
            order of valid-data count;
         3. Calculate a two-part linear fit for the difference between
            the urban annual anomalies and this combined rural annual anomaly;
-        4. Yield the parameters of this linear fit.
+        4. If this fit is satisfactory, apply it; otherwise apply a linear fit.
 
-        If there are not enough rural stations, or the combined rural
-        record does not have enough overlap with the urban record, try
-        a second time for this urban station, with a larger radius.
-        If there is still not enough data, do not produce an
-        adjustment record.
+        If there are not enough nearby rural stations, or the combined
+        rural record does not have enough overlap with the urban
+        record, try a second time for this urban station, with a
+        larger radius.  If there is still not enough data, discard the
+        urban station.
      """
 
     f = [0.0] * 900
     x = [0.0] * 900
 
     last_year = giss_data.get_ghcn_last_year()
+    first_year = 1880
+
     iyoff = giss_data.BASE_YEAR - 1
     iyrm = last_year - iyoff
 
     rural_stations = []
-    urban_stations = []
-    urban_lkup = {}
+    urban_stations = {}
  
     pi180 = math.pi / 180.0
 
@@ -160,28 +167,28 @@ def urban_adjustments(anomaly_stream):
         d.id = record.uid
         d.first_year = record.first - iyoff
         d.last_year = d.first_year + length - 1
-        d.uses = 0
         d.station = station
         d.record = record
         if is_rural(station):
             rural_stations.append(d)
         else:
-            urban_stations.append(d)
-            urban_lkup[record] = d
+            urban_stations[record] = d
 
     # Sort the rural stations according to the length of the time record
     # (ignoring gaps).
-    for i, st in enumerate(rural_stations):
+    for st in rural_stations:
         st.recLen = len([v for v in st.anomalies if valid(v)])
-        st.index = i
     rural_stations.sort(key=lambda s:s.recLen)
     rural_stations.reverse()
 
     # Combine time series for rural stations around each urban station
     for record in all:
-        station = record.station
-        us = urban_lkup.get(record, None)
+        us = urban_stations.get(record, None)
         if us is None:
+            # Just remove leading/trailing invalid values for rural stations.
+            record.strip_invalid()
+            record.begin = record.first
+            record.end = record.last
             yield record
             continue
 
@@ -234,10 +241,8 @@ def urban_adjustments(anomaly_stream):
                 iy1 = first + 1                  # avoid infinite loop
 
         if dropStation:
-            yield record
             continue
 
-        #===  c subtract urban station and call a curve fitting program
         fit = getfit(length, x, f)
         # find extended range
         iyxtnd = int(round(quorate_count / parameters.urban_adjustment_proportion_good)) - (last - first + 1)
@@ -255,9 +260,21 @@ def urban_adjustments(anomaly_stream):
                      n1x = iyu1
                  n2x = iyu2
 
-        flag = flags(fit, first + iyoff, last + iyoff)
-        us.record.urban_adjustment = (fit, first + iyoff, last + iyoff, n1x, n2x, flag)
-        yield us.record
+        series = record.series
+        # adjust
+        m1 = record.rel_first_month + record.good_start_idx
+        m2 = record.rel_first_month + record.good_end_idx - 1
+        offset = record.good_start_idx # index of first valid month
+        a, b = adjust(first_year, record, series, fit, n1x, n2x, first + iyoff, last + iyoff, m1, m2, offset)
+        # a and b are numbers of new first and last valid months
+        aa = a - m1
+        bb = b - a + 1
+        record.set_series(a-1 + first_year * 12 + 1, series[aa + offset:aa + offset + bb])
+        record.begin = ((a-1) / 12) + first_year
+        record.first = record.begin
+        record.end = ((b-1) / 12) + first_year
+        record.last = record.last_year
+        yield record
 
 
 def get_neighbours(us, rural_stations, radius):
@@ -305,8 +322,6 @@ def combine_neighbors(us, iyrm, iyoff, neighbors):
 
     # start with the neighbor with the longest time record
     rs = neighbors[0]
-    rs.uses += 1
-
     combined[rs.first_year - 1:rs.last_year] = rs.anomalies
     for m in range(len(rs.anomalies)):
         if valid(rs.anomalies[m]):
@@ -319,8 +334,6 @@ def combine_neighbors(us, iyrm, iyoff, neighbors):
         dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
         nsm, ncom = cmbine(combined, weights, counts, dnew, rs.first_year,
             rs.last_year, rs.weight)
-        if nsm != 0:
-            rs.uses += 1
 
     return counts, urban_series, combined
 
@@ -495,135 +508,10 @@ def trend2(xc, a, dataLen, xmid, min):
 
     return sl1, sl2, rms, sl
 
-def good_two_part_fit(fit, iy1, iy2):
-    """Decide whether to apply a the two-part fit.
 
-    If the two-part fit is not good, the linear fit is used instead.
-    The two-part fit is good if all of these conditions are true:
-
-    - left leg is longer than urban_adjustment_short_leg
-    - right leg is longer than urban_adjustment_short_leg
-    - left gradient is abs less than urban_adjustment_steep_leg
-    - right gradient is abs less than urban_adjustment_steep_leg
-    - difference between gradients is abs less than urban_adjustment_steep_leg
-    - either gradients have same sign or
-             at least one gradient is abs less than urban_adjustment_reverse_gradient
-    """
-
-    (sl1, sl2, knee, sl) = fit
-    return ((knee >= iy1 + parameters.urban_adjustment_short_leg) and
-            (knee <= iy2 - parameters.urban_adjustment_short_leg) and
-            (abs(sl1) <= parameters.urban_adjustment_steep_leg) and
-            (abs(sl2) <= parameters.urban_adjustment_steep_leg) and
-            (abs(sl2 - sl1) <= parameters.urban_adjustment_steep_leg) and
-            ((sl1 * sl2 >= 0) or
-             (abs(sl1) <= parameters.urban_adjustment_reverse_gradient) or
-             (abs(sl2) <= parameters.urban_adjustment_reverse_gradient)))
-
-def flags(fit, iy1, iy2):
-    """Calculates flags concerning a two-part linear fit.
-    In adjust(), below, the two-part fit will be disregarded
-    if the flag value is not either 0 or 100.
-
-    Possible flag parts:
-    1 if either side is "short" (less than urban_adjustment_short_leg)
-    20 if left gradient is "too steep" (abs value greater than urban_adjustment_steep_leg)
-    10 if right gradient is "too steep" (abs value greater than urban_adjustment_steep_leg)
-    100 if gradient difference is "too steep" (abs greater than urban_adjustment_steep_leg)
-    100 if gradient difference is "a bit steep" (abs greater than urban_adjustment_leg_difference)
-    1000 if gradients have different sign and both "steep" (abs greater than urban_adjustment_reverse_gradient)
-
-    So two-part fit is only used if all of these conditions are true:
-
-    - left leg is longer than urban_adjustment_short_leg
-    - right leg is longer than urban_adjustment_short_leg
-    - left gradient is abs less than urban_adjustment_steep_leg
-    - right gradient is abs less than urban_adjustment_steep_leg
-    - difference between gradients is abs less than urban_adjustment_steep_leg
-    - either gradients have same sign or
-             at least one gradient is abs less than urban_adjustment_reverse_gradient
-    """
-
-    (sl1, sl2, knee, sl) = fit
-
-    # classify : iflag: +1 for short legs etc
-    iflag = 0
-    if knee < iy1 + parameters.urban_adjustment_short_leg or knee > iy2 - parameters.urban_adjustment_short_leg:
-        iflag += 1
-    if abs(sl1) > parameters.urban_adjustment_steep_leg:
-        iflag += 20
-    if abs(sl2) > parameters.urban_adjustment_steep_leg:
-        iflag += 10
-    if abs(sl2 - sl1) > parameters.urban_adjustment_steep_leg:
-        iflag += 100
-    if abs(sl2 - sl1) > parameters.urban_adjustment_leg_difference:
-        iflag += 100
-
-    if sl1 * sl2 < 0.0 and abs(sl1) > parameters.urban_adjustment_reverse_gradient and abs(sl2) > parameters.urban_adjustment_reverse_gradient:
-        iflag += 1000
-    return iflag
-
-def apply_adjustments(stream):
-    """Applies the urban adjustments to the station records in
-    *stream*.  Returns an iterator of adjusted station records.
-
-    Rural stations are passed unchanged.  Urban stations without an
-    adjustment record are discarded.  Urban stations with an
-    adjustment record are adjusted accordingly, to remove the modelled
-    urban-heat-island effect.
-
-    An urban adjustment record describes linear and two-part linear
-    fits to the difference between an urban station annual anomaly
-    series and the combination of annual anomaly series for nearby
-    rural stations.  The linear fit is to allow for a linear urban
-    heat-island effect at the urban station.  The two-part linear fit
-    is to allow for a model of urbanization starting at some point
-    during the time series.
-    """
-
-    log = open('log/padjust.log', 'w')
-    first_year = 1880
-    adj_dict = {}
-
-    for record in stream:
-        station = record.station
-        series = record.series
-        report_name = "%s%c%c%c%3s" % (
-                      station.name, station.US_brightness,
-                      station.pop, station.GHCN_brightness, station.uid[:3])
-        report_station = "station   %9d" % int(record.uid[3:])
-        if record.urban_adjustment is not None:
-            # adjust
-            m1 = record.rel_first_month + record.good_start_idx
-            m2 = record.rel_first_month + record.good_end_idx - 1
-            offset = record.good_start_idx # index of first valid month
-            (fit, iy1, iy2, iy1e, iy2e, flag) = record.urban_adjustment
-            a, b = adjust(first_year, record, series, fit, iy1e, iy2e, iy1, iy2,
-                    flag, m1, m2, offset)
-            # a and b are numbers of new first and last valid months
-            aa = a - m1
-            bb = b - a + 1
-            record.set_series(a-1 + first_year * 12 + 1, series[aa + offset:aa + offset + bb])
-            record.begin = ((a-1) / 12) + first_year
-            record.first = record.begin
-            record.end = ((b-1) / 12) + first_year
-            record.last = record.last_year
-            yield record
-        else:
-            if is_rural(station):
-                # Just remove leading/trailing invalid values for rural stations.
-                record.strip_invalid()
-                record.begin = record.first
-                record.end = record.last
-                yield record
-
-
-def adjust(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2, offset):
+def adjust(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, m1, m2, offset):
     (sl1, sl2, knee, sl0) = fit
-    if iflag in (0, 100):
-        assert good_two_part_fit(fit, iy1a, iy2a)
-    else:
-        assert not good_two_part_fit(fit, iy1a, iy2a)
+    if not good_two_part_fit(fit, iy1a, iy2a):
         # Use linear approximation
         sl1, sl2 = sl0, sl0
 
@@ -657,6 +545,32 @@ def adjust(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, iflag, m1, m2
     return m1, m2
 
 
+def good_two_part_fit(fit, iy1, iy2):
+    """Decide whether to apply a two-part fit.
+
+    If the two-part fit is not good, the linear fit is used instead.
+    The two-part fit is good if all of these conditions are true:
+
+    - left leg is longer than urban_adjustment_short_leg
+    - right leg is longer than urban_adjustment_short_leg
+    - left gradient is abs less than urban_adjustment_steep_leg
+    - right gradient is abs less than urban_adjustment_steep_leg
+    - difference between gradients is abs less than urban_adjustment_steep_leg
+    - either gradients have same sign or
+             at least one gradient is abs less than urban_adjustment_reverse_gradient
+    """
+
+    (sl1, sl2, knee, sl) = fit
+    return ((knee >= iy1 + parameters.urban_adjustment_short_leg) and
+            (knee <= iy2 - parameters.urban_adjustment_short_leg) and
+            (abs(sl1) <= parameters.urban_adjustment_steep_leg) and
+            (abs(sl2) <= parameters.urban_adjustment_steep_leg) and
+            (abs(sl2 - sl1) <= parameters.urban_adjustment_steep_leg) and
+            ((sl1 * sl2 >= 0) or
+             (abs(sl1) <= parameters.urban_adjustment_reverse_gradient) or
+             (abs(sl2) <= parameters.urban_adjustment_reverse_gradient)))
+
+
 def step2(record_source):
     last_year = giss_data.get_ghcn_last_year()
     MTOT = 12 * (last_year - giss_data.BASE_YEAR + 1)
@@ -667,7 +581,6 @@ def step2(record_source):
         mlast=None, title='GHCN V2 Temperatures (.1 C)')
 
     data = drop_short_records(record_source)
-    adjustments = urban_adjustments(data)
-    adjusted = apply_adjustments(adjustments)
+    adjusted = urban_adjustments(data)
     for record in adjusted:
         yield record

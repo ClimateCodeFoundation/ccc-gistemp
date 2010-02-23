@@ -332,8 +332,7 @@ def combine_neighbors(us, iyrm, iyoff, neighbors):
     for i, rs in enumerate(neighbors[1:]):
         dnew = [giss_data.XMISSING] * iyrm
         dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
-        nsm, ncom = cmbine(combined, weights, counts, dnew, rs.first_year,
-            rs.last_year, rs.weight)
+        cmbine(combined, weights, counts, dnew, rs.first_year, rs.last_year, rs.weight)
 
     return counts, urban_series, combined
 
@@ -390,14 +389,11 @@ def cmbine(combined, weights, counts, data, first, last, weight):
     values from *data*, and if there are fewer than *parameters.rural_station_min_overlap*
     entries valid in both arrays then it doesn't combine at all.
 
-    Returns (*n*,*c*), where *n* is the number of entries combined and
-    *c* was the number of values valid in both arrays.
-
     Note: if *data[i]* is valid and *combined[i]* is not, the weighted
     average code runs and still produces the right answer, because
     *weights[i]* will be zero.
     """
-    nsm = sumn = ncom = 0
+    sumn = ncom = 0
     avg_sum = 0.0
     a, b = first - 1, last
     for v_avg, v_new in itertools.izip(combined[a:b], data[a:b]):
@@ -408,7 +404,7 @@ def cmbine(combined, weights, counts, data, first, last, weight):
         sumn += v_new
 
     if ncom < parameters.rural_station_min_overlap:
-        return nsm, ncom
+        return
     bias = (avg_sum - sumn) / float(ncom)
 
     # update period of valid data, averages and weights
@@ -420,9 +416,6 @@ def cmbine(combined, weights, counts, data, first, last, weight):
         old_wt, weights[n] = weights[n], wtnew
         combined[n] = (old_wt * combined[n] + weight * (v_new + bias)) / wtnew
         counts[n] += 1
-        nsm += 1
-
-    return nsm, ncom
 
 
 def getfit(length, x, f):

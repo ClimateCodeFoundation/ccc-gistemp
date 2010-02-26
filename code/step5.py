@@ -113,11 +113,9 @@ def SBBXtoBX(data, box, rland, intrp, base=(1961,1991), ignore_land=False):
     # TODO: Use giss_data
     XBAD = land_meta.missing_flag
 
-    # :todo: do we really need the area array to be 8000 cells long?
     for nr,box in enumerate(eqarea.grid()):
         # Averages for the land and ocean (one series per subbox)...
         avg = [[XBAD]*combined_n_months for _ in range(2*nsubbox)]
-        area = [km2persubbox] * nsubbox
         wgtc = [0] * (nsubbox*2)
         # Eat the records from land and ocean 100 (nsubbox) at a time.
         # In other words, all 100 subboxes for the box (region).

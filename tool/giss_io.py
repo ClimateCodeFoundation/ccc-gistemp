@@ -123,6 +123,12 @@ class SubboxWriter(object):
         assert self.meta.mavg == 6, "Only monthly averages supported"
 
     def _flush(self, mo1):
+        if self.meta is None:
+            # Not even a meta record written.  We could complain here,
+            # but the cause is likely to be closing files early because
+            # of some underlying problem.  Complaining here would mask
+            # that problem.
+            return
         if not self.buf_record:
             m = self.meta
             rec = struct.pack(self.bos + '8i80s', mo1, m.kq, m.mavg,

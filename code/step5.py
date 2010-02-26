@@ -18,6 +18,7 @@ are computed from monthly anomalies.
 # Clear Climate Code
 import eqarea
 import fort
+import giss_data
 import earth
 
 # http://www.python.org/doc/2.3.5/lib/itertools-functions.html
@@ -40,7 +41,29 @@ def SBBXtoBX(data, box, rland, intrp, base=(1961,1991), ignore_land=False):
     with both ocean and land data will ignore their land data.
     """
     
-    land_meta,ocean_meta = data.next()
+    # First item from iterator is normally a pair of metadataobjects,
+    # one for land, one for ocean.  If we are piping step3 straight into
+    # step5 then it is not a pair.  In that case we synthesize missing
+    # ocean data.
+    meta = data.next()
+    try:
+        land_meta,ocean_meta = meta
+    except:
+        # Use the land meta object for both land and ocean data
+        land_meta,ocean_meta = meta,meta
+        def blank_ocean_data(data):
+            """Augment a land-only data series with blank ocean data."""
+            for land_box in data:
+                series = [giss_data.XMISSING] * len(land_box.series)
+                ocean_box = giss_data.SubboxRecord(
+                    lat_S=land_box.lat_S,
+                    lat_N=land_box.lat_N,
+                    lon_W=land_box.lon_W,
+                    lon_E=land_box.lon_E,
+                    stations=0, station_months=0,
+                    d=giss_data.XMISSING, series=series)
+                yield land_box, ocean_box
+        data = blank_ocean_data(data)
 
     bos ='>'
     boxf = fort.File(box, bos=bos)

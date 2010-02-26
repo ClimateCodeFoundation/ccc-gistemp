@@ -30,17 +30,14 @@ import struct
 import os
 import sys
 
-def SBBXtoBX(data, box, log, rland, intrp, base=(1961,1991),
-        ignore_land=False):
+def SBBXtoBX(data, box, rland, intrp, base=(1961,1991), ignore_land=False):
     """Simultaneously combine the land series and the ocean series and
     combine subboxes into boxes.  *data* should be an iterator of
     (land, ocean) subbox series pairs; *box* should be an open binary
     output file (where the output from this routine will be written);
-    *log* should be an open text file (where diagnostic information
-    will be logged); *rland* and *intrp* are equivalent to the command
-    line arguments to SBBXotoBX.f.  *ignore_land* is a flag that when
-    True means cells with both ocean and land data will ignore their
-    land data.
+    *rland* and *intrp* are equivalent to the command line arguments
+    to SBBXotoBX.f.  *ignore_land* is a flag that when True means cells
+    with both ocean and land data will ignore their land data.
     """
     
     land_meta,ocean_meta = data.next()
@@ -107,12 +104,10 @@ def SBBXtoBX(data, box, log, rland, intrp, base=(1961,1991),
     nlb = base[1] - combined_year_beg
 
     info = [land_meta.mo1, land_meta.kq, land_meta.mavg, land_meta.monm,
-            land_meta.monm4, land_meta.yrbeg, land_meta.missing_flag,
+            land_meta.monm4, combined_year_beg, land_meta.missing_flag,
             land_meta.precipitation_flag]
 
-    info[3] = land_meta.monm
     info[4] = 2 * land_meta.monm + 5
-    info[5] = combined_year_beg
     boxf.writeline(struct.pack('%s8i' % bos, *info) + land_meta.title)
 
     # TODO: Use giss_data
@@ -241,18 +236,6 @@ def SBBXtoBX(data, box, log, rland, intrp, base=(1961,1991),
                 avgr[m] -= bias[k]
                 ngood += 1
 
-        def nint10x(x):
-            return int((10*x) + 0.5)
-        def nint(x):
-            return int(x+0.5)
-        for l in [(map(nint10x, avgr[i:i+12]),map(nint10x, avgr[i+12:i+24]))
-                    for i in range(0, combined_n_months, 24)]:
-            print >> log, l
-        # GISTEMP divdes the weight by TOMETR, but we never multiplied it by
-        # the area in the first place.
-        for l in [(map(nint, wtr[i:i+12]),map(nint, wtr[i+12:i+24]))
-                    for i in range(0, combined_n_months, 24)]:
-            print >> log, l
         # MONM or MONMC?
         fmt = '%s%df' % (bos, combined_n_months)
         boxf.writeline(
@@ -437,15 +420,14 @@ def tavg(data, km, nyrs, base, limit, nr, id, deflt=0.0, XBAD=9999):
     return bias
 
 
-def zonav(inp, out, log):
+def zonav(inp):
     """ 
     Perform Zonal Averaging.
 
     The input *inp* is a box file, usually work/BX.Ts.GHCN.CL.PA.1200 .
     The data in the boxes are combined to produce averages over
-    various latitudinal zones.  The output *out* is a zone file, usually
-    work/ZON.Ts.ho2.GHCN.CL.PA.1200.step1 (the output can be converted
-    to text with tool/zontotext.py).
+    various latitudinal zones.  Returns an iterator of
+    (averages, weights, title) tuples, one per zone.
 
     14 belts are produced.  The first 8 are the basic belts that are used
     for the equal area grid, the remaining 6 are combinations:
@@ -467,7 +449,6 @@ def zonav(inp, out, log):
     """
 
     inp = fort.File(inp, bos='>')
-    out = fort.File(out, bos='>')
 
     # Number of special zones.  zonav.f line 71
     NZS = 3
@@ -511,9 +492,7 @@ def zonav(inp, out, log):
     outinfo = list(info)
     outinfo[3] = monm
     outinfo[5] = iyrbeg
-    out.writeline(struct.pack('>8i', *outinfo) + titlei +
-     ' zones:  90->64.2->44.4->23.6->0->-23.6-'
-     '>-44.4->-64.2->-90                      ')
+    yield (outinfo, titlei, ' zones:  90->64.2->44.4->23.6->0->-23.6->-44.4->-64.2->-90                      ')
 
     ibm,kzone,titlez = zones()
 
@@ -554,7 +533,6 @@ def zonav(inp, out, log):
         # zonav.f lines 137 to 140
         lntot = sum(lenr)
         if lntot == 0:
-            log.write('**** NO DATA FOR ZONE %d %s' % (jb, titlez[jb]))
             continue
         lenr,IORD = sort_perm(lenr)
         nr = IORD[0]
@@ -595,7 +573,7 @@ def zonav(inp, out, log):
                 avg[jb][m] -= bias[k]
                 lenz[jb] += 1
 
-        zoneout(out, log, avg[jb], wt[jb], titlez[jb])
+        yield (avg[jb], wt[jb], titlez[jb])
 
     # *lenz* contains the lemgths of each zone 0 to 7 (the number of
     # valid months in each zone).
@@ -655,47 +633,7 @@ def zonav(inp, out, log):
                     if avgg[m] != XBAD:
                         avgg[m] -= bias[k]
                     m += 1
-        zoneout(out, log, avgg, wtg, titlez[JBM+jz])
-    out.flush()
-
-def swaw(s):
-    """Swap the words of a string, so that every 4 bytes are
-    reversed.  This emulates the way that Fortran strings get
-    written out using the SWRITE subroutine in zonav.f and
-    friends.
-    """
-
-    l = len(s)//4
-    return struct.pack('<%dI' % l, *struct.unpack('>%dI' % l, s))
-
-def zoneout(out, log, average, weight, title):
-    """Output, onto the files *out* and *log*, the zone record in
-    the arrays *average* and *weight*, labelled *title*."""
-
-    def f(x):
-        """Format a monthly anomaly as a string, for logging."""
-        return "%4d" % math.floor((10*x) + 0.5)
-
-    def filerepr(a):
-        """Take an array (list,sequence,tuple) of floats and return
-        a string representing the binary file representation.  Which
-        is simply each element as a 4-byte float.
-        """
-
-        return struct.pack('>%df' % len(a), *a)
-
-    print >> log, 'zonal mean', title
-    spaces = [' '*5]
-    for l in [map(f, average[i:i+12])+spaces+map(f, average[i+12:i+24])
-                for i in range(0, len(average), 24)]:
-        print >> log, ''.join(l)
-    print >> log, 'weights'
-    for l in [map(f, weight[i:i+12])+spaces+map(f, weight[i+12:i+24])
-                for i in range(0, len(weight), 24)]:
-        print >> log, ''.join(l)
-
-    # zonav.f line 175 and line 215
-    out.writeline(filerepr(average) + filerepr(weight) + swaw(title))
+        yield(avgg, wtg, titlez[JBM+jz])
 
 def sort_perm(a):
     """The array *a* is sorted into descending order.  The fresh sorted
@@ -757,12 +695,11 @@ def zones():
     return ibm, kzone, titlez
 
 
-def annzon(inp, log, out, zono, annzono,
-  alternate={'global':2, 'hemi':True}):
+def annzon(zoned_averages, out, zono, annzono, alternate={'global':2, 'hemi':True}):
     """Compute annual anomalies and write them out to various files.
-    *inp* is the input file, a ZON file typically produced by `zonav`.
-    *log* is an output file for logging.  *out* is a list (length 4) of
-    binary output files for the result files:
+    *zoned_averages* is an iterator of zoned averages produced by `zonav`.
+    *out* is a list (length 4) of binary output files for the result
+    files:
     (ZonAnn|GLB|NH|SH).Ts.ho2.GHCN.CL.PA.txt .
     *zono* and *annzono* are binary output files where the (recomputed)
     zonal means and annual zonal means are written.
@@ -778,7 +715,6 @@ def annzon(inp, log, out, zono, annzono,
 
     bos = '>'
 
-    inp = fort.File(inp, bos)
     zono = fort.File(zono, bos)
     annzono = fort.File(annzono, bos)
 
@@ -788,10 +724,7 @@ def annzon(inp, log, out, zono, annzono,
     monmin = 6
 
     # annzon.f line 70
-    header = struct.unpack(bos+'8i80s80s', inp.readline())
-    info = header[:8]
-    title = header[8]
-    titl2 = header[9]
+    (info, title, titl2) = zoned_averages.next()
     kq = info[1]
     # annzon.f line 72
     # km: the number of time frames per year.
@@ -819,11 +752,9 @@ def annzon(inp, log, out, zono, annzono,
     XBAD = float(info[6])
     # annzon.f line 84
     # Create and write out the header record of the output files.
-    print >> log, title
     print >> out[0], ' Annual Temperature Anomalies (.01 C) - ' + title[28:80]
     for f in out[1:]:
         print >> f, title
-    print >> log, info
     infoo = list(info)
     infoo[2] = 5
     infoo[3] //= 12
@@ -833,23 +764,13 @@ def annzon(inp, log, out, zono, annzono,
       monmin)
     # Ensure exactly 80 characters.
     titlelo = '%-80s' % titleo
-    # Ah, the Fortran emits a '1' at the beginning of the title record
-    # on the log file; this is an ANSI printer escape (for bold, if I
-    # remember my IBM days rightly).  We Don't Do That.
-    print >> log, titleo
-    print >> log, infoo
 
     # annzon.f line 98
     # :read:zonal:
     # Collect JZM zonal means.
-    fmt = bos + '%df' % monm
     w = len(struct.pack(bos + 'f', 0.0))
     for jz in range(jzm):
-        record = inp.readline()
-        tdata = struct.unpack(fmt, record[:w*monm])
-        twt = struct.unpack(fmt, record[w*monm:2*w*monm])
-        assert 80 == len(record[2*w*monm:])
-        titlez[jz] = record[2*w*monm:]
+        (tdata, twt, titlez[jz]) = zoned_averages.next()
         # Regroup the *data* and *wt* series so that they come in blocks of
         # 12 (*km*, really).
         # Uses essentially the same trick as the `grouper()` recipe in
@@ -965,9 +886,6 @@ def annzon(inp, log, out, zono, annzono,
             return '*****'
         return x
 
-    # annzon.f line 166
-    for jz in range(jzp):
-        print >> log, jz, swaw(titlez[iord[jz]])
     iyrsp = iyrs
     # Check (and skip) incomplete year.
     if data[-1][-1][-1] > 8000:
@@ -1109,25 +1027,19 @@ def step5(data):
 
     """
     box = open(os.path.join('result', 'BX.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
-    log = open(os.path.join('log', 'SBBXotoBX.log'), 'w')
-    SBBXtoBX(data, box, log, rland=100, intrp=0)
+    SBBXtoBX(data, box, rland=100, intrp=0)
     # Necessary, because box is an input to the next stage, so the file
     # needs to be fully written.
     box.close()
 
-    out = open(os.path.join('work', 'ZON.Ts.ho2.GHCN.CL.PA.1200.step1'), 'wb')
     inp = open(os.path.join('result', 'BX.Ts.ho2.GHCN.CL.PA.1200'), 'rb')
-    log = open(os.path.join('log', 'zonav.Ts.ho2.GHCN.CL.PA.log'), 'w')
+    zoned_averages = zonav(inp)
 
-    zonav(inp, out, log)
-
-    inp = open(os.path.join('work', 'ZON.Ts.ho2.GHCN.CL.PA.1200.step1'), 'rb')
-    log = open(os.path.join('log', 'annzon.Ts.ho2.GHCN.CL.PA.log'), 'w')
     out = ['ZonAnn', 'GLB', 'NH', 'SH']
     out = [open(os.path.join('result', bit+'.Ts.ho2.GHCN.CL.PA.txt'), 'w')
             for bit in out]
     zono = open(os.path.join('work', 'ZON.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
     annzono = open(os.path.join('work', 'ANNZON.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
+    annzon(zoned_averages, out, zono, annzono)
 
-    annzon(inp, log, out, zono, annzono)
     yield "Step 5 Completed"

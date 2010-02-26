@@ -114,17 +114,26 @@ def parse_steps(steps):
     steps = steps.strip()
     if not steps:
         return range(0, 6)
-    try:
-        step = int(steps)
-        return [step]
-
-    except (TypeError, ValueError):
+    result = set()
+    for part in steps.split(','):
         try:
-            a, b = [int(v) for v in steps.split(",")]
-            return range(a, b + 1)
-
+            # Is it a plain integer?
+            step = int(part)
+            result.add(step)
         except ValueError:
-            sys.exit("Do not understand steps arg %r" % steps)
+            # Assume part is of form '1-3'.
+            try:
+                l,r = part.split('-')
+                result.update(range(int(l), int(r)+1))
+            except ValueError:
+                # Expect to catch both
+                # "ValueError: too many values to unpack" when the split
+                # produces too many values ("1-3-"), and
+                # "ValueError: invalid literal for int() with base 10: 'a'"
+                # when int fails ("1,a")
+                raise Fatal("Can't understand steps argument.")
+
+    return list(sorted(result))
 
 
 def parse_options(arglist):

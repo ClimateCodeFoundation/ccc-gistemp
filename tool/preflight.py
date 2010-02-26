@@ -66,7 +66,7 @@ def checkit(log):
         v2.inv
         """.split()
 
-    step0big = '9641C_200907_F52.avg v2.mean'.split()
+    step0big = '9641C_201002_F52.avg v2.mean'.split()
     step5big = 'SBBX.HadR2'.split()
     big = step0big + step5big
     assert big

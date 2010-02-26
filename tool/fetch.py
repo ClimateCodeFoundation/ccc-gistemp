@@ -68,13 +68,16 @@ def fetch(files, prefix='input/', output=sys.stdout):
     # We are moving from USHCNv1 (hcn_doe_mean_data.Z) to USHCNv2
     # (9641C_200907_F52.avg.gz).  It does no harm to remember how to
     # fetch the older file.
+    # The name of the USHCNv2 file changes every time NOAA make a new
+    # release (it incorporates the date).  For now, just update this by
+    # hand.  :todo: use ftplib to get the name of the latest release.
 
     # v2.mean.Z used to be in the NOAA list, but now we get a zip file,
     # so it's handled slightly specially a bit later on.
     noaa = """
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.temperature.inv
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/hcn_doe_mean_data.Z
-    ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_200907_F52.avg.gz
+    ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_201002_F52.avg.gz
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/station.inventory.Z
     """.split()
 

@@ -614,7 +614,7 @@ def step0_input():
         pass
     input = Struct()
     input.ushcn_stations = read_USHCN_stations('input/ushcn2.tbl', 'input/ushcnV2_cmb.tbl')
-    input.ushcn_source = read_USHCN("input/9641C_200907_F52.avg", input.ushcn_stations)
+    input.ushcn_source = read_USHCN("input/9641C_201002_F52.avg", input.ushcn_stations)
     input.ghcn_source = V2MeanReader("input/v2.mean", code.giss_data.BASE_YEAR)
     input.antarc_source = itertools.chain(
             read_antarctic("input/antarc1.txt", "input/antarc1.list", '8'),

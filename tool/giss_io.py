@@ -246,7 +246,8 @@ class StationReader(object):
             n = max_month - min_month + 1
             fmt = "%diiiii36sii" % n
             fields = struct.unpack(self.bos + fmt, rec)
-            series = fields[:n]
+            tenths = fields[:n]
+            series = convert_tenths_to_float(tenths)
             (lat, lon, ident, elevation, name,
                     self.min_month, self.max_month) = fields[n:]
             country_code = name[-3:]
@@ -254,7 +255,8 @@ class StationReader(object):
             station = code.giss_data.StationRecord(uid)
             # TODO: Rename min_month to first_month.
             # TODO: Handle magic 1880, should use meta info!
-            station.set_series_from_tenths(1880 * 12 + min_month, series)
+
+            station.set_series(1880 * 12 + min_month, series)
 
             # TODO: We could verify that the station data is correct.
             yield station
@@ -700,6 +702,27 @@ def step5_input():
     ocean = SubboxReader(open("work/SBBX.HadR2", "rb"))
 
     return itertools.izip(land, ocean)
+
+def step5_bx_output(data):
+    bos = '>'
+    box = open(os.path.join('result', 'BX.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
+    boxf = fort.File(box, bos=bos)
+    (info, title) = data.next()
+    boxf.writeline(struct.pack('%s8i' % bos, *info) + title)
+    yield (info, title)
+
+    try:
+        for record in data:
+            (avgr, wtr, ngood, box) = record
+            n = len(avgr)
+            fmt = '%s%df' % (bos, n)
+            boxf.writeline(struct.pack(fmt, *avgr) +
+                           struct.pack(fmt, *wtr) +
+                           struct.pack('%si' % bos, ngood) +
+                           struct.pack('%s4i' % bos, *box))
+            yield (avgr, wtr, ngood, box)
+    finally:
+        boxf.close()
 
 def step5_output(data):
     # Already implicit in Step 5.

@@ -37,15 +37,6 @@ except ImportError:
     gzip = None
 
 import fort
-import script_support
-from script_support import trace
-
-
-# This supports using this script as a module.
-class _Struct(object):
-    pass
-options = _Struct()
-options.verbose = 1
 
 
 # Constants (from original fortran parameters)
@@ -113,10 +104,8 @@ def load_sst_data(iyr1, n_years, dates):
     # Read in the SST data for recent years (unit 11)
     sst = make_3d_array(IM, JM, 12 * n_years)
 
-    trace(0, " Reading input/oiv2mon... files.")
     for iyr, mon in dates:
         path = "input/oiv2mon.%04d%02d" % (iyr, mon)
-        trace(1, " trying to read %s" % path)
         f11 = fort.open(path)
         f11.bos = ">"
         data = f11.readline()
@@ -179,8 +168,6 @@ def select_input_files(curr_moe=None, curr_yre=None, args=[],
             sys.stderr.write("         Please add python gzip support or"
                 " unzip the oiv2mon files manually\n")
             return 0, None, None, None
-        elif ret == 0:
-            trace(1, " Ungzipped %s", p)
 
     # Only select the files necessary to add data.
     start_year = curr_yre
@@ -294,15 +281,11 @@ class MergeReader(object):
         #
         # Interpolate to Sergei's subbox grid
         #
-        trace(0, " Interpolating to Sergei's subbox grid")
         moff = (self.iyr1 - IYRBEG) * 12
         boxes = self.reader
         sst = self.sst
         clim = self.clim
-        for n in range(8000):
-            if n and n % 500 == 0:
-                trace(0, " %s of 8000 positions processed", n)
-            box = boxes.next() 
+        for box in boxes:
             box.pad_with_missing(self.meta.monm)
             lts = box.lat_S
             ltn = box.lat_N
@@ -343,16 +326,3 @@ class MergeReader(object):
 
             box.trim()
             yield box
-
-
-if __name__ == "__main__":
-    import optparse
-    usage =    "usage: %prog [options] [year month1 month2]"
-    usage += "\n       %prog [options] [year1 year2 [month2]]"
-    parser = script_support.makeParser(usage)
-    parser.add_option("--use-all-oiv2mon", action="store_true",
-        help="Use all the oiv2mon files in input")
-    options, args = script_support.parseArgs(parser, __doc__, (0, 3))
-    if len(args) not in (0, 2, 3):
-        parser.error("Expected either zero, 2 or 3 arguments")
-    sys.exit(main(args, options.use_all_oiv2mon))

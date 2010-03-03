@@ -28,22 +28,35 @@ def checkit(log):
 
         log.write('MISSING: config/%s\n' % name)
 
+    def missing_file(name):
+        for suffix in ['', '.gz']:
+            if input_ok(name+suffix):
+                return False
+        return True
+
     def missing_files(names):
-        """Check list of names and return mising ones.  Compression
+        """Check list of names and return missing ones.  Compression
         extensions (.gz) are also tried if supplied name is not found.
+        Each name can be a string or a list of strings; if a list of
+        strings then any string will do, and the first string will be
+        returned if none are present.
         """
 
         missing = []
-        for name in names:
-            gotit = False
-            for suffix in ['', '.gz']:
-                if input_ok(name+suffix):
-                    gotit = True
-                    break
-            if not gotit:
-                # Didn't find file, even trying compressed suffixes.
-                missing_input(name)
-                missing.append(name)
+        for item in names:
+            if isinstance(item, str):
+                if missing_file(item):
+                    # Didn't find file, even trying compressed suffixes.
+                    missing_input(item)
+                    missing.append(item)
+            else:
+                assert isinstance(item, list)
+                for name in item:
+                    if not missing_file(name):
+                        break
+                else:
+                    missing_input(item[0])
+                    missing.append(item[0])
         return missing
 
     rc = 0
@@ -66,7 +79,9 @@ def checkit(log):
         v2.inv
         """.split()
 
-    step0big = '9641C_201002_F52.avg v2.mean'.split()
+    ushcn_alternatives = '9641C_201002_F52.avg 9641C_200907_F52.avg'.split()
+
+    step0big = 'v2.mean'.split() + [ushcn_alternatives]
     step5big = 'SBBX.HadR2'.split()
     big = step0big + step5big
     assert big

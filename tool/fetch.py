@@ -77,6 +77,7 @@ def fetch(files, prefix='input/', output=sys.stdout):
     noaa = """
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.temperature.inv
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/hcn_doe_mean_data.Z
+    ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_200907_F52.avg.gz
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_201002_F52.avg.gz
     ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/station.inventory.Z
     """.split()

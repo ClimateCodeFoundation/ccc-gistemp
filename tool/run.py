@@ -95,6 +95,7 @@ def run_step5(data):
     if data is None:
         data = giss_io.step5_input()
     result = step5.step5(data)
+    giss_io.step5_output(result)
     return vischeck(result)
 
 def vischeck(data):

@@ -451,21 +451,15 @@ def zonav(boxed_data):
     outinfo = list(info)
     outinfo[3] = monm
     outinfo[5] = iyrbeg
-    yield (outinfo, titlei, ' zones:  90->64.2->44.4->23.6->0->-23.6->-44.4->-64.2->-90                      ')
+    yield (outinfo, titlei)
 
-    ibm,kzone,titlez = zones()
+    ibm,kzone = zones()
 
     JBM = len(ibm)
 
     # :init:lenz:
     lenz = [None]*JBM
 
-    # Length, in bytes, of a float as stored in the binary file.
-    w = len(struct.pack('>f', 0.0))
-    # Length, in bytes, of an integer as stored in the binary file.
-    wi = len(struct.pack('>i', 0))
-    # If these are different, then things are likely to break.
-    assert w == wi
     wt = [None] * JBM
     avg = [None] * JBM
     for jb in range(JBM):
@@ -506,15 +500,14 @@ def zonav(boxed_data):
                 avg[jb][m] -= bias[k]
                 lenz[jb] += 1
 
-        yield (avg[jb], wt[jb], titlez[jb])
+        yield (avg[jb], wt[jb])
 
     # *lenz* contains the lemgths of each zone 0 to 7 (the number of
     # valid months in each zone).
     lenz, iord = sort_perm(lenz)
     for jz in range(NZS+3):
         if lenz[0] == 0:
-            raise Error('**** NO DATA FOR ZONE %d %s' %
-              (JBM+jz, titlez[JBM+jz]))
+            raise Error('**** NO DATA FOR ZONE %d' % JBM+jz)
         # Find the longest basic belt that is in the special zone.
         for j1 in range(JBM):
             # kzone records which basic belts (0 to 7) are in each
@@ -557,7 +550,7 @@ def zonav(boxed_data):
                     if avgg[m] != XBAD:
                         avgg[m] -= bias[k]
                     m += 1
-        yield(avgg, wtg, titlez[JBM+jz])
+        yield(avgg, wtg)
 
 def sort_perm(a):
     """The array *a* is sorted into descending order.  The fresh sorted
@@ -573,14 +566,12 @@ def sort_perm(a):
     return sorted,iord
 
 def zones():
-    """Return the latitude and other parameters that define the 14 belts
-    (8 basic belts and 6 zones).  A triple of (*ibm*,*kzone*,*titlez*)
-    is returned.  `ibm[b]` gives the number of boxes (regions) in belt
-    *b* for `b in range(8)`.  *kzone* defines how the 6 combined zones
-    are made from the basic belts.  `b in kzone[k]` is true when basic
-    belt *b* is in special zone *k* (*b* is in range(8), *k* is in
-    range(6)).  `titlez[z]` is an 80 character string that is the title
-    for zone *z* for `z in range(14)`.
+    """Return the parameters of the 14 zones (8 basic belts and 6
+    additional).  A pair of (*ibm*,*kzone*) is returned.  `ibm[b]`
+    gives the number of boxes (regions) in belt *b* for `b in
+    range(8)`.  *kzone* defines how the 6 combined zones are made from
+    the basic belts.  `b in kzone[k]` is true when basic belt *b* is
+    in special zone *k* (*b* is in range(8), *k* is in range(6)).
     """
 
     # Number of boxes (regions) in each band.
@@ -592,61 +583,25 @@ def zones():
     T = set([3,4])    # Tropics
     kzone = [N-T, T, S-T, N, S, G]
 
-    # Boundaries (degrees latitude, +ve North) of the 8 basic belts.
-    band = ['90.0 N',
-            '64.2 N',
-            '44.4 N',
-            '23.6 N',
-            'EQUATOR',
-            '23.6 S',
-            '44.4 S',
-            '64.2 S',
-            '90.0 S']
-    # Accumulate the titles here.
-    titlez = ['  LATITUDE BELT FROM %7s TO %7s' % (band[j+1], band[j]) for j in range(8)]
-
-    titlez += [
-        '  NORTHERN LATITUDES: 23.6 N TO  90.0 N',
-        '       LOW LATITUDES: 23.6 S TO  23.6 N',
-        '  SOUTHERN LATITUDES: 90.0 S TO  23.6 S',
-        'NORTHERN HEMISPHERE',
-        'SOUTHERN HEMISPHERE',
-        'GLOBAL MEANS']
-
-    # Ensure all titles are 80 characters long.
-    titlez = map(lambda s: ('%-80s' % s)[:80], titlez)
-    
-    return ibm, kzone, titlez
+    return ibm, kzone
 
 
-def annzon(zoned_averages, out, zono, annzono, alternate={'global':2, 'hemi':True}):
-    """Compute annual anomalies and write them out to various files.
-    *zoned_averages* is an iterator of zoned averages produced by `zonav`.
-    *out* is a list (length 4) of binary output files for the result
-    files:
-    (ZonAnn|GLB|NH|SH).Ts.ho2.GHCN.CL.PA.txt .
-    *zono* and *annzono* are binary output files where the (recomputed)
-    zonal means and annual zonal means are written.
+def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
+    """Compute annual zoned anomalies. *zoned_averages* is an iterator
+    of zoned averages produced by `zonav`.
 
-    The *alternate* argument (replaces IAVGGH in the Fortran) controls
-    whether alternate algorithms are used to compute the global and
-    hemispheric means.
-    alternate['global'] is 1 or 2, to select 1 of 2 different alternate
-    computations, or false to not compute an alternative;
+    The *alternate* argument controls whether alternate algorithms are
+    used to compute the global and hemispheric means.
+    alternate['global'] is 1 or 2, to select 1 of 2 different
+    alternate computations, or false to not compute an alternative;
     alternate['hemi'] is true to compute an alternative, false
     otherwise.
     """
 
-    bos = '>'
-
-    zono = fort.File(zono, bos)
-    annzono = fort.File(annzono, bos)
-
     jzm = 14
-    jzp = 14
     monmin = 6
 
-    (info, title, titl2) = zoned_averages.next()
+    (info, title) = zoned_averages.next()
     kq = info[1]
     # km: the number of time frames per year.
     km = 1
@@ -665,27 +620,14 @@ def annzon(zoned_averages, out, zono, annzono, alternate={'global':2, 'hemi':Tru
     wt =   [ None for _ in range(jzm)]
     ann =  [ [None]*iyrs for _ in range(jzm)]
     annw = [ [None]*iyrs for _ in range(jzm)]
-    titlez = [None]*jzm
     # Here we use the Python convention, *iyrend* is one past the highest
     # year used.
     iyrend = info[3] // km + iyrbeg
     XBAD = float(info[6])
-    # Create and write out the header record of the output files.
-    print >> out[0], ' Annual Temperature Anomalies (.01 C) - ' + title[28:80]
-    for f in out[1:]:
-        print >> f, title
-    infoo = list(info)
-    infoo[2] = 5
-    infoo[3] //= 12
-    titleo = ('ANNUALLY AVERAGED (%d OR MORE MONTHS) TEMPERATURE ANOMALIES (C)' % monmin)
-    # Ensure exactly 80 characters.
-    titlelo = '%-80s' % titleo
 
-    # :read:zonal:
     # Collect JZM zonal means.
-    w = len(struct.pack(bos + 'f', 0.0))
     for jz in range(jzm):
-        (tdata, twt, titlez[jz]) = zoned_averages.next()
+        (tdata, twt) = zoned_averages.next()
         # Regroup the *data* and *wt* series so that they come in blocks of
         # 12 (*km*, really).
         # Uses essentially the same trick as the `grouper()` recipe in
@@ -725,7 +667,6 @@ def annzon(zoned_averages, out, zono, annzono, alternate={'global':2, 'hemi':Tru
         wtsp = [3.,2.,2.,3.]
         for iy in range(iyrs):
             glob = 0.
-            # Fortran uses JZM to index the last zone, we use -1.
             ann[-1][iy] = XBAD
             for z,w in zip(zone, wtsp):
                 if ann[z][iy] == XBAD:
@@ -746,9 +687,6 @@ def annzon(zoned_averages, out, zono, annzono, alternate={'global':2, 'hemi':Tru
                     data[-1][iy][m] = .1 * glob
     # Alternate hemispheric means.
     if alternate['hemi']:
-        # Note: In Fortran IHEM is either 1 or 2, in Python it is 0 or
-        # 1.  This changes some computations but not others (because the
-        # indexing is from 0 in Python).
         # For the computations it will be useful to recall how the zones
         # are numbered.  There is a useful docstring at the beginning of
         # zonav.py.
@@ -766,154 +704,7 @@ def annzon(zoned_averages, out, zono, annzono, alternate={'global':2, 'hemi':Tru
                         data[ihem+11][iy][m] = (
                           0.4*data[ihem+3][iy][m] +
                           0.6*data[2*ihem+8][iy][m])
-
-    # iord literal borrowed exactly from Fortran...
-    iord = [14,12,13, 9,10,11, 1,2,3,4,5,6,7,8]
-    # ... and then adjusted for Python index convention.
-    iord = map(lambda x: x-1, iord)
-    iy1tab = 1880
-    # Display the annual means.
-    def annasstr(z):
-        """Helper function that returns the annual anomaly for zone *z*
-        as a string representation of an integer (the integer is the
-        anomaly scaled by 100 to convert to centikelvin).
-
-        The returned value is a string that is 5 characters long.  If
-        the integer will not fit into a 5 character string, '*****' is
-        returned (this emulates the Fortran convention of formatting
-        999900 (which is the XBAD value in centikelvin) as a '*****'.
-        
-        The year, *iy*, is lexically captured which is a bit horrible.
-        """
-        x = int(math.floor(100*ann[z][iy] + 0.5))
-        x = '%5d' % x
-        if len(x) > 5:
-            return '*****'
-        return x
-
-    iyrsp = iyrs
-    # Check (and skip) incomplete year.
-    if data[-1][-1][-1] > 8000:
-        iyrsp -= 1
-    banner = """
-                           24N   24S   90S     64N   44N   24N   EQU   24S   44S   64S   90S
-Year  Glob  NHem  SHem    -90N  -24N  -24S    -90N  -64N  -44N  -24N  -EQU  -24S  -44S  -64S Year
-""".strip('\n')
-    for iy in range(iy1tab - iyrbeg, iyrsp):
-        if (iy+iyrbeg >= iy1tab+5 and ((iy+iyrbeg) % 20 == 1) or
-          iy == iy1tab - iyrbeg):
-            print >> out[0]
-            print >> out[0], banner
-        iyr = iyrbeg+iy
-        print >> out[0], ('%4d' + ' %s'*3 + '  ' + ' %s'*3 +
-                          '  ' + ' %s'*8 + '%5d') % tuple([iyr] +
-          [annasstr(iord[zone]) for zone in range(jzp)] + [iyr])
-    # The trailing banner is just like the repeated banner, except that
-    # "Year  Glob  NHem  SHem" appears on on the first line, not the
-    # second line (and the same for the "Year" that appears at the end
-    # of the line).  *sigh*.
-    banner = banner.split('\n')
-    banner[0] = banner[1][:24] + banner[0][24:] + ' Year'
-    banner[1] = ' '*24 + banner[1][24:-5]
-    banner = '\n'.join(banner)
-    print >> out[0], banner
-    print >> out[0]
-
-    tit = ['    GLOBAL','N.HEMISPH.','S.HEMISPH.']
-    # Shift the remaining 3 output files so that the indexing works out.
-    out = out[1:]
-    banner = 'Year   Jan  Feb  Mar  Apr  May  Jun  Jul  Aug' + \
-      '  Sep  Oct  Nov  Dec    J-D D-N    DJF  MAM  JJA  SON  Year'
-    # All the "WRITE(96+J" stuff in the Fortran is replaced with this
-    # enumeration into the *out* array (an array of file descriptors).
-    for j,outf in enumerate(out):
-        print >> outf, (tit[j] + ' Temperature Anomalies' + 
-          ' in .01 C     base period: 1951-1980')
-        for iy in range(iy1tab-iyrbeg, iyrs):
-            iout = [100*XBAD]*18
-            if (iy+iyrbeg >= iy1tab+5 and ((iy+iyrbeg) % 20 == 1) or
-              iy == iy1tab - iyrbeg):
-                print >> outf
-                print >> outf, banner
-            # *data* for this zone, avoids some duplication of code.
-            zdata = data[iord[j]]
-            # :todo: Would probably be better to have a little 4-long
-            # seasonal array to do the computation in.
-            awin = 9999
-            if iy > 0:
-                awin = zdata[iy-1][11] + zdata[iy][0] + zdata[iy][1]
-            aspr = sum(zdata[iy][2:5])
-            asmr = sum(zdata[iy][5:8])
-            afl  = sum(zdata[iy][8:11])
-            if awin < 8000:
-                iout[14] = nint(100.0*awin/3)
-            if aspr < 8000:
-                iout[15] = nint(100.0*aspr/3)
-            if asmr < 8000:
-                iout[16] = nint(100.0*asmr/3)
-            if afl < 8000:
-                iout[17] = nint(100.0*afl/3)
-            ann2=awin+aspr+asmr+afl
-            if ann2 < 8000:
-                iout[13] = nint(100.0*ann2/12)
-            ann1=ann[iord[j]][iy]
-            if iy == iyrs-1 and zdata[iy][-1] > 8000:
-                ann1 = 9999
-            if ann1 < 8000:
-                iout[12] = nint(100.0*ann[iord[j]][iy])
-            for m in range(12):
-                iout[m] = nint(100.0*zdata[iy][m])
-            iyr = iyrbeg+iy
-            # Convert each of *iout* to a string, storing the results in
-            # *sout*.
-            sout = [None]*len(iout)
-            for i,x in enumerate(iout):
-                # All the elements of iout are formatted to width 5,
-                # except for element 13 (14 in the Fortran code), which
-                # is length 4.
-                if i == 13:
-                    x = '%4d' % x
-                    if len(x) > 4:
-                        x = '****'
-                else:
-                    x = '%5d' % x
-                    if len(x) > 5:
-                        x = '*****'
-                sout[i] = x
-            print >> outf, (
-              '%4d ' + '%s'*12 + '  %s%s  ' + '%s'*4 + '%6d') % tuple(
-              [iyr] + sout + [iyr])
-        print >> outf, banner
-
-    # Save annual means on disk.
-    annzono.writeline(struct.pack(bos+'8i', *infoo) +
-                      titleo +
-                      title[28:80] +
-                      ' '*28)
-    for jz in range(jzm):
-        fmt = bos + '%df' % (monm//12)
-        annzono.writeline(struct.pack(fmt, *ann[jz]) +
-                          struct.pack(fmt, *annw[jz]) +
-                          titlez[jz])
-    # Save monthly means on disk
-    zono.writeline(struct.pack(bos + '8i', *info) +
-                   title + titl2)
-
-    for jz in range(jzm):
-        fmt = bos + '%df' % monm
-        zono.writeline(struct.pack(fmt, *itertools.chain(*data[jz])) +
-                       struct.pack(fmt, *itertools.chain(*wt[jz])) +
-                       titlez[jz])
-
-
-def nint(x):
-    """Nearest integer.  Reasonable approximation to Fortran's NINT
-    routine."""
-
-    # http://www.python.org/doc/2.4.4/lib/module-math.html
-
-    return int(math.floor(x+0.5))
-
+    return (info, data, wt, ann, annw, monmin, title)
 
 def step5(data):
     """Step 5 of GISTEMP.
@@ -929,12 +720,4 @@ def step5(data):
     boxed = SBBXtoBX(data, rland=100)
     boxed = giss_io.step5_bx_output(boxed)
     zoned_averages = zonav(boxed)
-
-    out = ['ZonAnn', 'GLB', 'NH', 'SH']
-    out = [open(os.path.join('result', bit+'.Ts.ho2.GHCN.CL.PA.txt'), 'w')
-            for bit in out]
-    zono = open(os.path.join('work', 'ZON.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
-    annzono = open(os.path.join('work', 'ANNZON.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
-    annzon(zoned_averages, out, zono, annzono)
-
-    yield "Step 5 Completed"
+    return annzon(zoned_averages)

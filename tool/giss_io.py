@@ -611,6 +611,14 @@ def read_float(s):
     except:
         return code.giss_data.XMISSING
 
+# Find the USHCN input file
+def ushcn_input_file():
+    files =  ["input/9641C_201002_F52.avg",
+              "input/9641C_200907_F52.avg"]
+    for f in files:
+        if os.path.exists(f):
+            return f
+    raise ValueError, "no USHCN data file in input directory; run tool/preflight.py."
 
 # Each of the stepN_input functions below produces an iterator that
 # yields that data for that step feeding from data files.
@@ -622,7 +630,7 @@ def step0_input():
         pass
     input = Struct()
     input.ushcn_stations = read_USHCN_stations('input/ushcn2.tbl', 'input/ushcnV2_cmb.tbl')
-    input.ushcn_source = read_USHCN("input/9641C_201002_F52.avg", input.ushcn_stations)
+    input.ushcn_source = read_USHCN(ushcn_input_file(), input.ushcn_stations)
     input.ghcn_source = V2MeanReader("input/v2.mean", code.giss_data.BASE_YEAR)
     input.antarc_source = itertools.chain(
             read_antarctic("input/antarc1.txt", "input/antarc1.list", '8'),
@@ -724,6 +732,198 @@ def step5_bx_output(data):
     finally:
         boxf.close()
 
+def step5_zone_titles():
+    # Boundaries (degrees latitude, +ve North) of the 8 basic belts.
+    band = ['90.0 N',
+            '64.2 N',
+            '44.4 N',
+            '23.6 N',
+            'EQUATOR',
+            '23.6 S',
+            '44.4 S',
+            '64.2 S',
+            '90.0 S']
+    # Accumulate the titles here.
+    titles = ['  LATITUDE BELT FROM %7s TO %7s' % (band[j+1], band[j]) for j in range(8)]
+
+    titles += [
+        '  NORTHERN LATITUDES: 23.6 N TO  90.0 N',
+        '       LOW LATITUDES: 23.6 S TO  23.6 N',
+        '  SOUTHERN LATITUDES: 90.0 S TO  23.6 S',
+        'NORTHERN HEMISPHERE',
+        'SOUTHERN HEMISPHERE',
+        'GLOBAL MEANS']
+
+    # Ensure all titles are 80 characters long.
+    titles = map(lambda s: ('%-80s' % s)[:80], titles)
+    return titles
+
+
 def step5_output(data):
-    # Already implicit in Step 5.
-    return data
+    (info, data, wt, ann, annw, monmin, title) = data
+    XBAD = 9999
+    iy1tab = 1880
+
+    zone_titles = step5_zone_titles()
+
+    titl2 = ' zones:  90->64.2->44.4->23.6->0->-23.6->-44.4->-64.2->-90                      '
+    titleo = 'ANNUALLY AVERAGED (%d OR MORE MONTHS) TEMPERATURE ANOMALIES (C)' % monmin
+    iyrbeg = info[5]
+    jzm = len(ann)
+    iyrs = len(ann[0])
+    monm = iyrs * 12
+    infoo = list(info)
+    infoo[2] = 5
+    infoo[3] //= 12
+    
+    out = ['ZonAnn', 'GLB', 'NH', 'SH']
+    out = [open(os.path.join('result', bit+'.Ts.ho2.GHCN.CL.PA.txt'), 'w')
+            for bit in out]
+    zono = open(os.path.join('work', 'ZON.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
+    annzono = open(os.path.join('work', 'ANNZON.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
+
+    bos = '>'
+
+    zono = fort.File(zono, bos)
+    annzono = fort.File(annzono, bos)
+
+    # Create and write out the header record of the output files.
+    print >> out[0], ' Annual Temperature Anomalies (.01 C) - ' + title[28:80]
+    for f in out[1:]:
+        print >> f, title
+
+    # iord literal borrowed exactly from Fortran...
+    iord = [14,12,13, 9,10,11, 1,2,3,4,5,6,7,8]
+    # ... and then adjusted for Python index convention.
+    iord = map(lambda x: x-1, iord)
+    # Display the annual means.
+    def annasstr(z):
+        """Helper function that returns the annual anomaly for zone *z*
+        as a string representation of an integer (the integer is the
+        anomaly scaled by 100 to convert to centikelvin).
+
+        The returned value is a string that is 5 characters long.  If
+        the integer will not fit into a 5 character string, '*****' is
+        returned (this emulates the Fortran convention of formatting
+        999900 (which is the XBAD value in centikelvin) as a '*****'.
+        
+        The year, *iy*, is lexically captured which is a bit horrible.
+        """
+        x = int(math.floor(100*ann[z][iy] + 0.5))
+        x = '%5d' % x
+        if len(x) > 5:
+            return '*****'
+        return x
+
+    iyrsp = iyrs
+    # Check (and skip) incomplete year.
+    if data[-1][-1][-1] > 8000:
+        iyrsp -= 1
+    banner = """
+                           24N   24S   90S     64N   44N   24N   EQU   24S   44S   64S   90S
+Year  Glob  NHem  SHem    -90N  -24N  -24S    -90N  -64N  -44N  -24N  -EQU  -24S  -44S  -64S Year
+""".strip('\n')
+    for iy in range(iy1tab - iyrbeg, iyrsp):
+        if (iy+iyrbeg >= iy1tab+5 and ((iy+iyrbeg) % 20 == 1) or
+          iy == iy1tab - iyrbeg):
+            print >> out[0]
+            print >> out[0], banner
+        iyr = iyrbeg+iy
+        print >> out[0], ('%4d' + ' %s'*3 + '  ' + ' %s'*3 +
+                          '  ' + ' %s'*8 + '%5d') % tuple([iyr] +
+          [annasstr(iord[zone]) for zone in range(jzm)] + [iyr])
+    # The trailing banner is just like the repeated banner, except that
+    # "Year  Glob  NHem  SHem" appears on on the first line, not the
+    # second line (and the same for the "Year" that appears at the end
+    # of the line).  *sigh*.
+    banner = banner.split('\n')
+    banner[0] = banner[1][:24] + banner[0][24:] + ' Year'
+    banner[1] = ' '*24 + banner[1][24:-5]
+    banner = '\n'.join(banner)
+    print >> out[0], banner
+    print >> out[0]
+
+    tit = ['    GLOBAL','N.HEMISPH.','S.HEMISPH.']
+    # Shift the remaining 3 output files so that the indexing works out.
+    out = out[1:]
+    banner = 'Year   Jan  Feb  Mar  Apr  May  Jun  Jul  Aug' + \
+      '  Sep  Oct  Nov  Dec    J-D D-N    DJF  MAM  JJA  SON  Year'
+    # All the "WRITE(96+J" stuff in the Fortran is replaced with this
+    # enumeration into the *out* array (an array of file descriptors).
+    for j,outf in enumerate(out):
+        print >> outf, (tit[j] + ' Temperature Anomalies' + 
+          ' in .01 C     base period: 1951-1980')
+        for iy in range(iy1tab-iyrbeg, iyrs):
+            iout = [100*XBAD]*18
+            if (iy+iyrbeg >= iy1tab+5 and ((iy+iyrbeg) % 20 == 1) or
+              iy == iy1tab - iyrbeg):
+                print >> outf
+                print >> outf, banner
+            # *data* for this zone, avoids some duplication of code.
+            zdata = data[iord[j]]
+            # :todo: Would probably be better to have a little 4-long
+            # seasonal array to do the computation in.
+            awin = 9999
+            if iy > 0:
+                awin = zdata[iy-1][11] + zdata[iy][0] + zdata[iy][1]
+            aspr = sum(zdata[iy][2:5])
+            asmr = sum(zdata[iy][5:8])
+            afl  = sum(zdata[iy][8:11])
+            if awin < 8000:
+                iout[14] = int(round(100.0*awin/3))
+            if aspr < 8000:
+                iout[15] = int(round(100.0*aspr/3))
+            if asmr < 8000:
+                iout[16] = int(round(100.0*asmr/3))
+            if afl < 8000:
+                iout[17] = int(round(100.0*afl/3))
+            ann2=awin+aspr+asmr+afl
+            if ann2 < 8000:
+                iout[13] = int(round(100.0*ann2/12))
+            ann1=ann[iord[j]][iy]
+            if iy == iyrs-1 and zdata[iy][-1] > 8000:
+                ann1 = 9999
+            if ann1 < 8000:
+                iout[12] = int(round(100.0*ann[iord[j]][iy]))
+            for m in range(12):
+                iout[m] = int(round(100.0*zdata[iy][m]))
+            iyr = iyrbeg+iy
+            # Convert each of *iout* to a string, storing the results in
+            # *sout*.
+            sout = [None]*len(iout)
+            for i,x in enumerate(iout):
+                # All the elements of iout are formatted to width 5,
+                # except for element 13 (14 in the Fortran code), which
+                # is length 4.
+                if i == 13:
+                    x = '%4d' % x
+                    if len(x) > 4:
+                        x = '****'
+                else:
+                    x = '%5d' % x
+                    if len(x) > 5:
+                        x = '*****'
+                sout[i] = x
+            print >> outf, (
+              '%4d ' + '%s'*12 + '  %s%s  ' + '%s'*4 + '%6d') % tuple(
+              [iyr] + sout + [iyr])
+        print >> outf, banner
+
+    # Save annual and monthly means on disk.
+    annzono.writeline(struct.pack(bos+'8i', *infoo) +
+                      titleo +
+                      title[28:80] +
+                      ' '*28)
+    zono.writeline(struct.pack(bos + '8i', *info) +
+                   title + titl2)
+
+    fmt_ann = bos + '%df' % (monm//12)
+    fmt_mon = bos + '%df' % monm
+    for jz in range(jzm):
+        annzono.writeline(struct.pack(fmt_ann, *ann[jz]) +
+                          struct.pack(fmt_ann, *annw[jz]) +
+                          zone_titles[jz])
+        zono.writeline(struct.pack(fmt_mon, *itertools.chain(*data[jz])) +
+                       struct.pack(fmt_mon, *itertools.chain(*wt[jz])) +
+                       zone_titles[jz])
+    return "Step 5 Completed"

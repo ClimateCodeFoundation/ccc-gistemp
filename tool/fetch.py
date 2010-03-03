@@ -120,6 +120,10 @@ def fetch(files, prefix='input/', output=sys.stdout):
     v2.inv
     """.split()
 
+    step45inputs = """
+    oisstv2_mod4.clim.gz
+    """.split()
+
     gistemp_source_tar = \
       'http://data.giss.nasa.gov/gistemp/sources/GISTEMP_sources.tar.gz'
 
@@ -129,6 +133,9 @@ def fetch(files, prefix='input/', output=sys.stdout):
     for n in step1inputs:
         place[n] = ['tar', gistemp_source_tar,
           'GISTEMP_sources/STEP1/input_files/' + n]
+    for n in step45inputs:
+        place[n] = ['tar', gistemp_source_tar,
+          'GISTEMP_sources/STEP4_5/input_files/' + n]
 
     place['v2.mean'] = ['zip',
       'ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/zipd/v2.mean.zip',

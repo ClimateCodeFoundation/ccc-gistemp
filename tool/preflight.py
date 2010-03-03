@@ -78,6 +78,9 @@ def checkit(log):
         sumofday.tbl
         v2.inv
         """.split()
+    step4 = """
+    oisstv2_mod4.clim.gz
+    """.split()
 
     ushcn_alternatives = '9641C_201002_F52.avg 9641C_200907_F52.avg'.split()
 
@@ -85,7 +88,7 @@ def checkit(log):
     step5big = 'SBBX.HadR2'.split()
     big = step0big + step5big
     assert big
-    all = step0 + step1 + big
+    all = step0 + step1 + step4 + big
     missing = missing_files(all)
     if missing:
         log.write('Attempting to fetch missing files: %s\n' %

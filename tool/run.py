@@ -80,13 +80,7 @@ def run_step3(data):
 
 def run_step4(data):
     from code import step4
-    if data is None:
-        data = giss_io.step4_input()
-    # :todo: push into giss_io.step4_input and always call it?
-    # Step 4 is a little unusual.  Its input is a pair of iterables.
-    # One for the Step 3 output (land data), one for the ocean data.
-    ocean = giss_io.SubboxReader(open('input/SBBX.HadR2', 'rb'))
-    data = (data, ocean)
+    data = giss_io.step4_input(data) 
     result = step4.step4(data)
     return giss_io.step4_output(result)
 

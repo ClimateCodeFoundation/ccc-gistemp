@@ -687,9 +687,15 @@ def step3_output(data):
     finally:
         out.close()
 
-def step4_input():
+def step4_dummy_input():
     while True:
         yield 'Step 4 dummy value'
+
+def step4_input(land):
+    if land is None:
+        land = step4_dummy_input()
+    ocean = SubboxReader(open('input/SBBX.HadR2', 'rb'))
+    return (land, ocean)
 
 def step4_output(data):
     # The Step 4 output is slightly unusual, it is an iterable of pairs.

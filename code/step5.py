@@ -31,14 +31,10 @@ import struct
 import os
 import sys
 
-def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
+def SBBXtoBX(data):
     """Simultaneously combine the land series and the ocean series and
     combine subboxes into boxes.  *data* should be an iterator of
-    (land, ocean) subbox series pairs; *rland* is
-    equivalent to the command line argument to SBBXotoBX.f.
-    *ignore_land* is a flag that when True means cells with both ocean
-    and land data will ignore their land data.
-    Returns an iterator of box data.
+    (land, ocean) subbox series pairs. Returns an iterator of box data.
     """
     
     # First item from iterator is normally a pair of metadataobjects,
@@ -66,19 +62,8 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
                 yield land_box, ocean_box
         data = blank_ocean_data(data)
 
-    # Danger! Suspiciously similar to step3.py (because it's pasted):
-
     # number of subboxes within each box
     nsubbox = 100
-
-    # Much of the Fortran code assumes that various "parameters" have
-    # particular fixed values (probably accidentally).  I don't trust the
-    # Python code to avoid similar assumptions.  So assert the
-    # "parameter" values here.  Just in case anyone tries changing them.
-    # Note to people reading comment becuse the assert fired:  Please
-    # don't assume that the code will "just work" when you change one of
-    # the parameter values.  It's supposed to, but it might not.
-    assert nsubbox == 100
 
     # TODO: Formalise use of only monthlies, see step 3.
     assert land_meta.mavg == 6
@@ -90,11 +75,6 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
     ocean_offset = 12*(ocean_meta.yrbeg-combined_year_beg)
     combined_n_months = max(land_meta.monm + land_offset,
                             land_meta.monm + ocean_offset)
-
-    # Indices into the combined arrays for the base period (which is a
-    # parameter).
-    nfb = base[0] - combined_year_beg
-    nlb = base[1] - combined_year_beg
 
     info = [land_meta.mo1, land_meta.kq, land_meta.mavg, land_meta.monm,
             land_meta.monm4, combined_year_beg, land_meta.missing_flag,
@@ -122,7 +102,7 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
             wgtc[i+nsubbox] = o.good_count
             # :ocean:weight:a: Assign a weight to the ocean cell.
             # A similar calculation appears elsewhere.
-            if ignore_land or wgtc[i+nsubbox] < parameters.subbox_min_valid or landsub[i].d < rland:
+            if wgtc[i+nsubbox] < parameters.subbox_min_valid or landsub[i].d < parameters.subbox_land_range:
                 wocn = 0
             else:
                 wocn = 1
@@ -154,7 +134,7 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
             ncr = nc-nsubbox
         # :ocean:weight:b: Assign weight to ocean cell, see similar
         # calculation, above at :ocean:weight:a.
-        if ignore_land or landsub[ncr].d < rland or (nc == ncr and wgtc[nc+nsubbox] < parameters.subbox_min_valid):
+        if landsub[ncr].d < parameters.subbox_land_range or (nc == ncr and wgtc[nc+nsubbox] < parameters.subbox_min_valid):
             wocn = 0
         else:
             wocn = 1
@@ -186,7 +166,7 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
             ncr = nc
             if nc >= nsubbox:
                 ncr = nc - nsubbox
-            if ignore_land or landsub[ncr].d < rland or (nc == ncr and wgtc[nc + nsubbox] < parameters.subbox_min_valid):
+            if landsub[ncr].d < parameters.subbox_land_range or (nc == ncr and wgtc[nc + nsubbox] < parameters.subbox_min_valid):
                 wocn = 0
             else:
                 wocn = 1
@@ -195,8 +175,10 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
                 wnc = 1 - wocn
             wt1 = wnc
             nsm = combine(avgr, bias, wtr, avg[nc], 0, combined_n_months/12, wt1, wtm, nc)
-        if nfb > 0:
-            bias = tavg(avgr, NYRSIN, nfb, nlb, True, "Box %d" % box_number)
+        bias = tavg(avgr, NYRSIN,
+                    parameters.subbox_reference_first_year - combined_year_beg,
+                    parameters.subbox_reference_last_year - combined_year_beg + 1,
+                    True, "Box %d" % box_number)
         ngood = 0
         m = 0
         for iy in range(combined_n_months/12):
@@ -213,7 +195,7 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
 # :todo: This was nabbed from code/step3.py.  Put it in one place and
 # make it common.
 #
-def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, id, NOVRLP=20, XBAD=9999):
+def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, id, XBAD=9999):
     """Run the GISTEMP combining algorithm.  This combines the data
     in the *dnew* array into the *avg* array (also updating the *bias*
     array).
@@ -227,11 +209,11 @@ def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, id, NOVRLP=20, XBAD=9999):
     
     Each month of the year is considered separately.  For the set of
     times where both *avg* and *dnew* have data the mean difference (a
-    bias) is computed.  If there are fewer than *NOVRLP* years in
-    common the data (for that month of the year) are not combined.
-    The bias is subtracted from the *dnew* record and it is point-wise
-    combined into *avg* according to the weight *wt1* and the exist
-    weight for *avg*.
+    bias) is computed.  If there are fewer than
+    *parameters.box_min_overlap* years in common the data (for that
+    month of the year) are not combined.  The bias is subtracted from
+    the *dnew* record and it is point-wise combined into *avg*
+    according to the weight *wt1* and the exist weight for *avg*.
 
     *id* is an identifier used only when diagnostics are issued
     (when combining stations it is expected to be the station ID; when
@@ -278,7 +260,7 @@ def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, id, NOVRLP=20, XBAD=9999):
             ncom += 1
             sum += avg[kn]
             sumn += dnew[kn]
-        if ncom < NOVRLP:
+        if ncom < parameters.box_min_overlap:
             continue
 
         biask = float(sum-sumn)/ncom
@@ -382,7 +364,6 @@ def zonav(boxed_data):
     # Number of special zones.
     NZS = 3
     # Number of required common data in order to combine.
-    NOVRLP = 20
 
     (info, titlei) = boxed_data.next()
     kq = info[1]
@@ -398,12 +379,10 @@ def zonav(boxed_data):
     # Index of first month to be output
     mfout = (iyrbeg - info[5])*12
 
-    # Initial and last years of the reference period
-    IYBASE = 1951
-    LYBASE = 1980
     # *reference* is a pair of (base,limit) that specifies the reference
-    # period (base period).  In the Fortran NFB and NFL are used.  Line 110
-    reference = (IYBASE-info[5], LYBASE-info[5]+1)
+    # period (base period).
+    reference = (parameters.box_reference_first_year-iyrbeg,
+                 parameters.box_reference_last_year-iyrbeg+1)
     # Typically 9999
     XBAD = info[6]
     last = info[6]
@@ -496,14 +475,7 @@ def zonav(boxed_data):
                 break
             combine(avgg, bias, wtg, avg[jb], 0,nyrsin, wt[jb], wtm, "Zone %d" % (JBM+jz))
         else:
-            # Set BIAS=time average over the base period if IYBASE > 0
-            if reference[0] > 0:
-                bias = tavg(avgg, nyrsin, reference[0], reference[1], True, "Zone %d" % (JBM+jz))
-            else:
-                # Not sure what the Fortran code zonav.f does when
-                # NFB <= 0, so assert here.
-                bias = None
-                assert 0
+            bias = tavg(avgg, nyrsin, reference[0], reference[1], True, "Zone %d" % (JBM+jz))
             m = 0
             for iy in range(nyrsin):
                 for k in range(12):
@@ -669,7 +641,7 @@ def step5(data):
         `code.giss_data.SubboxSetProtocol`.
 
     """
-    boxed = SBBXtoBX(data, rland=100)
+    boxed = SBBXtoBX(data)
     boxed = giss_io.step5_bx_output(boxed)
     zoned_averages = zonav(boxed)
     return annzon(zoned_averages)

@@ -135,3 +135,40 @@ subbox_min_valid = 240
 record, either land or ocean, which has fewer than this number of
 valid data."""
 
+subbox_land_range = 100
+"""If a subbox has both land data and ocean data, but the distance
+from the subbox centre to the nearest station used in its record is
+less than this, the land data is used in preference to the ocean data
+when calculating the box series. Note: the distance used is actually a
+great-circle chord length."""
+
+subbox_reference_first_year = 1961
+"""When combining subbox records into box records, temperature series
+are turned into anomaly series by subtracting monthly means computed
+over a reference period.  This is the first year of that reference
+period."""
+
+subbox_reference_last_year = 1990
+"""When combining subbox records into box records, temperature series
+are turned into anomaly series by subtracting monthly means computed
+over a reference period.  This is the last year of that reference
+period."""
+
+box_min_overlap = 20
+"""When combining subbox records to make box records, do not combine a
+calendar month from a candidate subbox record if it has fewer than
+this number of years of overlap with the same calendar month in the
+combined box record.  Also used when combining boxes into zones."""
+
+box_reference_first_year = 1951
+"""When combining box records into zone records, temperature series
+are turned into anomaly series by subtracting monthly means computed
+over a reference period.  This is the first year of that reference
+period."""
+
+box_reference_last_year = 1980
+"""When combining box records into zone records, temperature series
+are turned into anomaly series by subtracting monthly means computed
+over a reference period.  This is the last year of that reference
+period."""
+

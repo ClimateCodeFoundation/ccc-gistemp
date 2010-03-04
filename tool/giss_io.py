@@ -10,6 +10,7 @@ import itertools
 import os
 import re
 import struct
+import glob
 
 import math
 
@@ -104,7 +105,6 @@ def open_or_uncompress(filename):
         except IOError:
             pass
         raise exception[0], exception[1], exception[2]
-
 
 class SubboxWriter(object):
     """Produces a GISTEMP SBBX (subbox) file; typically the output of
@@ -616,7 +616,7 @@ def ushcn_input_file():
     files =  ["input/9641C_201002_F52.avg",
               "input/9641C_200907_F52.avg"]
     for f in files:
-        if os.path.exists(f):
+        if os.path.exists(f) or os.path.exists(f+'.gz'):
             return f
     raise ValueError, "no USHCN data file in input directory; run tool/preflight.py."
 
@@ -687,14 +687,105 @@ def step3_output(data):
     finally:
         out.close()
 
+def make_3d_array(a, b, c):
+    """Create an array with three dimensions.
+
+    Actually a list-of-lists-of-lists, but the result can be treated as an
+    array with dimensions ``[a][b][c]``.
+
+    """
+    x = [0.0] * c
+    arr = []
+    for i in range(a):
+        arr.append([list(x) for j in range(b)])
+
+    return arr
+
+def step4_find_monthlies(latest_year, latest_month):
+    dates = {}
+    filename_re = re.compile('^oiv2mon\.([0-9][0-9][0-9][0-9])([0-9][0-9])(\.gz)?$')
+    for f in os.listdir('input'):
+        m = filename_re.match(f)
+        if m:
+            year = int(m.group(1))
+            month = int(m.group(2))
+            if (year, month) > (latest_year, latest_month):
+                if m.group(3):
+                    f = f[:-3]
+                dates[(year, month)] = 'input/'+f
+    l = dates.items()
+    l.sort()
+    return l
+
+def step4_load_sst_monthlies(latest_year, latest_month):
+    files = step4_find_monthlies(latest_year, latest_month)
+    if not files:
+        print "No more recent sea-surface data files.\n"
+        return None
+
+    first_year = files[0][0][0]
+    last_year = files[-1][0][0]
+    n_years = last_year - first_year + 1
+
+    # Read in the SST data for recent years
+    sst = make_3d_array(360, 180, 12 * n_years)
+
+    dates = []
+    for (date, file) in files:
+        dates.append(date)
+        (year, month) = date
+        f = open_or_uncompress(file)
+        f = fort.File(f, bos = ">")
+        f.readline() # discard first record
+        data = f.readline()
+        f.close()
+        month = 12 * (year - first_year) + month - 1
+        p = 0
+        for lat in range(180):
+            for long in range(360):
+                v, = struct.unpack(">f", data[p:p+4])
+                p += 4
+                sst[long][lat][month] = v
+
+    return sst, dates
+
+def step4_load_clim():
+    f = open_or_uncompress("input/oisstv2_mod4.clim")
+    f = fort.File(f, bos='>')
+    data = f.readline()
+    f.close()
+
+    clim_title = data[:80]
+    clim = make_3d_array(360, 180, 12)
+    p = 0
+    for month in range(12):
+        for lat in range(180):
+            for long in range(360):
+                v, = struct.unpack(">f", data[p+80:p+84])
+                p += 4
+                clim[long][lat][month] = v
+    return clim
+
 def step4_dummy_input():
     while True:
         yield 'Step 4 dummy value'
+
+# This is used to extract the end month/year from the title of the SBBX file.
+rTitle = re.compile(r"Monthly Sea Surface Temperature anom \(C\)"
+        " Had: 1880-11/1981, oi2: 12/1981- *(?P<month>\d+)/(?P<year>\d+)")
 
 def step4_input(land):
     if land is None:
         land = step4_dummy_input()
     ocean = SubboxReader(open('input/SBBX.HadR2', 'rb'))
+    m = rTitle.match(ocean.meta.title)
+    if m is None:
+        sys.stderr.write("The title in SBBX.HadR2 does not look right\n")
+        sys.stderr.write("Unable to determine end month/year from:\n")
+        sys.stderr.write("  %r\n" % ocean.meta.title)
+        sys.exit(1)
+    ocean.end_month = int(m.group(1))
+    ocean.end_year = int(m.group(2))
     return (land, ocean)
 
 def step4_output(data):

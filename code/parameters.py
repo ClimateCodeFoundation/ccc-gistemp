@@ -129,3 +129,9 @@ the last year of that reference period."""
 sea_surface_cutoff_temp = -1.77
 """When incorporating monthly sea-surface datasets, treat any
 temperature colder than this as missing data."""
+
+subbox_min_valid = 240
+"""When combining the sub-boxes into boxes, do not use any sub-box
+record, either land or ocean, which has fewer than this number of
+valid data."""
+

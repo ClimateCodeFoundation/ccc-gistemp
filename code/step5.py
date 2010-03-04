@@ -18,6 +18,7 @@ are computed from monthly anomalies.
 # Clear Climate Code
 import eqarea
 import giss_data
+import parameters
 from tool import giss_io
 
 # http://www.python.org/doc/2.3.5/lib/itertools-functions.html
@@ -67,8 +68,6 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
 
     # Danger! Suspiciously similar to step3.py (because it's pasted):
 
-    # number of boxes
-    nbox = 80
     # number of subboxes within each box
     nsubbox = 100
 
@@ -79,23 +78,16 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
     # Note to people reading comment becuse the assert fired:  Please
     # don't assume that the code will "just work" when you change one of
     # the parameter values.  It's supposed to, but it might not.
-    assert nbox == 80
-    # NCM in the Fortran
     assert nsubbox == 100
-
-    novrlp=20
 
     # TODO: Formalise use of only monthlies, see step 3.
     assert land_meta.mavg == 6
-    km = 12
-    NYRSIN = land_meta.monm/km
-    # IYRBGC in the Fortran code
+    NYRSIN = land_meta.monm/12
     combined_year_beg = min(land_meta.yrbeg, ocean_meta.yrbeg)
     # Index into the combined array of the first year of the land data.
     land_offset = 12*(land_meta.yrbeg-combined_year_beg)
     # As I1TIN but for ocean data.
     ocean_offset = 12*(ocean_meta.yrbeg-combined_year_beg)
-    # combined_n_months is MONMC in the Fortran.
     combined_n_months = max(land_meta.monm + land_offset,
                             land_meta.monm + ocean_offset)
 
@@ -114,12 +106,12 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
     # TODO: Use giss_data
     XBAD = land_meta.missing_flag
 
-    for nr,box in enumerate(eqarea.grid()):
+    for box_number,box in enumerate(eqarea.grid()):
         # Averages for the land and ocean (one series per subbox)...
         avg = [[XBAD]*combined_n_months for _ in range(2*nsubbox)]
         wgtc = [0] * (nsubbox*2)
         # Eat the records from land and ocean 100 (nsubbox) at a time.
-        # In other words, all 100 subboxes for the box (region).
+        # In other words, all 100 subboxes for the box.
         landsub,oceansub = zip(*itertools.islice(data, nsubbox))
         # :todo: combine below zip with above zip?
         for i,l,o in zip(range(nsubbox),landsub,oceansub):
@@ -130,7 +122,7 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
             wgtc[i+nsubbox] = o.good_count
             # :ocean:weight:a: Assign a weight to the ocean cell.
             # A similar calculation appears elsewhere.
-            if ignore_land or wgtc[i+nsubbox] < 12*novrlp or landsub[i].d < rland:
+            if ignore_land or wgtc[i+nsubbox] < parameters.subbox_min_valid or landsub[i].d < rland:
                 wocn = 0
             else:
                 wocn = 1
@@ -162,7 +154,7 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
             ncr = nc-nsubbox
         # :ocean:weight:b: Assign weight to ocean cell, see similar
         # calculation, above at :ocean:weight:a.
-        if ignore_land or landsub[ncr].d < rland or (nc == ncr and wgtc[nc+nsubbox] < 12*novrlp):
+        if ignore_land or landsub[ncr].d < rland or (nc == ncr and wgtc[nc+nsubbox] < parameters.subbox_min_valid):
             wocn = 0
         else:
             wocn = 1
@@ -171,15 +163,15 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
         if nc < nsubbox:
             wnc = 1 - wocn
 
-        wtm = [wnc]*km
-        bias = [0]*km
+        wtm = [wnc]*12
+        bias = [0]*12
         
-        # Weights for the region's record.
+        # Weights for the box's record.
         wtr = [0]*combined_n_months
         for m,a in enumerate(avg[nc]):
             if a < XBAD:
                 wtr[m] = wnc
-        # Create the region (box) record by copying the subbox record
+        # Create the box record by copying the subbox record
         # into AVGR
         avgr = avg[nc][:]
 
@@ -189,12 +181,12 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
             w = wgtc[n]
             # :todo: Can it be correct to use [n]?  It's what the
             # Fortran does.
-            if wgtc[n] < 12*novrlp:
+            if wgtc[n] < parameters.subbox_min_valid:
                 continue
             ncr = nc
             if nc >= nsubbox:
                 ncr = nc - nsubbox
-            if ignore_land or landsub[ncr].d < rland or (nc == ncr and wgtc[nc + nsubbox] < 12*novrlp):
+            if ignore_land or landsub[ncr].d < rland or (nc == ncr and wgtc[nc + nsubbox] < parameters.subbox_min_valid):
                 wocn = 0
             else:
                 wocn = 1
@@ -202,15 +194,14 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
             if nc < nsubbox:
                 wnc = 1 - wocn
             wt1 = wnc
-            nsm = combine(avgr, bias, wtr, avg[nc], 0, combined_n_months/km,
-              wt1, wtm, km, nc)
+            nsm = combine(avgr, bias, wtr, avg[nc], 0, combined_n_months/12, wt1, wtm, nc)
         if nfb > 0:
-            bias = tavg(avgr, km, NYRSIN, nfb, nlb, True, "Region %d" % nr)
+            bias = tavg(avgr, NYRSIN, nfb, nlb, True, "Box %d" % box_number)
         ngood = 0
         m = 0
-        for iy in range(combined_n_months/km):
-            for k in range(km):
-                m = iy*km + k
+        for iy in range(combined_n_months/12):
+            for k in range(12):
+                m = iy*12 + k
                 if avgr[m] == XBAD:
                     continue
                 avgr[m] -= bias[k]
@@ -222,41 +213,30 @@ def SBBXtoBX(data, rland, base=(1961,1991), ignore_land=False):
 # :todo: This was nabbed from code/step3.py.  Put it in one place and
 # make it common.
 #
-def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, km, id, NOVRLP=20, XBAD=9999):
+def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, id, NOVRLP=20, XBAD=9999):
     """Run the GISTEMP combining algorithm.  This combines the data
     in the *dnew* array into the *avg* array (also updating the *bias*
     array).
 
-    Each of the arguments *avg*, *wt*, *dnew* is a linear array that is
-    divided into "years" by considering each contiguous segment of
-    *km* elements a year.  Only data for years in range(nf1, nl1) are
+    Each of the arguments *avg*, *wt*, *dnew* is a linear array that
+    is divided into "years" by considering each contiguous segment of
+    12 elements a year.  Only data for years in range(nf1, nl1) are
     considered and combined.  Note that range(nf1, nl1) includes *nf1*
     but excludes *nl1* (and that this differs from the Fortran
     convention).
     
-    Each month (or other subdivision, such as season, according to
-    *km*) of the year is considered separately.  For the set of times
-    where both *avg* and *dnew* have data the mean difference (a bias)
-    is computed.  If there are fewer than *NOVRLP* years in common the
-    data (for that month of the year) are not combined.  The bias is
-    subtracted from the *dnew* record and it is point-wise combined
-    into *avg* according to the weight *wt1* and the exist
+    Each month of the year is considered separately.  For the set of
+    times where both *avg* and *dnew* have data the mean difference (a
+    bias) is computed.  If there are fewer than *NOVRLP* years in
+    common the data (for that month of the year) are not combined.
+    The bias is subtracted from the *dnew* record and it is point-wise
+    combined into *avg* according to the weight *wt1* and the exist
     weight for *avg*.
 
     *id* is an identifier used only when diagnostics are issued
     (when combining stations it is expected to be the station ID; when
     combining subboxes it is expected to be the subbox number (0 to 99)).
     """
-
-    # In the absence of type checks, check that the arrays have an
-    # accessible element.
-    avg[0]
-    bias[km-1]
-    wt[0]
-    dnew[0]
-    wtm[km-1]
-    assert nf1 < nl1
-    assert wt1 >= 0
 
     # This is somewhat experimental.  *wt1* the weight of the incoming
     # data, *dnew*, can either be a scalar (applies to the entire *dnew*
@@ -282,20 +262,15 @@ def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, km, id, NOVRLP=20, XBAD=999
                 return wt1_constant
         wt1 = constant_list()
 
-    # The Fortran code handles the arrays by just assuming them to
-    # be 2D arrays of shape (*,KM).  Sadly Python array handling
-    # just isn't that convenient, so look out for repeated uses of
-    # "[k+km*n]" instead.
-
     nsm = 0
-    missed = km
-    missing = [True]*km
-    for k in range(km):
+    missed = 12
+    missing = [True]*12
+    for k in range(12):
         sumn = 0    # Sum of data in dnew
         sum = 0     # Sum of data in avg
         ncom = 0    # Number of years where both dnew and avg are valid
         for n in range(nf1, nl1):
-            kn = k+km*n     # CSE for array index
+            kn = k+12*n     # CSE for array index
             # Could specify that arguments are array.array and use
             # array.count(BAD) and sum, instead of this loop.
             if avg[kn] >= XBAD or dnew[kn] >= XBAD:
@@ -311,7 +286,7 @@ def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, km, id, NOVRLP=20, XBAD=999
 
         # Update period of valid data, averages and weights
         for n in range(nf1, nl1):
-            kn = k+km*n     # CSE for array index
+            kn = k+12*n     # CSE for array index
             if dnew[kn] >= XBAD:
                 continue
             wtnew = wt[kn] + wt1[kn]
@@ -326,34 +301,27 @@ def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, km, id, NOVRLP=20, XBAD=999
 
 
 # :todo: make common with step3.py
-def tavg(data, km, nyrs, base, limit, nr, id, deflt=0.0, XBAD=9999):
-    """:meth:`tavg` computes the time averages (separately for each calendar
-    month if *km*=12) over the base period (year *base* to *limit*) and
+def tavg(data, nyrs, base, limit, nr, id, deflt=0.0, XBAD=9999):
+    """:meth:`tavg` computes the time averages for each calendar
+    month over the base period (year *base* to *limit*) and
     saves them in *bias* (a fresh array that is returned).
     
     In case of no data, the average is set to
     *deflt* if nr=0 or computed over the whole period if nr>0.
 
-    Similarly to :meth:`combine` *data* is treated as a linear array divided
-    into years by considering contiguous chunks of *km* elements.
-
     *id* is an arbitrary printable value used for identification in
     diagnostic output (for example, the cell number).
-
-    Note: the Python convention for *base* and *limit* is used, the base
-    period consists of the years starting at *base* and running up to,
-    but including, the year *limit*.
     """
 
-    bias = [0.0]*km
-    missed = km
-    len = km*[0]    # Warning: shadows builtin "len"
-    for k in range(km):
+    bias = [0.0]*12
+    missed = 12
+    len = 12*[0]    # Warning: shadows builtin "len"
+    for k in range(12):
         bias[k] = deflt
         sum = 0.0
         m = 0
         for n in range(base, limit):
-            kn = k+km*n     # CSE for array index
+            kn = k+12*n     # CSE for array index
             if data[kn] >= XBAD:
                 continue
             m += 1
@@ -367,14 +335,14 @@ def tavg(data, km, nyrs, base, limit, nr, id, deflt=0.0, XBAD=9999):
         return bias
     # Base period is data free (for at least one month); use bias
     # with respect to whole series.
-    for k in range(km):
+    for k in range(12):
         if len[k] > 0:
             continue
         print "No data in base period - MONTH,NR,ID", k, nr, id
         sum = 0.0
         m = 0
         for n in range(nyrs):
-            kn = k+km*n     # CSE for array index
+            kn = k+12*n     # CSE for array index
             if data[kn] >= XBAD:
                 continue
             m += 1
@@ -418,22 +386,17 @@ def zonav(boxed_data):
 
     (info, titlei) = boxed_data.next()
     kq = info[1]
-    km = 1
-    if info[2] == 6:
-        km = 12
-    if info[2] == 7:
-        km = 4
     ml = info[3]
-    nyrsin = info[3]/km
+    nyrsin = info[3]/12
     # The rest of the code is structured so that MONM and IYRBEG could
     # be different from these values (for example, to make the output
     # file smaller, I think).
     iyrbeg = info[5]
     monm = ml
     # One more than the last year with data
-    yearlimit = monm/km + iyrbeg
+    yearlimit = monm/12 + iyrbeg
     # Index of first month to be output
-    mfout = (iyrbeg - info[5])*km
+    mfout = (iyrbeg - info[5])*12
 
     # Initial and last years of the reference period
     IYBASE = 1951
@@ -487,13 +450,13 @@ def zonav(boxed_data):
             # :todo: could the id parameter (the last one) be something
             # more useful, like "Zone 4"? Is it only used for
             # diagnostics?
-            combine(avg[jb], bias, wt[jb], ar[nr], 0,nyrsin, wtr[nr], wtm, km, jb)
-        bias = tavg(avg[jb], km, nyrsin, reference[0], reference[1], True, "Belt %d" % jb)
+            combine(avg[jb], bias, wt[jb], ar[nr], 0,nyrsin, wtr[nr], wtm, jb)
+        bias = tavg(avg[jb], nyrsin, reference[0], reference[1], True, "Belt %d" % jb)
         lenz[jb] = 0
         m = 0
         for iy in range(nyrsin):
-            for k in range(km):
-                m = iy*km + k
+            for k in range(12):
+                m = iy*12 + k
                 if avg[jb][m] == XBAD:
                     continue
                 avg[jb][m] -= bias[k]
@@ -531,13 +494,11 @@ def zonav(boxed_data):
                 # Not convinced this behavious is either correct or
                 # worth preserving.
                 break
-            combine(avgg, bias, wtg, avg[jb], 0,nyrsin,
-              wt[jb], wtm, km, "Zone %d" % (JBM+jz))
+            combine(avgg, bias, wtg, avg[jb], 0,nyrsin, wt[jb], wtm, "Zone %d" % (JBM+jz))
         else:
             # Set BIAS=time average over the base period if IYBASE > 0
             if reference[0] > 0:
-                bias = tavg(avgg, km, nyrsin, reference[0], reference[1],
-                  True, "Zone %d" % (JBM+jz))
+                bias = tavg(avgg, nyrsin, reference[0], reference[1], True, "Zone %d" % (JBM+jz))
             else:
                 # Not sure what the Fortran code zonav.f does when
                 # NFB <= 0, so assert here.
@@ -545,7 +506,7 @@ def zonav(boxed_data):
                 assert 0
             m = 0
             for iy in range(nyrsin):
-                for k in range(km):
+                for k in range(12):
                     if avgg[m] != XBAD:
                         avgg[m] -= bias[k]
                     m += 1
@@ -602,15 +563,9 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
 
     (info, title) = zoned_averages.next()
     kq = info[1]
-    # km: the number of time frames per year.
-    km = 1
-    if info[2] == 6:
-        km = 12
-    if info[2] == 7:
-        km = 4
     iyrbeg = info[5]
     monm = info[3]
-    iyrs = monm // km
+    iyrs = monm // 12
     # Allocate the 2- and 3- dimensional arrays.
     # The *data* and *wt* arrays are properly 3 dimensional
     # ([zone][year][month]), but the inner frames are only allocated
@@ -621,18 +576,17 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
     annw = [ [None]*iyrs for _ in range(jzm)]
     # Here we use the Python convention, *iyrend* is one past the highest
     # year used.
-    iyrend = info[3] // km + iyrbeg
+    iyrend = info[3] // 12 + iyrbeg
     XBAD = float(info[6])
 
     # Collect JZM zonal means.
     for jz in range(jzm):
         (tdata, twt) = zoned_averages.next()
-        # Regroup the *data* and *wt* series so that they come in blocks of
-        # 12 (*km*, really).
+        # Regroup the *data* and *wt* series so that they come in blocks of 12.
         # Uses essentially the same trick as the `grouper()` recipe in
         # http://docs.python.org/library/itertools.html#recipes
-        data[jz] = zip(*[iter(tdata)]*km)
-        wt[jz] = zip(*[iter(twt)]*km)
+        data[jz] = zip(*[iter(tdata)]*12)
+        wt[jz] = zip(*[iter(twt)]*12)
 
     # Find (compute) the annual means.
     for jz in range(jzm):
@@ -642,7 +596,7 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
             anniy = 0.
             annwiy = 0.
             mon = 0
-            for m in range(km):
+            for m in range(12):
                 if data[jz][iy][m] == XBAD:
                     continue
                 mon += 1
@@ -650,7 +604,6 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
                 annwiy += wt[jz][iy][m]
             if mon >= monmin:
                 ann[jz][iy] = float(anniy)/mon
-            # :todo: Surely KM is intended here, not 12?
             annw[jz][iy] = annwiy/12.
 
     # Alternate global mean.

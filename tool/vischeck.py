@@ -73,24 +73,24 @@ def asgooglechartURL(seq, offset):
     *offset* corresponds to the -o option
     """
 
+    import itertools
+
     prefix = 'http://chart.apis.google.com/chart'
 
-    ds = []
-    oy = None
-    for i in seq:
-        l = list(i)
-        d = chartsingle(l)
-        ds.append(d)
-        # Let y be the list of years for the chart legend.  We include
-        # the first year of the series, the last year, and every decade
-        # beginning.
-        y = map(lambda x:x[0], l)
-        for i in range(1,len(y)-1):
-            if y[i]%10:
-                y[i]=''
-        if oy is not None and oy != y:
-            raise Error("Year ranges in data series are different.")
-        oy = y
+    # Read all data because we need to compute min and max years
+    data = [list(s) for s in seq]
+
+    yearmin = min(map(lambda p:p[0], itertools.chain(*data)))
+    yearmax = max(map(lambda p:p[0], itertools.chain(*data)))
+    data = [pad(s, yearmin, yearmax) for s in data]
+    # Let y be the list of years for the chart legend.  We include
+    # the first year of the series, the last year, and every decade
+    # beginning.
+    y = map(lambda x:x[0], data[0])
+    for i in range(1,len(y)-1):
+        if y[i]%10:
+            y[i]=''
+    ds = [chartsingle(l) for l in data]
 
     xaxis = '|' + '|'.join(map(str, y))
     vaxis = '||-0.5|+0.0|+0.5|'
@@ -109,6 +109,18 @@ def asgooglechartURL(seq, offset):
     colours = ['ff0000','000000']
     chco = 'chco=' + ','.join(colours)
     return prefix + '?' + '&'.join(['cht=lc',chds,chd,chxt,chxl,chco,chs])
+
+def pad(data, yearmin, yearmax):
+    """pad so that data series starts at yearmin and ends at yearmax."""
+
+    t0 = data[0][0]
+    t1 = data[-1][0]
+
+    assert yearmin <= t0 <= t1 <= yearmax
+    nonelots = [None]*(yearmax-yearmin+1)
+    return (zip(range(yearmin, t0), nonelots) +
+      data +
+      zip(range(t1+1, yearmax+1), nonelots))
 
 def chartsingle(l):
     """Take a list and return a URL fragment for its Google

@@ -17,7 +17,6 @@ are computed from monthly anomalies.
 
 # Clear Climate Code
 import eqarea
-import fort
 import giss_data
 from tool import giss_io
 

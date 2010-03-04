@@ -666,7 +666,7 @@ def step2_input():
     return StationTsReader("work/Ts.txt")
 
 def step2_output(data):
-    out = V2MeanWriter(open("work/v2.step2.out", 'w'))
+    out = V2MeanWriter("work/v2.step2.out")
     try:
         for thing in data:
             out.write(thing)

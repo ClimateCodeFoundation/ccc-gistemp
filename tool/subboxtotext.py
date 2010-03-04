@@ -66,10 +66,12 @@
 # d (single precision float) is an approximation to the distance from the
 #   box centre to the nearest station used.
 
-sys.path.append(os.path.join(os.getcwd(),'code'))
-import fort
 import struct
 import sys
+import os
+
+sys.path.append(os.path.join(os.getcwd(),'code'))
+import fort
 
 def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
   bos='>', trimmed='fromfile'):

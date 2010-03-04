@@ -9,16 +9,13 @@ __docformat__ = "restructuredtext"
 
 
 import sys
-from tool import giss_io
 import itertools
 
 import giss_data
+import parameters
+from tool import giss_io
 
 
-# Constants (from original fortran parameters)
-IM = 360         # degrees of longitude
-JM = 180         # degrees of latitude
-IOFF = IM // 2   # half longitude
 IYRBEG = 1880    # first year
 
 def merge_ocean(ocean, sst, dates):
@@ -40,27 +37,27 @@ def merge_ocean(ocean, sst, dates):
     meta.title = (meta.title[:40] + " Had: 1880-11/1981, oi2: 12/1981-%2d/%04d" % (last_new_month, last_new_year))
     yield meta
 
-    # Interpolate to Sergej's subbox grid
+    # Average into Sergej's subbox grid
     for box in reader:
         box.pad_with_missing(meta.monm)
 
-        js = (18001 + (box.lat_S + 9000) * JM)/18000
-        jn = (17999 + (box.lat_N + 9000) * JM)/18000
-        iw = (36001 + (box.lon_W + 18000) * IM)/36000 + IOFF
-        ie = (35999 + (box.lon_E + 18000) * IM)/36000 + IOFF
-        if ie > IM:
-            iw = iw - IM
-            ie = ie - IM
-        assert 1 <= iw <= IM and 1 <= ie <= IM 
+        # identify all the degree boxes which are included in this subbox
+        js = int(box.lat_S + 90.01)
+        jn = int(box.lat_N + 89.99)
+        iw = int(box.lon_W + 360.01)
+        ie = int(box.lon_E + 359.99)
+        if ie >= 360:
+            iw = iw - 360
+            ie = ie - 360
 
         for y, m in dates:
             mm = (y - first_new_year) * 12 + m
             month = (m - 1) % 12
             count = 0
             sum = 0.0
-            for j in range(js -1, jn):
-                for i in range(iw - 1, ie):
-                    if sst[i][j][mm-1] < -1.77 or clim[i][j][month] == giss_data.XMISSING:
+            for j in range(js, jn+1):
+                for i in range(iw, ie+1):
+                    if sst[i][j][mm-1] < parameters.sea_surface_cutoff_temp or clim[i][j][month] == giss_data.XMISSING:
                         continue
                     count += 1
                     sum += sst[i][j][mm-1] - clim[i][j][month]

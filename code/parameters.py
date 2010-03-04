@@ -126,3 +126,6 @@ gridding_reference_last_year = 1980
 subtracting monthly means computed over a reference period.  This is
 the last year of that reference period."""
 
+sea_surface_cutoff_temp = -1.77
+"""When incorporating monthly sea-surface datasets, treat any
+temperature colder than this as missing data."""

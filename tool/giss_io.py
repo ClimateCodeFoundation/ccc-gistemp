@@ -140,13 +140,19 @@ class SubboxWriter(object):
                 # Write as trimmed record.
                 fmt = "iiiiiiif1f"
                 rec = struct.pack(self.bos + fmt, mo1,
-                    b.lat_S, b.lat_N, b.lon_W, b.lon_E, b.stations,
-                        b.station_months, b.d, 9999.0)
+                                  int(round(b.lat_S * 100)),
+                                  int(round(b.lat_N * 100)),
+                                  int(round(b.lon_W * 100)),
+                                  int(round(b.lon_E * 100)),
+                                  b.stations, b.station_months, b.d, 9999.0)
             else:
                 fmt = "iiiiiiif%df" % b.n
                 rec = struct.pack(self.bos + fmt, mo1,
-                    b.lat_S, b.lat_N, b.lon_W, b.lon_E, b.stations,
-                        b.station_months, b.d, *b.series)
+                                  int(round(b.lat_S * 100)),
+                                  int(round(b.lat_N * 100)),
+                                  int(round(b.lon_W * 100)),
+                                  int(round(b.lon_E * 100)),
+                                  b.stations, b.station_months, b.d, *b.series)
         self.f.writeline(rec)
 
     def write(self, record):
@@ -297,7 +303,7 @@ class SubboxReader(object):
             (self.mo1, lat_S, lat_N, lon_W, lon_E, stations,
                     station_months, d) = fields[:8]
             subbox = code.giss_data.SubboxRecord(
-                    lat_S, lat_N, lon_W, lon_E,
+                    lat_S/100.0, lat_N/100.0, lon_W/100.0, lon_E/100.0,
                     stations, station_months, d, series)
             yield subbox
 

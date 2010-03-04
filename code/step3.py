@@ -274,8 +274,6 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
         # Used to generate the "subbox at" rows in the log.
         lastcentre = (None, None)
         for subbox in subboxes:
-            # Convert latitude longitude to integer 100ths for output.
-            latlon = map(lambda x:int(round(100*x)), subbox)
             # Select and weight stations
             centre = eqarea.centre(subbox)
             if centre[0] != lastcentre[0]:
@@ -292,8 +290,8 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
 
             if len(incircle_records) == 0:
                 box_obj = giss_data.SubboxRecord(
-                    lat_S=latlon[0], lat_N=latlon[1], lon_W=latlon[2],
-                    lon_E=latlon[3], stations=0, station_months=0,
+                    lat_S=subbox[0], lat_N=subbox[1], lon_W=subbox[2],
+                    lon_E=subbox[3], stations=0, station_months=0,
                     d=giss_data.XMISSING, series=series)
                 log.write('*')
                 log.flush()
@@ -340,8 +338,8 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                         series[m] -= bias[k]
                     m += 1
             box_obj = giss_data.SubboxRecord(n=max_months,
-                    lat_S=latlon[0], lat_N=latlon[1], lon_W=latlon[2],
-                    lon_E=latlon[3], stations=total_stations, station_months=total_good_months,
+                    lat_S=subbox[0], lat_N=subbox[1], lon_W=subbox[2],
+                    lon_E=subbox[3], stations=total_stations, station_months=total_good_months,
                     d=radius*(1-max_weight), series=series)
             yield box_obj
 

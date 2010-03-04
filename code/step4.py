@@ -65,7 +65,7 @@ def merge_ocean(ocean, sst, dates):
                     count += 1
                     sum += sst[i][j][mm-1] - clim[i][j][month]
 
-            index = (y - IYRBEG) * 12 + mm - 1
+            index = (y - IYRBEG) * 12 + m - 1
             box.set_value(index, giss_data.XMISSING)
             if count > 0:
                 box.set_value(index, sum / count)

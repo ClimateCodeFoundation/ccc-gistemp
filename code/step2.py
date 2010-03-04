@@ -99,8 +99,11 @@ def annual_anomaly(record):
 def is_rural(station):
     """Test whether the station described by *station* is rural.
     """
-    return station.US_brightness == '1' or (station.US_brightness == ' ' and
-            station.pop == 'R')
+    if parameters.use_global_brightness:
+        return station.global_brightness <= 10
+    else:
+        return station.US_brightness == '1' or (station.US_brightness == ' ' and
+                                                station.pop == 'R')
 
 class Struct(object):
     pass

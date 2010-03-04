@@ -200,8 +200,17 @@ class StationRecordWriter(object):
         else:
             r = self.buf_record
             s = r.station
+            if parameters.use_global_brightness:
+                if s.global_brightness > 35:
+                    b = '3'
+                elif s.global_brightness > 10:
+                    b = '2'
+                else:
+                    b = '1'
+            else:
+                b = s.US_brightness
             compound_name = "%s%c%c%c%3s" % (
-                      s.name, s.US_brightness, s.pop, s.GHCN_brightness,
+                      s.name, b, s.pop, s.GHCN_brightness,
                       s.uid[:3])
 
             fmt = "%di" % len(r.series)

@@ -93,31 +93,32 @@ class StationInventoryReader(object):
     format is the Fortran program:
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.read.inv.f
 
-    Here is a typical line, with a record diagram
+    Here are two typical lines, with a record diagram
 
     40371148001 ALMASIPPI,MA                    49.55  -98.20  274  287R   -9FLxxno-9x-9COOL FIELD/WOODSA1   0
+    42572530000 CHICAGO/O'HARE, ILLINOIS        42.00  -87.90  205  197U 6216FLxxno-9A 1COOL CROPS      C3 125
 
     0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345
-    id---------xname--------------------------xlat---xlon----x1---2----34----5-6-7-8-910grveg-----------GU
+    id---------xname--------------------------xlat---xlon----x1---2----34----5-6-7-8-910grveg-----------GU--11
 
-    id:    40371148001
-    name:  ALMASIPPI,MA
-    lat:   49.55
-    lon:   -98.20
-    1:     elevs: 274
-    2:     elevg: 287R
-    3:     pop: R
-    4:     ipop: -9
-    5:     topo: FL
-    6:     stveg: xx
-    7:     stloc: no
-    8:     iloc: -9
-    9:     airstn: x
-    10:    itowndis: -9
-    grveg: COOL FIELD/WOODS
-    G:     GHCN-brightness: A
-    U:     US-brightness:1
-
+       id                  40371148001          42572530000
+       name                ALMASIPPI,MA         CHICAGO/O'HARE, ILLINOIS
+       lat                 49.55                42.00
+       lon                 -98.20               -87.90
+    1  elevs               274                  205
+    2  elevg               287                  197
+    3  pop                 R                    U
+    4  ipop                -9                   6216
+    5  topo                FL                   FL
+    6  stveg               xx                   xx
+    7  stloc               no                   no
+    8  iloc                -9                   -9
+    9  airstn              x                    A
+    10 itowndis            -9                   1
+       grveg               COOL FIELD/WOODS     COOL CROPS
+    G  GHCN_brightness     A                    C
+    U  US_brightness       1                    3
+    11 global_brightness   0                    125
     """
     fields = (
         (0,   11,  'uid',              str),
@@ -137,7 +138,7 @@ class StationInventoryReader(object):
         (84,  100, 'grveg',            str),
         (100, 101, 'GHCN_brightness',  str),
         (101, 102, 'US_brightness',    str),
-        (102, 106, 'idontknow',        str),
+        (102, 106, 'global_brightness',int),
     )
 
     def __init__(self, path):
@@ -286,8 +287,8 @@ class Station(object):
         Unknown.
     :Ivar topo:
         Unknown.
-    :Ivar idontknow:
-        The last 3 digits in each line of v2.inv. Name and meaning unknown.
+    :Ivar global_brightness:
+        A global brightness index, range 0-186 (at least)
 
     """
     def __init__(self, name=None, lat=None, lon=None, uid=None,
@@ -295,7 +296,7 @@ class Station(object):
             elevation=None, pop=None, ipop=None, topo=None, stveg=None,
             stloc=None, iloc=None, airstn=None, itowndis=None,
             grveg=None, GHCN_brightness=None, US_brightness=None,
-            idontknow=None):
+            global_brightness=None):
         self.name = name
         self.lat = lat
         self.lon = lon
@@ -313,7 +314,7 @@ class Station(object):
         self.grveg = grveg
         self.GHCN_brightness = GHCN_brightness
         self.US_brightness = US_brightness
-        self.idontknow = idontknow
+        self.global_brightness = global_brightness
 
            
 # TODO: Needs some review. Among things to think about:

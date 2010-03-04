@@ -550,7 +550,8 @@ def good_two_part_fit(fit, iy1, iy2):
     - right gradient is abs less than urban_adjustment_steep_leg
     - difference between gradients is abs less than urban_adjustment_steep_leg
     - either gradients have same sign or
-             at least one gradient is abs less than urban_adjustment_reverse_gradient
+             at least one gradient is abs less than
+             urban_adjustment_reverse_gradient
     """
 
     (sl1, sl2, knee, sl) = fit
@@ -565,14 +566,6 @@ def good_two_part_fit(fit, iy1, iy2):
 
 
 def step2(record_source):
-    last_year = giss_data.get_ghcn_last_year()
-    MTOT = 12 * (last_year - giss_data.BASE_YEAR + 1)
-
-    yield giss_data.StationMetaData(
-        mo1=None, kq=1, mavg=6, monm=MTOT, monm4=MTOT + 15,
-        yrbeg=1880, missing_flag=9999, precipitation_flag=-9999,
-        mlast=None, title='GHCN V2 Temperatures (.1 C)')
-
     data = drop_short_records(record_source)
     adjusted = urban_adjustments(data)
     for record in adjusted:

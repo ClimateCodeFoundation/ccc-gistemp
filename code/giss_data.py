@@ -237,21 +237,11 @@ class StationMetaData(object):
     :Ivar title:
         A title for this set of station records.
     """
-    def __init__(self, mo1, kq, mavg, monm, monm4, yrbeg,
-            missing_flag, precipitation_flag, mlast, title,):
-        self.mo1 = mo1
-        self.kq = kq
-        self.mavg = mavg
-        self.monm = monm
-        self.monm4 = monm4
-        self.yrbeg = yrbeg
-        self.missing_flag = missing_flag
-        self.precipitation_flag = precipitation_flag
-        self.mlast = mlast
-        self.title = title
+    def __init__(self, **k):
+        self.__dict__ = k
 
     def __repr__(self):
-        return '<StationMetadata %r>' % self.__dict__
+        return 'StationMetadata(%r)' % self.__dict__
 
 
 class Station(object):
@@ -592,6 +582,9 @@ class StationRecord(MonthlyTemperatureRecord):
         self.uid = uid
         self.source = v2_sources().get(uid, "UNKNOWN")
         self.ann_anoms = []
+
+    def __str__(self):
+        return "StationRecord(uid=%r)" % self.uid
 
     @property
     def series(self):

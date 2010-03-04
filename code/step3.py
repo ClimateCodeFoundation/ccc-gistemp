@@ -242,6 +242,8 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
      is the combining radius in kilometres.
     """
 
+    station_records = list(station_records)
+
     log = sys.stdout
 
     # Critical radius as an angle of arc
@@ -346,21 +348,25 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
     print >>log
 
 
-def step3(record_source, radius=parameters.gridding_radius, year_begin=1880):
+def step3(records, radius=parameters.gridding_radius, year_begin=1880):
     """Step 3 of the GISS processing.
 
-    """
-    station_records = [record for record in record_source]
-    m, station_records = station_records[0], station_records[1:]
-    meta = giss_data.SubboxMetaData(m.mo1, m.kq, m.mavg, m.monm,
-            m.monm + 7, m.yrbeg, m.missing_flag, m.precipitation_flag,
-            m.title)
+    *records* should be a generator that yields each station.
 
-    # Output series cannot begin earlier than input series.
-    # TODO: The ``year_begin`` argument seems to have no effect,
-    #       other than what appears in the ``title`` below.
-    #       This might have been inroduced during Jan/Feb 2010.
-    year_begin = max(year_begin, meta.yrbeg)
+    """
+
+    # Most of the metadata here used to be synthesized in step2.py and
+    # copied from the first yielded record.  Now we synthesize here
+    # instead.
+    last_year = giss_data.get_ghcn_last_year()
+    year_begin = giss_data.BASE_YEAR
+    # Compute total number of months in a fixed length record.
+    monm = 12 * (last_year - year_begin + 1)
+    meta = giss_data.SubboxMetaData(mo1=None, kq=1, mavg=6, monm=monm,
+            monm4=monm + 7, yrbeg=year_begin, missing_flag=9999,
+            precipitation_flag=9999,
+            title='GHCN V2 Temperatures (.1 C)')
+
 
     units = '(C)'
     title = "%20.20s ANOM %-4s CR %4dKM %s-present" % (meta.title,
@@ -368,9 +374,7 @@ def step3(record_source, radius=parameters.gridding_radius, year_begin=1880):
     meta.mo1 = 1
     meta.title = title.ljust(80)
 
-    box_source = iter_subbox_grid(station_records,
-                                  meta.monm, meta.yrbeg,
-                                  radius)
+    box_source = iter_subbox_grid(records, monm, year_begin, radius)
 
     yield meta
     for box in box_source:

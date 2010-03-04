@@ -735,6 +735,7 @@ def step4_load_sst_monthlies(latest_year, latest_month):
         dates.append(date)
         (year, month) = date
         f = open_or_uncompress(file)
+        print "reading", file
         f = fort.File(f, bos = ">")
         f.readline() # discard first record
         data = f.readline()
@@ -772,7 +773,7 @@ def step4_dummy_input():
 
 # This is used to extract the end month/year from the title of the SBBX file.
 rTitle = re.compile(r"Monthly Sea Surface Temperature anom \(C\)"
-        " Had: 1880-11/1981, oi2: 12/1981- *(?P<month>\d+)/(?P<year>\d+)")
+        " Had: 1880-11/1981, oi2: 12/1981- *(\d+)/(\d+)")
 
 def step4_input(land):
     if land is None:
@@ -784,9 +785,10 @@ def step4_input(land):
         sys.stderr.write("Unable to determine end month/year from:\n")
         sys.stderr.write("  %r\n" % ocean.meta.title)
         sys.exit(1)
-    ocean.end_month = int(m.group(1))
-    ocean.end_year = int(m.group(2))
-    return (land, ocean)
+    end_month = int(m.group(1))
+    end_year = int(m.group(2))
+    monthlies = step4_load_sst_monthlies(end_year, end_month)
+    return (land, ocean, monthlies)
 
 def step4_output(data):
     # The Step 4 output is slightly unusual, it is an iterable of pairs.

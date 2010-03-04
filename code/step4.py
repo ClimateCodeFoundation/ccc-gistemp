@@ -54,7 +54,7 @@ def merge_ocean(ocean, sst, dates):
         assert 1 <= iw <= IM and 1 <= ie <= IM 
 
         for y, m in dates:
-            mm = (y - first_new_year) * 12 + mm
+            mm = (y - first_new_year) * 12 + m
             month = (m - 1) % 12
             count = 0
             sum = 0.0
@@ -75,15 +75,16 @@ def merge_ocean(ocean, sst, dates):
 
 
 def step4(data):
-    """Step 4 of GISTEMP processing.  This is a little unusual compared
-    to the other steps.  The input data is a pair of iterables.
+    """Step 4 of GISTEMP processing.  This is a little unusual
+    compared to the other steps.  The input data is a 3-tuple *(land,
+    ocean, monthlies)*, *land* and *ocean* being iterables of boxed
+    data sets and *monthlies* being data read from any sea-surface
+    monthly datasets which are present (and more recent than the
+    *ocean* data).
     """
 
-    land, ocean = data
-    monthlies = giss_io.step4_load_sst_monthlies(ocean.end_year, ocean.end_month)
-    if monthlies is None:
-        print "No monthly sea-surface data files."
-    else:
+    land, ocean, monthlies = data
+    if monthlies is not None:
         sst, dates = monthlies
         ocean = merge_ocean(ocean, sst, dates)
 

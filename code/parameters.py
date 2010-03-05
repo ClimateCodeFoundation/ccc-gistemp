@@ -13,9 +13,6 @@ collected and documented here.
 """
 __docformat__ = "restructuredtext"
 
-# TODO: Go through the whole algorithm collecting parameters and
-# moving them here.
-
 USHCN_offset_start_year = 1980
 """The first year of the period considered when calculating the
 offsets between GHCN and USHCN records, to apply to a USHCN
@@ -179,3 +176,6 @@ are turned into anomaly series by subtracting monthly means computed
 over a reference period.  This is the last year of that reference
 period."""
 
+zone_annual_min_months = 6
+"""When computing zone annual means, require at least this many valid
+month data."""

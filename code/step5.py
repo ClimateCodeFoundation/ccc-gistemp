@@ -361,161 +361,128 @@ def zonav(boxed_data):
      13 global (all belts 0 to 7)
     """
 
-    # Number of special zones.
-    NZS = 3
-    # Number of required common data in order to combine.
-
     (info, titlei) = boxed_data.next()
-    kq = info[1]
-    ml = info[3]
-    nyrsin = info[3]/12
-    # The rest of the code is structured so that MONM and IYRBEG could
-    # be different from these values (for example, to make the output
-    # file smaller, I think).
+    XBAD = info[6] # 9999
     iyrbeg = info[5]
-    monm = ml
+    monm = info[3]
+    nyrsin = monm/12
     # One more than the last year with data
-    yearlimit = monm/12 + iyrbeg
-    # Index of first month to be output
-    mfout = (iyrbeg - info[5])*12
+    yearlimit = nyrsin + iyrbeg
 
     # *reference* is a pair of (base,limit) that specifies the reference
     # period (base period).
     reference = (parameters.box_reference_first_year-iyrbeg,
                  parameters.box_reference_last_year-iyrbeg+1)
-    # Typically 9999
-    XBAD = info[6]
-    last = info[6]
-    trace = info[7]
 
-    # Write output file header
-    outinfo = list(info)
-    outinfo[3] = monm
-    outinfo[5] = iyrbeg
-    yield (outinfo, titlei)
+    yield (info, titlei)
 
-    ibm,kzone = zones()
+    boxes_in_band,band_in_zone = zones()
 
-    JBM = len(ibm)
+    bands = len(boxes_in_band)
 
-    # :init:lenz:
-    lenz = [None]*JBM
-
-    wt = [None] * JBM
-    avg = [None] * JBM
-    for jb in range(JBM):
-        ar = [None] * ibm[jb]
-        wtr = [None] * ibm[jb]
-        lenr = [None] * ibm[jb]
-        for ib in range(ibm[jb]):
-            (ar[ib], wtr[ib], lenr[ib], _) = boxed_data.next()
+    lenz = [None]*bands
+    wt = [None] * bands
+    avg = [None] * bands
+    for band in range(bands):
+        ar = [None] * boxes_in_band[band]
+        wtr = [None] * boxes_in_band[band]
+        lenr = [None] * boxes_in_band[band]
+        for box in range(boxes_in_band[band]):
+            (ar[box], wtr[box], lenr[box], _) = boxed_data.next()
         lntot = sum(lenr)
         if lntot == 0:
             continue
         lenr,IORD = sort_perm(lenr)
         nr = IORD[0]
-        # Copy the longest region's record into *wt* and *avg*.
+        # Copy the longest box record into *wt* and *avg*.
         # Using list both performs a copy and converts into a mutable
         # list.
-        wt[jb] = list(wtr[nr])
-        avg[jb] = list(ar[nr])
+        wt[band] = list(wtr[nr])
+        avg[band] = list(ar[nr])
         # And combine the remaining series.
         bias = [0]*12
         wtm = [0]*12
-        for n in range(1,ibm[jb]):
+        for n in range(1,boxes_in_band[band]):
             nr = IORD[n]
             if lenr[n] == 0:
                 break
-            # :todo: could the id parameter (the last one) be something
-            # more useful, like "Zone 4"? Is it only used for
-            # diagnostics?
-            combine(avg[jb], bias, wt[jb], ar[nr], 0,nyrsin, wtr[nr], wtm, jb)
-        bias = tavg(avg[jb], nyrsin, reference[0], reference[1], True, "Belt %d" % jb)
-        lenz[jb] = 0
+            combine(avg[band], bias, wt[band], ar[nr], 0,nyrsin, wtr[nr], wtm, band)
+        bias = tavg(avg[band], nyrsin, reference[0], reference[1], True, "Belt %d" % band)
+        lenz[band] = 0
         m = 0
         for iy in range(nyrsin):
             for k in range(12):
                 m = iy*12 + k
-                if avg[jb][m] == XBAD:
+                if avg[band][m] == XBAD:
                     continue
-                avg[jb][m] -= bias[k]
-                lenz[jb] += 1
+                avg[band][m] -= bias[k]
+                lenz[band] += 1
 
-        yield (avg[jb], wt[jb])
+        yield (avg[band], wt[band])
 
     # *lenz* contains the lemgths of each zone 0 to 7 (the number of
     # valid months in each zone).
     lenz, iord = sort_perm(lenz)
-    for jz in range(NZS+3):
+    for zone in range(len(band_in_zone)):
         if lenz[0] == 0:
-            raise Error('**** NO DATA FOR ZONE %d' % JBM+jz)
-        # Find the longest basic belt that is in the special zone.
-        for j1 in range(JBM):
-            # kzone records which basic belts (0 to 7) are in each
-            # of the "special zones".
-            if iord[j1] in kzone[jz]:
+            raise Error('**** NO DATA FOR ZONE %d' % bands+zone)
+        # Find the longest band that is in the special zone.
+        for j1 in range(bands):
+            if iord[j1] in band_in_zone[zone]:
                 break
         else:
-            # Slightly obscure Python feature; we get here when the
-            # "for" loop exits normally.  Which in this case, is a
-            # problem (we always expect to find at least one basic
-            # belt for every special zone).
-            raise Error('No basic belt in special zone %d.' % jz)
-        jb = iord[j1]
-        wtg = list(wt[jb])
-        avgg = list(avg[jb])
-        # Add in the remaining latitude belts JB with JB in kzone[jz].
-        for j in range(j1+1,JBM):
-            jb = iord[j]
-            if jb not in kzone[jz]:
+            raise Error('No band in special zone %d.' % zone)
+        band = iord[j1]
+        wtg = list(wt[band])
+        avgg = list(avg[band])
+        # Add in the remaining bands, in length order.
+        for j in range(j1+1,bands):
+            band = iord[j]
+            if band not in band_in_zone[zone]:
                 continue
-            if lenz[j] == 0:
-                # Not convinced this behavious is either correct or
-                # worth preserving.
-                break
-            combine(avgg, bias, wtg, avg[jb], 0,nyrsin, wt[jb], wtm, "Zone %d" % (JBM+jz))
-        else:
-            bias = tavg(avgg, nyrsin, reference[0], reference[1], True, "Zone %d" % (JBM+jz))
-            m = 0
-            for iy in range(nyrsin):
-                for k in range(12):
-                    if avgg[m] != XBAD:
-                        avgg[m] -= bias[k]
-                    m += 1
+            combine(avgg, bias, wtg, avg[band], 0,nyrsin, wt[band], wtm, "Zone %d" % (bands+zone))
+        bias = tavg(avgg, nyrsin, reference[0], reference[1], True, "Zone %d" % (bands+zone))
+        m = 0
+        for iy in range(nyrsin):
+            for k in range(12):
+                if avgg[m] != XBAD:
+                    avgg[m] -= bias[k]
+                m += 1
         yield(avgg, wtg)
 
 def sort_perm(a):
     """The array *a* is sorted into descending order.  The fresh sorted
     array and the permutation array are returned as a pair (*sorted*,
-    *iord*).  The original *a* is not mutated.
+    *indexes*).  The original *a* is not mutated.
 
-    The *iord* array is such that `a[iord[x]] == sorted[x]`.
+    The *indexes* array is such that `a[indexes[x]] == sorted[x]`.
     """
     from step3 import sort
     z = zip(a, range(len(a)))
     sort(z, lambda x,y: y[0]-x[0])
-    sorted,iord = zip(*z)
-    return sorted,iord
+    sorted, indexes = zip(*z)
+    return sorted, indexes
 
 def zones():
-    """Return the parameters of the 14 zones (8 basic belts and 6
-    additional).  A pair of (*ibm*,*kzone*) is returned.  `ibm[b]`
-    gives the number of boxes (regions) in belt *b* for `b in
-    range(8)`.  *kzone* defines how the 6 combined zones are made from
-    the basic belts.  `b in kzone[k]` is true when basic belt *b* is
-    in special zone *k* (*b* is in range(8), *k* is in range(6)).
+    """Return the parameters of the 14 zones (8 basic bands and 6
+    additional).  A pair of (*boxes_in_band*,*band_in_zone*) is
+    returned.  `boxes_in_band[b]` gives the number of boxes in band
+    *b* for `b in range(8)`.  *band_in_zone* defines how the 6
+    combined zones are made from the basic bands.  `b in
+    band_in_zone[k]` is true when basic band *b* is in special zone
+    *z* (*b* is in range(8), *z* is in range(6)).
     """
 
     # Number of boxes (regions) in each band.
-    ibm = [4,8,12,16,16,12,8,4]
+    boxes_in_band = [4,8,12,16,16,12,8,4]
 
     N = set(range(4)) # Northern hemisphere
     G = set(range(8)) # Global
     S = G - N         # Southern hemisphere
     T = set([3,4])    # Tropics
-    kzone = [N-T, T, S-T, N, S, G]
+    band_in_zone = [N-T, T, S-T, N, S, G]
 
-    return ibm, kzone
+    return boxes_in_band, band_in_zone
 
 
 def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
@@ -530,53 +497,48 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
     otherwise.
     """
 
-    jzm = 14
-    monmin = 6
+    zones = 14
 
     (info, title) = zoned_averages.next()
-    kq = info[1]
     iyrbeg = info[5]
     monm = info[3]
     iyrs = monm // 12
+    iyrend = iyrs + iyrbeg
+    XBAD = float(info[6])
+
     # Allocate the 2- and 3- dimensional arrays.
     # The *data* and *wt* arrays are properly 3 dimensional
     # ([zone][year][month]), but the inner frames are only allocated
     # when we read the data, see :read:zonal below.
-    data = [ None for _ in range(jzm)]
-    wt =   [ None for _ in range(jzm)]
-    ann =  [ [None]*iyrs for _ in range(jzm)]
-    annw = [ [None]*iyrs for _ in range(jzm)]
-    # Here we use the Python convention, *iyrend* is one past the highest
-    # year used.
-    iyrend = info[3] // 12 + iyrbeg
-    XBAD = float(info[6])
+    data = [ None for _ in range(zones)]
+    wt =   [ None for _ in range(zones)]
+    ann =  [ [XBAD]*iyrs for _ in range(zones)]
+    annw = [ [0]*iyrs for _ in range(zones)]
 
-    # Collect JZM zonal means.
-    for jz in range(jzm):
+    # Collect zonal means.
+    for zone in range(zones):
         (tdata, twt) = zoned_averages.next()
         # Regroup the *data* and *wt* series so that they come in blocks of 12.
         # Uses essentially the same trick as the `grouper()` recipe in
         # http://docs.python.org/library/itertools.html#recipes
-        data[jz] = zip(*[iter(tdata)]*12)
-        wt[jz] = zip(*[iter(twt)]*12)
+        data[zone] = zip(*[iter(tdata)]*12)
+        wt[zone] = zip(*[iter(twt)]*12)
 
     # Find (compute) the annual means.
-    for jz in range(jzm):
+    for zone in range(zones):
         for iy in range(iyrs):
-            ann[jz][iy] = XBAD
-            annw[jz][iy] = 0.
             anniy = 0.
             annwiy = 0.
             mon = 0
             for m in range(12):
-                if data[jz][iy][m] == XBAD:
+                if data[zone][iy][m] == XBAD:
                     continue
                 mon += 1
-                anniy += data[jz][iy][m]
-                annwiy += wt[jz][iy][m]
-            if mon >= monmin:
-                ann[jz][iy] = float(anniy)/mon
-            annw[jz][iy] = annwiy/12.
+                anniy += data[zone][iy][m]
+                annwiy += wt[zone][iy][m]
+            if mon >= parameters.zone_annual_min_months:
+                ann[zone][iy] = float(anniy)/mon
+            annw[zone][iy] = annwiy/12.
 
     # Alternate global mean.
     if alternate['global']:
@@ -609,6 +571,7 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
                     glob += data[z][iy][m]*w
                 else:
                     data[-1][iy][m] = .1 * glob
+
     # Alternate hemispheric means.
     if alternate['hemi']:
         # For the computations it will be useful to recall how the zones
@@ -628,7 +591,7 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
                         data[ihem+11][iy][m] = (
                           0.4*data[ihem+3][iy][m] +
                           0.6*data[2*ihem+8][iy][m])
-    return (info, data, wt, ann, annw, monmin, title)
+    return (info, data, wt, ann, annw, parameters.zone_annual_min_months, title)
 
 def step5(data):
     """Step 5 of GISTEMP.

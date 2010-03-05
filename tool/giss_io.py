@@ -673,7 +673,7 @@ def step1_input():
     return V2MeanReader("work/v2.mean_comb")
 
 def step1_output(data):
-    out = StationTsWriter("work/Ts.txt")
+    out = V2MeanWriter("work/v2.step1.out")
     try:
         for thing in data:
             out.write(thing)
@@ -682,7 +682,7 @@ def step1_output(data):
         out.close()
 
 def step2_input():
-    return StationTsReader("work/Ts.txt")
+    return V2MeanReader("work/v2.step1.out")
 
 def step2_output(data):
     out = V2MeanWriter("work/v2.step2.out")

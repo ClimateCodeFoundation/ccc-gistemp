@@ -328,9 +328,13 @@ def StationTsReader(path):
 
     f = open(path)
 
-    for (record_line, lines) in itertools.groupby(
-      f, lambda line: line[0] == ' '):
-        if record_line: 
+    def isheader(line):
+        """Helper function that flags header lines."""
+
+        return line[0] == ' '
+
+    for (header_line, lines) in itertools.groupby(f, isheader):
+        if header_line: 
             # Line beginning with a blank introduces a new station
             # record.
             lines = list(lines)
@@ -374,7 +378,7 @@ def V2MeanReader(path, year_min=-9999):
     """Reads a file in GHCN v2.mean format and yields each station.
     
     If `year_min` is specified, then only years >= year_min are kept
-    (the default, -9999, effectively keeps all years."""
+    (the default, -9999, effectively keeps all years)."""
 
     f = open(path)
     def id12(l):

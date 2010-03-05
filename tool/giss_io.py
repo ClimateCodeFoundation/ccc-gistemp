@@ -632,7 +632,8 @@ def read_float(s):
 
 # Find the USHCN input file
 def ushcn_input_file():
-    files =  ["input/9641C_201002_F52.avg",
+    files =  ["input/9641C_201003_F52.avg",
+              "input/9641C_201002_F52.avg",
               "input/9641C_200907_F52.avg"]
     for f in files:
         if os.path.exists(f) or os.path.exists(f+'.gz'):

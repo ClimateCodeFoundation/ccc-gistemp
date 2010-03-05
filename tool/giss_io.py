@@ -690,7 +690,7 @@ def step2_output(data):
         out.close()
 
 def step3_input():
-    return StationReader(open("work/Ts.GHCN.CL.PA", "rb"), bos='<')
+    return V2MeanReader("work/v2.step2.out")
 
 def step3_output(data):
     out = SubboxWriter(open('work/SBBX1880.Ts.GHCN.CL.PA.1200', 'wb'),

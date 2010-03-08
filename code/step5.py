@@ -159,7 +159,6 @@ def SBBXtoBX(data):
         # Loop over the remaining cells.
         for n in range(1,2*nsubbox):
             nc = IORDR[n]
-            w = wgtc[n]
             # :todo: Can it be correct to use [n]?  It's what the
             # Fortran does.
             if wgtc[n] < parameters.subbox_min_valid:

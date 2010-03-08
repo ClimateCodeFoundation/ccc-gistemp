@@ -142,6 +142,11 @@ def fetch(files, prefix='input/', output=sys.stdout):
       'ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/zipd/v2.mean.zip',
       'raid2g/ghcn/v2/data/current/zipd/v2.mean']
 
+    # For the USHCN (V2) data, the filename we need to retrieve is
+    # variable (it changes every time new USHCN data is released).
+    place['ushcnv2.gz'] = ['ushcn', 'ftp.ncdc.noaa.gov',
+      '/pub/data/ushcn/v2/monthly']
+
 
     # A "special" place is one that isn't just an ordinary URL.
     # Places are identified as being "special" when they are a list
@@ -152,6 +157,7 @@ def fetch(files, prefix='input/', output=sys.stdout):
     special = dict(
       tar=fetch_tar,
       zip=fetch_zip,
+      ushcn=fetch_ushcn,
     )
     def addurl(d):
         """Add 'url' handler to all plain strings."""
@@ -214,17 +220,17 @@ def fetch_url(l, prefix, output):
     """(helper function used by :meth:`fetch`)
 
     *l* is a list of (*place*,*name*) pairs.  Each *name* is a short name,
-    each *place* is a triple ('url',*url*,*local*).
+    each *place* is a pair ('url',*url*).
     """
 
     import os
 
-    for (handler, place), name in l:
+    for (handler, url), name in l:
         assert handler == 'url'
         # Make a local filename.
         local = os.path.join(prefix, name)
-        output.write(name + ' ' + place + '\n')
-        urllib.urlretrieve(place, local, progress_hook(output))
+        output.write(name + ' ' + url + '\n')
+        urllib.urlretrieve(url, local, progress_hook(output))
         output.write('\n')
         output.flush()
 
@@ -282,6 +288,44 @@ def fetch_zip(l, prefix, output):
             dest.close()
             src.close()
         print >>output, "  ... finished extracting"
+
+def fetch_ushcn(l, prefix, output):
+    """(helper function used by :meth:`fetch`)
+
+    *l* is a list of (*place*,*name*) pairs.  Each *name* is a short
+    name, each *place* is a triple ('ushcn',*host*,*directory*).
+
+    Retrieves a USHCN (V2) file opening an FTP connection to the host,
+    and scanning the directory, looking for files that match a
+    particular pattern.  The file with the most recent date in its
+    filename is downloaded.
+    """
+
+    # http://www.python.org/doc/2.4.4/lib/module-ftplib.html
+    import ftplib
+    # http://www.python.org/doc/2.4.4/lib/module-re.html
+    import re
+
+    # Regular expression for USHCN V2 filename.
+    file = re.compile(r'9641C_\d{6}_F52.avg.gz')
+
+    for place,name in l:
+        helper,host,directory = place
+        assert 'ushcn' == helper
+        remote = ftplib.FTP(host, 'ftp', 'ccc-staff@ravenbrook.com')
+        remote.cwd(directory)
+        dir = remote.nlst()
+        good = filter(file.match, dir)
+        good.sort()
+        # Most recent file sorts to the end of the list, because dates
+        # are in the form YYYYMM.
+        remotename = good[-1]
+        if directory[0] != '/':
+            directory = '/' + directory
+        fetch_url(
+          [(('url',
+             'ftp://%s%s/%s' % (host, directory, remotename)), name)],
+          prefix, output)
 
 def fetch_from_tar(inp, want, prefix='input', log=sys.stdout,
         compression_type=""):

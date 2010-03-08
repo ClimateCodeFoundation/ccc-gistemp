@@ -14,7 +14,7 @@ import glob
 
 import math
 
-from code import fort
+import fort
 import code.giss_data
 import code.read_config
 

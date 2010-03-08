@@ -82,7 +82,12 @@ def checkit(log):
     oisstv2_mod4.clim.gz
     """.split()
 
-    ushcn_alternatives = '9641C_201003_F52.avg 9641C_201002_F52.avg 9641C_200907_F52.avg'.split()
+    ushcn_alternatives = """
+        ushcnv2
+        9641C_201003_F52.avg
+        9641C_201002_F52.avg
+        9641C_200907_F52.avg
+        """.split()
 
     step0big = 'v2.mean'.split() + [ushcn_alternatives]
     step5big = 'SBBX.HadR2'.split()

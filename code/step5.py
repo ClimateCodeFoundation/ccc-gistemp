@@ -19,7 +19,9 @@ are computed from monthly anomalies.
 import eqarea
 import giss_data
 import parameters
+import series
 from tool import giss_io
+from giss_data import valid, invalid, MISSING
 
 # http://www.python.org/doc/2.3.5/lib/itertools-functions.html
 import itertools
@@ -51,14 +53,14 @@ def SBBXtoBX(data):
         def blank_ocean_data(data):
             """Augment a land-only data series with blank ocean data."""
             for land_box in data:
-                series = [giss_data.XMISSING] * len(land_box.series)
+                ocean_series = [MISSING] * len(land_box.series)
                 ocean_box = giss_data.SubboxRecord(
                     lat_S=land_box.lat_S,
                     lat_N=land_box.lat_N,
                     lon_W=land_box.lon_W,
                     lon_E=land_box.lon_E,
                     stations=0, station_months=0,
-                    d=giss_data.XMISSING, series=series)
+                    d=MISSING, series=ocean_series)
                 yield land_box, ocean_box
         data = blank_ocean_data(data)
 
@@ -143,7 +145,6 @@ def SBBXtoBX(data):
         if nc < nsubbox:
             wnc = 1 - wocn
 
-        wtm = [wnc]*12
         bias = [0]*12
         
         # Weights for the box's record.
@@ -174,165 +175,10 @@ def SBBXtoBX(data):
             if nc < nsubbox:
                 wnc = 1 - wocn
             wt1 = wnc
-            nsm = combine(avgr, bias, wtr, avg[nc], 0, combined_n_months/12, wt1, wtm, nc)
-        bias = tavg(avgr, NYRSIN,
-                    parameters.subbox_reference_first_year - combined_year_beg,
-                    parameters.subbox_reference_last_year - combined_year_beg + 1,
-                    True, "Box %d" % box_number)
-        ngood = 0
-        m = 0
-        for iy in range(combined_n_months/12):
-            for k in range(12):
-                m = iy*12 + k
-                if avgr[m] == XBAD:
-                    continue
-                avgr[m] -= bias[k]
-                ngood += 1
-
+            series.combine(avgr, wtr, avg[nc], wt1, 0, combined_n_months/12, parameters.box_min_overlap)
+        series.anomalize(avgr, parameters.subbox_reference_period, combined_year_beg)
+        ngood = sum(valid(a) for a in avgr)
         yield (avgr, wtr, ngood, box)
-
-
-# :todo: This was nabbed from code/step3.py.  Put it in one place and
-# make it common.
-#
-def combine(avg, bias, wt, dnew, nf1, nl1, wt1, wtm, id, XBAD=9999):
-    """Run the GISTEMP combining algorithm.  This combines the data
-    in the *dnew* array into the *avg* array (also updating the *bias*
-    array).
-
-    Each of the arguments *avg*, *wt*, *dnew* is a linear array that
-    is divided into "years" by considering each contiguous segment of
-    12 elements a year.  Only data for years in range(nf1, nl1) are
-    considered and combined.  Note that range(nf1, nl1) includes *nf1*
-    but excludes *nl1* (and that this differs from the Fortran
-    convention).
-    
-    Each month of the year is considered separately.  For the set of
-    times where both *avg* and *dnew* have data the mean difference (a
-    bias) is computed.  If there are fewer than
-    *parameters.box_min_overlap* years in common the data (for that
-    month of the year) are not combined.  The bias is subtracted from
-    the *dnew* record and it is point-wise combined into *avg*
-    according to the weight *wt1* and the exist weight for *avg*.
-
-    *id* is an identifier used only when diagnostics are issued
-    (when combining stations it is expected to be the station ID; when
-    combining subboxes it is expected to be the subbox number (0 to 99)).
-    """
-
-    # This is somewhat experimental.  *wt1* the weight of the incoming
-    # data, *dnew*, can either be a scalar (applies to the entire *dnew*
-    # series) or a list (in which case each element is the weight of the
-    # corresponding element of *dnew*).  (zonav uses the list form).
-    # In the body of this function we treat *wt1* as an indexable
-    # object.  Here we convert scalars to an object that always returns
-    # a constant.
-    try:
-        wt1[0]
-        def update_bias():
-            pass
-    except TypeError:
-        wt1_constant = wt1
-        def update_bias():
-            """Find mean bias."""
-            wtmnew = wtm[k]+wt1_constant
-            bias[k] = float(wtm[k]*bias[k]+wt1_constant*biask)/wtmnew
-            wtm[k]=wtmnew
-            return
-        class constant_list:
-            def __getitem__(self, i):
-                return wt1_constant
-        wt1 = constant_list()
-
-    nsm = 0
-    missed = 12
-    missing = [True]*12
-    for k in range(12):
-        sumn = 0    # Sum of data in dnew
-        sum = 0     # Sum of data in avg
-        ncom = 0    # Number of years where both dnew and avg are valid
-        for n in range(nf1, nl1):
-            kn = k+12*n     # CSE for array index
-            # Could specify that arguments are array.array and use
-            # array.count(BAD) and sum, instead of this loop.
-            if avg[kn] >= XBAD or dnew[kn] >= XBAD:
-                continue
-            ncom += 1
-            sum += avg[kn]
-            sumn += dnew[kn]
-        if ncom < parameters.box_min_overlap:
-            continue
-
-        biask = float(sum-sumn)/ncom
-        update_bias()
-
-        # Update period of valid data, averages and weights
-        for n in range(nf1, nl1):
-            kn = k+12*n     # CSE for array index
-            if dnew[kn] >= XBAD:
-                continue
-            wtnew = wt[kn] + wt1[kn]
-            avg[kn] = float(wt[kn]*avg[kn] + wt1[kn]*(dnew[kn]+biask))/wtnew
-            wt[kn] = wtnew
-            nsm += 1
-        missed -= 1
-        missing[k] = False
-    if False and missed > 0:
-        print "Unused data - ID/SUBBOX,WT", id, wt1, missing
-    return nsm
-
-
-# :todo: make common with step3.py
-def tavg(data, nyrs, base, limit, nr, id, deflt=0.0, XBAD=9999):
-    """:meth:`tavg` computes the time averages for each calendar
-    month over the base period (year *base* to *limit*) and
-    saves them in *bias* (a fresh array that is returned).
-    
-    In case of no data, the average is set to
-    *deflt* if nr=0 or computed over the whole period if nr>0.
-
-    *id* is an arbitrary printable value used for identification in
-    diagnostic output (for example, the cell number).
-    """
-
-    bias = [0.0]*12
-    missed = 12
-    len = 12*[0]    # Warning: shadows builtin "len"
-    for k in range(12):
-        bias[k] = deflt
-        sum = 0.0
-        m = 0
-        for n in range(base, limit):
-            kn = k+12*n     # CSE for array index
-            if data[kn] >= XBAD:
-                continue
-            m += 1
-            sum += data[kn]
-        len[k] = m
-        if m == 0:
-            continue
-        bias[k] = float(sum)/float(m)
-        missed -= 1
-    if nr*missed == 0:
-        return bias
-    # Base period is data free (for at least one month); use bias
-    # with respect to whole series.
-    for k in range(12):
-        if len[k] > 0:
-            continue
-        print "No data in base period - MONTH,NR,ID", k, nr, id
-        sum = 0.0
-        m = 0
-        for n in range(nyrs):
-            kn = k+12*n     # CSE for array index
-            if data[kn] >= XBAD:
-                continue
-            m += 1
-            sum += data[kn]
-        if m == 0:
-            continue
-        bias[k] = float(sum)/float(m)
-    return bias
 
 
 def zonav(boxed_data):
@@ -369,11 +215,6 @@ def zonav(boxed_data):
     # One more than the last year with data
     yearlimit = nyrsin + iyrbeg
 
-    # *reference* is a pair of (base,limit) that specifies the reference
-    # period (base period).
-    reference = (parameters.box_reference_first_year-iyrbeg,
-                 parameters.box_reference_last_year-iyrbeg+1)
-
     yield (info, titlei)
 
     boxes_in_band,band_in_zone = zones()
@@ -400,24 +241,13 @@ def zonav(boxed_data):
         wt[band] = list(wtr[nr])
         avg[band] = list(ar[nr])
         # And combine the remaining series.
-        bias = [0]*12
-        wtm = [0]*12
         for n in range(1,boxes_in_band[band]):
             nr = IORD[n]
             if lenr[n] == 0:
                 break
-            combine(avg[band], bias, wt[band], ar[nr], 0,nyrsin, wtr[nr], wtm, band)
-        bias = tavg(avg[band], nyrsin, reference[0], reference[1], True, "Belt %d" % band)
-        lenz[band] = 0
-        m = 0
-        for iy in range(nyrsin):
-            for k in range(12):
-                m = iy*12 + k
-                if avg[band][m] == XBAD:
-                    continue
-                avg[band][m] -= bias[k]
-                lenz[band] += 1
-
+            series.combine(avg[band], wt[band], ar[nr], wtr[nr], 0,nyrsin, parameters.box_min_overlap)
+        series.anomalize(avg[band], parameters.box_reference_period, iyrbeg)
+        lenz[band] = sum(valid(a) for a in avg[band])
         yield (avg[band], wt[band])
 
     # *lenz* contains the lemgths of each zone 0 to 7 (the number of
@@ -440,14 +270,8 @@ def zonav(boxed_data):
             band = iord[j]
             if band not in band_in_zone[zone]:
                 continue
-            combine(avgg, bias, wtg, avg[band], 0,nyrsin, wt[band], wtm, "Zone %d" % (bands+zone))
-        bias = tavg(avgg, nyrsin, reference[0], reference[1], True, "Zone %d" % (bands+zone))
-        m = 0
-        for iy in range(nyrsin):
-            for k in range(12):
-                if avgg[m] != XBAD:
-                    avgg[m] -= bias[k]
-                m += 1
+            series.combine(avgg, wtg, avg[band], wt[band], 0,nyrsin, parameters.box_min_overlap)
+        series.anomalize(avgg, parameters.box_reference_period, iyrbeg)
         yield(avgg, wtg)
 
 def sort_perm(a):

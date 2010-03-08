@@ -14,25 +14,12 @@ import earth # required for radius.
 import eqarea
 import giss_data
 import parameters
+import series
+from giss_data import MISSING, valid, invalid
 
 import math
 import sys
 import itertools
-
-
-def invalid(x):
-    """Test for invalid datum ("equal" to the giss_data.XMISSING value, for some
-    definition of "equal").
-    """
-
-    return x == giss_data.XMISSING
-
-def valid(x):
-    """Test for valid datum.  See invalid()."""
-
-    # It's important that this obey Iverson's convention: in other words
-    # return 0 or 1 (or False or True, which it does).
-    return not invalid(x)
 
 
 def inbox(station_records, lats, latn, longw, longe):
@@ -156,83 +143,6 @@ def sort(l, cmp):
     return
 
 
-def combine(average, weight, new, new_weight, first_year, last_year):
-    """Run the GISTEMP combining algorithm.  This combines the data in
-    the *new* array into the *average* array.  *new* has weight
-    *new_weight*, *average* has weights in the *weight* array.
-
-    Only data for years in *range(first_year, last_year)* are
-    considered and combined.
-
-    The number of month records combined is returned.
-    
-    Each month of the year is considered separately.  For the set of
-    times where both *average* and *new* have data the mean difference (a
-    bias) is computed.  If there are fewer than
-    *parameters.gridding_min_overlap* years in common the data (for
-    that month of the year) are not combined.  The bias is subtracted
-    from the new record and it is point-wise combined into *average*
-    according to the station weight, *new_weight*, and the existing
-    weights for average.
-    """
-
-    months_combined = 0
-    for m in range(12):
-        sum_new = 0.0  # Sum of data in new
-        sum = 0.0      # Sum of data in average
-        count = 0      # Number of years where both new and average are valid
-        for a,n in itertools.izip(average[first_year*12+m: last_year*12: 12],
-                                  new[first_year*12+m: last_year*12: 12]):
-            if invalid(a) or invalid(n):
-                continue
-            count += 1
-            sum += a
-            sum_new += n
-        if count < parameters.gridding_min_overlap:
-            continue
-        bias = (sum-sum_new)/count
-        # Update period of valid data, averages and weights
-        for i in range(first_year*12+m, last_year*12, 12):
-            if invalid(new[i]):
-                continue
-            new_month_weight = weight[i] + new_weight
-            average[i] = (weight[i]*average[i] + new_weight*(new[i]+bias))/new_month_weight
-            weight[i] = new_month_weight
-            months_combined += 1
-    return months_combined
-
-
-# TODO: This was an almost duplicate of the function in step5.
-#       Make the code common.
-def tavg(data, base, limit):
-    """tavg computes the time averages (separately for each calendar
-    month) over the base period (year base to limit). In case of no
-    data, the average is computed over the whole period.
-    """
-    averages = []
-    for m in range(12):
-        sum = 0.0
-        count = 0
-        for datum in data[m+12*base:m+12*limit:12]:
-            if invalid(datum):
-                continue
-            count += 1
-            sum += datum
-        if count == 0:
-            sum = 0.0
-            count = 0
-            for datum in data[m::12]:
-                if invalid(datum):
-                    continue
-                count += 1
-                sum += datum
-        if count == 0:
-            averages.append(0.0)
-        else:
-            averages.append(sum/count)
-    return averages
-
-
 def iter_subbox_grid(station_records, max_months, first_year, radius):
     """Convert the input *station_records*, into a gridded anomaly
     dataset which is returned as an iterator.
@@ -286,13 +196,13 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
             incircle_records = list(incircle(region_records, arc, *centre))
 
             # Combine data.
-            series = [giss_data.XMISSING] * max_months
+            subbox_series = [MISSING] * max_months
 
             if len(incircle_records) == 0:
                 box_obj = giss_data.SubboxRecord(
                     lat_S=subbox[0], lat_N=subbox[1], lon_W=subbox[2],
                     lon_E=subbox[3], stations=0, station_months=0,
-                    d=giss_data.XMISSING, series=series)
+                    d=MISSING, series=subbox_series)
                 log.write('*')
                 log.flush()
                 yield box_obj
@@ -306,7 +216,7 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
             max_weight = record.weight
             offset = record.rel_first_month - 1
             a = record.series # just a temporary
-            series[offset:offset + len(a)] = a
+            subbox_series[offset:offset + len(a)] = a
             weight = [0.0] * max_months
             for i in range(len(a)):
                 if valid(a[i]):
@@ -317,10 +227,12 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                 # TODO: A StationMethod method to produce a padded data series
                 #       would be good here. Hence we could just do:
                 #           new = record.padded_series(max_months)
-                new = [giss_data.XMISSING] * max_months
+                new = [MISSING] * max_months
                 aa, bb = record.rel_first_month, record.rel_last_month
                 new[aa - 1:bb] = record.series
-                station_months = combine(series, weight, new, record.weight, record.rel_first_year, record.rel_last_year + 1)
+                station_months = series.combine(subbox_series, weight, new, record.weight,
+                                                record.rel_first_year, record.rel_last_year + 1,
+                                                parameters.gridding_min_overlap)
                 total_good_months += station_months
                 if station_months == 0:
                     continue
@@ -329,18 +241,11 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                 if max_weight < record.weight:
                     max_weight = record.weight
 
-            bias = tavg(series, parameters.gridding_reference_first_year-first_year,
-                        parameters.gridding_reference_last_year-first_year+1)
-            m = 0
-            for y in range(max_months // 12):
-                for k in range(12):
-                    if valid(series[m]):
-                        series[m] -= bias[k]
-                    m += 1
+            series.anomalize(subbox_series, parameters.gridding_reference_period, first_year)
             box_obj = giss_data.SubboxRecord(n=max_months,
                     lat_S=subbox[0], lat_N=subbox[1], lon_W=subbox[2],
                     lon_E=subbox[3], stations=total_stations, station_months=total_good_months,
-                    d=radius*(1-max_weight), series=series)
+                    d=radius*(1-max_weight), series=subbox_series)
             yield box_obj
 
     print >>log

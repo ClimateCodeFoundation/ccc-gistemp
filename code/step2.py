@@ -18,21 +18,7 @@ import itertools
 import earth
 import giss_data
 import parameters
-
-def invalid(x):
-    """Test for invalid datum ("equal" to the giss_data.XMISSING value, for some
-    definition of "equal").
-    """
-
-    return x == giss_data.XMISSING
-
-def valid(x):
-    """Test for valid datum.  See invalid()."""
-
-    # It's important that this obey Iverson's convention: in other words
-    # return 0 or 1 (or False or True, which it does).
-    return not invalid(x)
-
+from giss_data import valid, invalid, MISSING
 
 def drop_short_records(record_source):
     """Drop records which don't have at least one month index
@@ -86,7 +72,7 @@ def annual_anomaly(record):
                 first = y
             last = y
         else:
-            annual_anoms.append(giss_data.XMISSING)
+            annual_anoms.append(MISSING)
     
     if first is None:
         record.anomalies = None
@@ -318,8 +304,8 @@ def combine_neighbors(us, iyrm, iyoff, neighbors):
 
     weights = [0.0] * iyrm
     counts = [0] * iyrm
-    urban_series = [giss_data.XMISSING] * iyrm
-    combined = [giss_data.XMISSING] * iyrm
+    urban_series = [MISSING] * iyrm
+    combined = [MISSING] * iyrm
 
     urban_series[us.first_year - 1:us.last_year] = us.anomalies
 
@@ -333,7 +319,7 @@ def combine_neighbors(us, iyrm, iyoff, neighbors):
 
     # add in the remaining stations
     for i, rs in enumerate(neighbors[1:]):
-        dnew = [giss_data.XMISSING] * iyrm
+        dnew = [MISSING] * iyrm
         dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
         cmbine(combined, weights, counts, dnew, rs.first_year, rs.last_year, rs.weight)
 
@@ -476,7 +462,7 @@ def trend2(xc, a, dataLen, xmid, min):
             sxa0 += x * v_a
 
     if count0 < min or count1 < min: 
-       return giss_data.XMISSING, giss_data.XMISSING, giss_data.XMISSING, giss_data.XMISSING
+       return MISSING, MISSING, MISSING, MISSING
 
     count = count0 + count1
     denom = (count * sxx0 * sxx1

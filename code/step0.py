@@ -41,7 +41,7 @@ USHCN data:
 """
 
 import itertools
-import giss_data
+from giss_data import MISSING, valid, invalid
 import parameters
 
 def calc_monthly_USHCN_offsets(u_record, g_record):
@@ -55,7 +55,7 @@ def calc_monthly_USHCN_offsets(u_record, g_record):
         count = 0
         for u_year, g_year in reversed_year_pairs:
             u_temp, g_temp = u_year[month], g_year[month]
-            if giss_data.XMISSING not in (u_temp, g_temp):
+            if valid(u_temp) and valid(g_temp):
                 sum += u_temp - g_temp
                 count += 1
                 if count == parameters.USHCN_offset_max_months:
@@ -77,7 +77,7 @@ def adjust_USHCN(ushcn_records, ghcn_records, us_stations):
         us_only[id12] = None
 
     def adj(t, d):
-        if t != giss_data.XMISSING:
+        if valid(t):
             return t - d
         return t
 

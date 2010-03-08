@@ -31,20 +31,18 @@ import read_config
 BASE_YEAR = 1880
 
 #: The value that is used to indicate a bad or missing data point.
-XMISSING = 9999.0
+MISSING = 9999.0
+
+def invalid(v):
+    return v == MISSING
+
+def valid(v):
+    return not invalid(v)
 
 
 _stations = None
 _v2_sources = None
 _ghcn_last_year = None
-
-def invalid(v):
-    return abs(v - XMISSING) < 0.1
-
-
-def valid(v):
-    return not invalid(v)
-
 
 def _load_v2_inv():
     """Load the v2.inv file.
@@ -229,7 +227,7 @@ class StationMetaData(object):
         often referred to in other code as variously bad, BAD, XBAD.
 
         This should become unimportant over time in the CCC code, which should
-        stick to always using the `XMISSING` value.
+        stick to always using the `MISSING` value.
     :Ivar precipitation_flag:
         Probably defines a special value that serves a similar purppose to
         the `missing_flag`. This does not seem to be used by any CCC code.
@@ -338,7 +336,7 @@ class MonthlyTemperatureRecord(object):
     1 AD has a month number of 13, February is 14, etc.
     
     Within series, some leading months and some trailing months may be set to
-    the `XMISSING` value. The `good_start_idx` and `good_end_idx` members define
+    the `MISSING` value. The `good_start_idx` and `good_end_idx` members define
     the Python range within the series that excludes these missing value.
 
     The GISTEMP/CCC code only uses data that starts from `BASE_YEAR` (1880).
@@ -505,7 +503,7 @@ class MonthlyTemperatureRecord(object):
         """Strip leading and trailing invalid values.
         
         Adjusts the record so that the series starts and ends with a good (not
-        `XMISSING`) value. If there are no good values, the series will be
+        `MISSING`) value. If there are no good values, the series will be
         emptied.
         
         """
@@ -535,7 +533,7 @@ class MonthlyTemperatureRecord(object):
         self._series = []
         for v in series:
             if invalid(v):
-                self._series.append(XMISSING)
+                self._series.append(MISSING)
             else:
                 self._good_start_idx = min(self._good_start_idx,
                         len(self._series))
@@ -549,12 +547,12 @@ class MonthlyTemperatureRecord(object):
             # Note: This assumes the series is a whole number of years.
             gap = year - self.last_year - 1
             if gap > 0:
-                self._series.extend([XMISSING] * gap * 12)
+                self._series.extend([MISSING] * gap * 12)
         start_month = year * 12 + 1
         self._first_month = min(self.first_month, start_month)
         for v in data:
             if invalid(v):
-                self._series.append(XMISSING)
+                self._series.append(MISSING)
             else:
                 self._good_start_idx = min(self._good_start_idx,
                         len(self._series))
@@ -642,18 +640,18 @@ class StationRecord(MonthlyTemperatureRecord):
 
     def has_data_for_year(self, year):
         for t in self.get_a_year(year):
-            if t != XMISSING:
+            if t != MISSING:
                 return True
 
     def get_a_month(self, month):
         """Get the value for a single month."""
         idx = month - self.first_month
         if idx < 0:
-            return XMISSING
+            return MISSING
         try:
             return self.series[month - self.first_month]
         except IndexError:
-            return XMISSING
+            return MISSING
 
     def get_a_year(self, year):
         """Get the time series data for a year."""
@@ -666,7 +664,7 @@ class StationRecord(MonthlyTemperatureRecord):
         :Return:
             A list of lists, where each sub-list contains 12 temperature values
             for a given year. This works for any range of years, missing years
-            are filled with the XMISSING value.
+            are filled with the MISSING value.
 
         """
         return [self.get_a_year(y) for y in range(first_year, last_year + 1)]
@@ -810,18 +808,18 @@ class SubboxRecord(MonthlyTemperatureRecord):
 
     def pad_with_missing(self, n):
         while self.n < n:
-            self._series.append(XMISSING)
+            self._series.append(MISSING)
     pad_with_missing = clear_cache(pad_with_missing)
             
     def set_value(self, idx, value):
         while idx >= len(self.series):
-            self._series.append(XMISSING)
+            self._series.append(MISSING)
         self._series[idx] = value
     set_value = clear_cache(set_value)
 
     def trim(self):
         self.station_months = len(self._series) - self._series.count(
-                XMISSING)
+                MISSING)
 
     def __repr__(self):
         return ('<Subbox (%+06.2f,%+06.2f) (%+07.2f,%+07.2f): %d>' %

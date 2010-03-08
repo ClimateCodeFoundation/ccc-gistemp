@@ -11,7 +11,7 @@ __docformat__ = "restructuredtext"
 import sys
 import itertools
 
-import giss_data
+from giss_data import MISSING, valid, invalid
 import parameters
 from tool import giss_io
 
@@ -57,13 +57,13 @@ def merge_ocean(ocean, sst, dates):
             sum = 0.0
             for j in range(js, jn+1):
                 for i in range(iw, ie+1):
-                    if sst[i][j][mm-1] < parameters.sea_surface_cutoff_temp or clim[i][j][month] == giss_data.XMISSING:
+                    if sst[i][j][mm-1] < parameters.sea_surface_cutoff_temp or invalid(clim[i][j][month]):
                         continue
                     count += 1
                     sum += sst[i][j][mm-1] - clim[i][j][month]
 
             index = (y - IYRBEG) * 12 + m - 1
-            box.set_value(index, giss_data.XMISSING)
+            box.set_value(index, MISSING)
             if count > 0:
                 box.set_value(index, sum / count)
 

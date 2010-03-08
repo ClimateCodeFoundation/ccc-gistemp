@@ -25,16 +25,15 @@ import code.read_config
 #: reading or writing input and working files.
 MISSING = 9999
 
-
 # For all plausible integers i, float_to_tenths(tenths_to_float(i)) == i.
 def tenths_to_float(t):
     if t == MISSING:
-        return code.giss_data.XMISSING
+        return code.giss_data.MISSING
     return t * 0.1
 
 
 def float_to_tenths(f):
-    if abs(f - code.giss_data.XMISSING) < 0.01:
+    if abs(f - code.giss_data.MISSING) < 0.01:
         return MISSING
     return int(round(f * 10.0))
 
@@ -61,7 +60,7 @@ def convert_to_tenths(celsius_series):
     """
     t = []
     for v in celsius_series:
-        if v >= code.giss_data.XMISSING:
+        if v >= code.giss_data.MISSING:
             t.append(MISSING)
         else:
             t.append(float_to_tenths(v))
@@ -74,7 +73,7 @@ def convert_tenths_to_float(tenths_series):
     t = []
     for v in tenths_series:
         if v == MISSING:
-            t.append(code.giss_data.XMISSING)
+            t.append(code.giss_data.MISSING)
         else:
             t.append(tenths_to_float(v))
     return t
@@ -562,7 +561,7 @@ def read_USHCN(path, stations):
             flag = line[m*7+17]
             if ((flag in 'EQ') or              # interpolated data
                 (temp_fahrenheit == -9999)) :  # absent data
-                temp = code.giss_data.XMISSING
+                temp = code.giss_data.MISSING
             else:
                 # tenths of degrees F to degrees C
                 temp = (temp_fahrenheit - 320) * 5/90.0
@@ -622,13 +621,13 @@ def read_hohenpeissenberg(path):
 
 def read_float(s):
     """Returns the float converted from the argument string.
-    If float conversion fails, returns XMISSING.
+    If float conversion fails, returns MISSING.
     """
 
     try:
         return float(s)
     except:
-        return code.giss_data.XMISSING
+        return code.giss_data.MISSING
 
 # Find the USHCN input file
 def ushcn_input_file():

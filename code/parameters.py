@@ -9,7 +9,8 @@
 """Parameters controlling the GISTEMP algorithm.
 
 Various numeric parameters controlling each phase of the algorithm are
-collected and documented here.
+collected and documented here.  They appear here in approximately the
+order in which they are used in the algorithm.
 """
 __docformat__ = "restructuredtext"
 
@@ -120,15 +121,10 @@ gridding_radius = 1200.0
 """The radius in kilometres used to find and weight station records to
 give a grid record."""
 
-gridding_reference_first_year = 1951
+gridding_reference_period = (1951, 1980)
 """When gridding, temperature series are turned into anomaly series by
 subtracting monthly means computed over a reference period.  This is
-the first year of that reference period."""
-
-gridding_reference_last_year = 1980
-"""When gridding, temperature series are turned into anomaly series by
-subtracting monthly means computed over a reference period.  This is
-the last year of that reference period."""
+the first and last years of that reference period."""
 
 sea_surface_cutoff_temp = -1.77
 """When incorporating monthly sea-surface datasets, treat any
@@ -146,17 +142,11 @@ less than this, the land data is used in preference to the ocean data
 when calculating the box series. Note: the distance used is actually a
 great-circle chord length."""
 
-subbox_reference_first_year = 1961
+subbox_reference_period = (1961, 1990)
 """When combining subbox records into box records, temperature series
 are turned into anomaly series by subtracting monthly means computed
-over a reference period.  This is the first year of that reference
-period."""
-
-subbox_reference_last_year = 1990
-"""When combining subbox records into box records, temperature series
-are turned into anomaly series by subtracting monthly means computed
-over a reference period.  This is the last year of that reference
-period."""
+over a reference period.  This is the first and last years of that
+reference period."""
 
 box_min_overlap = 20
 """When combining subbox records to make box records, do not combine a
@@ -164,17 +154,11 @@ calendar month from a candidate subbox record if it has fewer than
 this number of years of overlap with the same calendar month in the
 combined box record.  Also used when combining boxes into zones."""
 
-box_reference_first_year = 1951
+box_reference_period = (1951, 1980)
 """When combining box records into zone records, temperature series
 are turned into anomaly series by subtracting monthly means computed
-over a reference period.  This is the first year of that reference
-period."""
-
-box_reference_last_year = 1980
-"""When combining box records into zone records, temperature series
-are turned into anomaly series by subtracting monthly means computed
-over a reference period.  This is the last year of that reference
-period."""
+over a reference period.  This is the first and last years of that
+reference period."""
 
 zone_annual_min_months = 6
 """When computing zone annual means, require at least this many valid

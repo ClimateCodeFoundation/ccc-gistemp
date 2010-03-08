@@ -40,33 +40,14 @@ import struct
 import itertools
 
 import read_config
-import giss_data
+from giss_data import valid, invalid, MISSING
 import parameters
 
-
-# TODO: Make valid/invalid checking a giss_data function.
-def invalid(x):
-    """Test for invalid datum ("equal" to the BAD value, for some
-    definition of "equal").
-    """
-
-    # If you're feeling spooky about the BAD value, re-enable this:
-    # if abs(x-BAD) < 0.1:
-    #     assert x == BAD
-
-    return x == giss_data.XMISSING
-
-def valid(x):
-    """Test for valid datum.  See invalid()."""
-
-    # It's important that this obey Iverson's convention: in other words
-    # return 0 or 1 (or False or True, which it does).
-    return not invalid(x)
 
 def valid_mean(seq, min=1):
     """Takes a sequence, *seq*, and computes the mean of the valid
     items (using the valid() function).  If there are fewer than *min*
-    valid items, the mean is XMISSING."""
+    valid items, the mean is MISSING."""
 
     count = 0
     sum = 0.0
@@ -77,7 +58,7 @@ def valid_mean(seq, min=1):
     if count >= min:
         return sum/float(count)
     else:
-        return giss_data.XMISSING
+        return MISSING
 
 def monthly_anomalies(data):
     """Calculate monthly anomalies, by subtracting from every datum
@@ -97,10 +78,10 @@ def monthly_anomalies(data):
                 """Convert a single datum to anomaly."""
                 if valid(datum):
                     return datum - mean
-                return giss_data.XMISSING
+                return MISSING
             monthly_anom.append(map(asanom, row))
         else:
-            monthly_anom.append([giss_data.XMISSING]*years)
+            monthly_anom.append([MISSING]*years)
     return monthly_mean, monthly_anom
 
 def monthly_annual(data):
@@ -140,7 +121,7 @@ def monthly_annual(data):
                 # year.  Which we do by offsetting the array, and not
                 # using the most recent December.
                 row[1:] = row[:-1]
-                row[0] = giss_data.XMISSING
+                row[0] = MISSING
             month_in_season.append(row)
         seasonal_anom_row = []
         for n in range(years):
@@ -160,14 +141,14 @@ def monthly_annual(data):
 
 
 def average(sums, counts, years):
-    """Return an array with sums[i]/counts[i], and XMISSING where
+    """Return an array with sums[i]/counts[i], and MISSING where
     counts[i] is zero.
     """
 
     assert len(sums) == years * 12
     assert len(counts) == years * 12
 
-    data = [giss_data.XMISSING] * (years*12)
+    data = [MISSING] * (years*12)
 
     for i in range(len(counts)):
         count = counts[i]
@@ -254,7 +235,7 @@ def get_longest_overlap(new_data, begin, records):
         best_id = rec_id
         best_record = record
     if overlap < parameters.station_combine_min_overlap:
-        return 0, 0, giss_data.XMISSING
+        return 0, 0, MISSING
     return best_record, best_id, diff
 
 def combine(sums, wgts, begin, years, records, log, new_id=None):
@@ -382,7 +363,7 @@ def sigma(list):
     # Remove invalid (missing) data.
     list = filter(valid, list)
     if len(list) == 0:
-        return giss_data.XMISSING
+        return MISSING
     # Two pass method ensures argument to sqrt is always positive.
     mean = sum(list) / len(list)
     sigma_squared = sum((x-mean)**2 for x in list)
@@ -461,11 +442,11 @@ def find_quintuples(new_sums, new_wgts,
                 index1 = i * sign + new_offset
                 index2 = i * sign + rec_offset
                 if index1 < 0 or index1 >= new_len:
-                    anom1 = giss_data.XMISSING
+                    anom1 = MISSING
                 else:
                     anom1 = new_ann_anoms[index1]
                 if index2 < 0 or index2 >= rec_len:
-                    anom2 = giss_data.XMISSING
+                    anom2 = MISSING
                 else:
                     anom2 = rec_ann_anoms[index2]
                 if valid(anom1):
@@ -613,10 +594,10 @@ def drop_strange(data):
                 # remove some years from mid-series
                 nmonths = (year2 + 1 - year1) * 12
                 series[(year1-begin)*12:(year2+1-begin)*12] = [
-                        giss_data.XMISSING] * nmonths
+                        MISSING] * nmonths
 
             else: # remove a single month
-                series[(year-begin)*12 + x-1] = giss_data.XMISSING
+                series[(year-begin)*12 + x-1] = MISSING
 
         else:
             record.set_series(begin * 12 + 1, series)

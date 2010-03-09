@@ -27,6 +27,9 @@ may run into problems with long URLs and the Google Chart API).
 Currently the same beginning and end years have to be used for all the
 series.
 
+Two trend lines are drawn for each series: one for the entire series
+and one for the last thirty years of data.
+
 If series are very close, they will be displayed on top of each other.
 An offset can be introduced between each series to shift it up the
 chart.  -o offset will shift each series up (for a positive offset) or
@@ -62,6 +65,26 @@ def asann(f):
             except ValueError:
                 yield((year, None))
 
+def trend(data):
+    """Computes linear regression parameters (a,b) on the *data*."""
+    sxx = sxy = syy = sx = sy = n = 0
+    for (x,y) in data:
+        if y is not None:
+            sxx += x*x
+            syy += y*y
+            sx += x
+            sy += y
+            sxy += x * y
+            n += 1
+    xbar = float(sx) / n
+    ybar = float(sy) / n
+    ssxx = sxx - float(sx * sx) / n
+    ssyy = syy - float(sy * sy) / n
+    ssxy = sxy - float(sx * sy) / n
+    b = ssxy / ssxx
+    a = ybar - b * xbar
+    return (a,b)
+
 def asgooglechartURL(seq, offset):
     """*seq* is a sequence of iterables (each one assumed to be the
     output from :meth:`asann`) into a URL suitable for passing to the
@@ -90,7 +113,7 @@ def asgooglechartURL(seq, offset):
     for i in range(1,len(y)-1):
         if y[i]%10:
             y[i]=''
-    ds = [chartsingle(l) for l in data]
+    ds = ['-999|' + chartsingle(l)+'|'+trendlines(l) for l in data]
 
     xaxis = '|' + '|'.join(map(str, y))
     vaxis = '||-0.5|+0.0|+0.5|'
@@ -99,16 +122,22 @@ def asgooglechartURL(seq, offset):
     chd='chd=t:' + '|'.join(ds)
     chs='chs=600x500'
     # Choose scale, and deal with offset if we have to.
-    scale = [-100,100]
+    scale = [-100,100]*6
     if offset and len(seq) > 1:
         scale *= len(seq)
         for i in range(len(seq)):
-            scale[2*i] -= i*offset
-            scale[2*i+1] -= i*offset
+            scale[12*i+2] -= i*offset
+            scale[12*i+3] -= i*offset
+            scale[12*i+6] -= i*offset
+            scale[12*i+7] -= i*offset
+            scale[12*i+10] -= i*offset
+            scale[12*i+11] -= i*offset
     chds = 'chds=' + ','.join(map(str, scale))
-    colours = ['ff0000','000000']
+    # red, then black for the underlying graphs
+    colours = ['ff0000','c04040','808080'] + ['000000','004040','008080']*(len(data)-1)
+
     chco = 'chco=' + ','.join(colours)
-    return prefix + '?' + '&'.join(['cht=lc',chds,chd,chxt,chxl,chco,chs])
+    return prefix + '?' + '&'.join(['cht=lxy',chds,chd,chxt,chxl,chco,chs])
 
 def pad(data, yearmin, yearmax):
     """pad so that data series starts at yearmin and ends at yearmax."""
@@ -121,6 +150,20 @@ def pad(data, yearmin, yearmax):
     return (zip(range(yearmin, t0), nonelots) +
       data +
       zip(range(t1+1, yearmax+1), nonelots))
+
+def trendlines(data):
+    # full trend
+    (a,b) = trend(data)
+    yearmin = data[0][0]
+    yearmax = data[-1][0]
+    full_left_y = int(round(a + yearmin * b))
+    full_right_y = int(round(a + yearmax * b))
+    # thirty-year trend
+    (a,b) = trend(data[-30:])
+    left_y = int(round(a + (yearmax-30) * b))
+    left_x = 100 - int(round((30.0 / (yearmax - yearmin))*200))
+    right_y = int(round(a + yearmax * b))
+    return "-100,100|%d,%d|%d,100|%d,%d" % (full_left_y, full_right_y, left_x, left_y, right_y)
 
 def chartsingle(l):
     """Take a list and return a URL fragment for its Google

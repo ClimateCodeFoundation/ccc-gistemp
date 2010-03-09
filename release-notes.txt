@@ -1,6 +1,7 @@
 CLEAR CLIMATE CODE RELEASE NOTES FOR RELEASE 0.3.0
 
 Nick Barnes, Ravenbrook Limited
+David Jones, Ravenbrook Limited
 
 $Date$
 
@@ -10,13 +11,14 @@ CONTENTS
   1. Introduction
   2. Getting help
   3. What's fixed
-     3.1.   What's fixed in release 0.3.0
-     3.2.   What was fixed in release 0.2.0
-     3.3.   What was fixed in release 0.1.0
-     3.4.   What was fixed in release 0.0.3
-     3.5.   What was fixed in release 0.0.2
-     3.6.   What was fixed in release 0.0.1
-     3.7.   What was fixed in release 0.0.0
+     3.1.   What's fixed in release 0.4.0
+     3.2.   What was fixed in release 0.3.0
+     3.3.   What was fixed in release 0.2.0
+     3.4.   What was fixed in release 0.1.0
+     3.5.   What was fixed in release 0.0.3
+     3.6.   What was fixed in release 0.0.2
+     3.7.   What was fixed in release 0.0.1
+     3.8.   What was fixed in release 0.0.0
   A. References
   B. Document history
   C. Copyright and license
@@ -24,11 +26,12 @@ CONTENTS
 
 1. INTRODUCTION
 
-These are the release notes for release 0.3.0 of the Clear Climate
+These are the release notes for release 0.4.0 of the Clear Climate
 Code GISTEMP project (ccc-gistemp).
 
-Clear Climate Code is reimplementing GISTEMP (the GISS surface
-temperature analysis system), to make it clearer.
+Clear Climate Code have reimplemented GISTEMP (the GISS surface
+temperature analysis system), to make it clearer.  Work continues
+towards making it more clear and more accessible.
 
 For instructions on installing and running ccc-gistemp, see the
 product readme (readme.txt).
@@ -48,7 +51,77 @@ support@clearclimatecode.org.
 
 This section lists defects that have been fixed.
 
-3.1. WHAT'S FIXED IN RELEASE 0.3.0
+
+3.1 WHAT'S FIXED IN RELEASE 0.4.0
+
+
+Issue 7: Out-of-date with respect to GISTEMP
+
+In particular the previous release was not using USHCN Version 2
+dataset (that GISTEMP uses), and now we are.
+
+
+Issue 17: Decompressing input files is slow.
+
+We now get input files in zip or gz format which we can decompress. on
+the fly, quickly.
+
+
+Issue 43: Problem when sigma is 0.
+
+Some possible inputs to the "sigma" routine in step1.py could cause an
+exception (due to taking the square root of a negative number).  This
+never occurred with actual data, and now the problem has been
+eliminating by rewriting the calculation.
+
+
+Issue 45: Does not produce land-only index
+
+It's now possible to omit Step 4 and produce a land-only index.  It
+matches GISTEMP.
+
+
+Issue 50: Data are rounded unnecessarily in internal processing.
+
+Rounding was used to exactly emulate the Fortran GISTEMP.  Rounding
+made the code less clear, and it has been removed.  Consequently all
+data is handled internally as floating point degrees Celsius (previously
+it was a mixture of integer tenths, floating point tenths, and floating
+point degrees).
+
+
+Issue 51: Data are passed between steps in intermediate files.
+
+All intermediate files are now unnecessary for a normal run, they are
+only produced for inspection purposes.  Data is passed between steps
+directly.  This allows the rounding steps to be removed (Issue 50) and
+allows a more flexible pipeline that can produce a land index (Issue
+45).
+
+
+Issue 52: Difficult to change some obvious parameters.
+
+Parameters like the 1200 Km radius used when gridding, and the number,
+3, of rural stations required to adjust an urban station, were scattered
+throughout the code.  A lot of these have now been placed in
+code/parameters.py where they can be changed more easily.
+
+
+Issue 53: Core algorithm is mixed with input/output.
+
+All code concerned with file input/output has been moved to the tool/
+directory; the "core GISTEMP algorithm" stays in the code/ directory.
+The code here is now smaller and clearer as a result.
+
+
+Issue 54: Selection of urban stations does not match GISTEMP.
+
+GISTEMP recently switched to using nighttime brightness to determine
+urban/rural stations.  We made the corresponding change. (see also Issue
+7)
+
+
+3.2. WHAT WAS FIXED IN RELEASE 0.3.0
 
 
 Issue 24: Doesn't work with Python 2.4
@@ -171,7 +244,7 @@ An internal program to generate Google Chart URLs broke under some
 circumstances.
 
 
-3.2. WHAT WAS FIXED IN RELEASE 0.2.0
+3.3. WHAT WAS FIXED IN RELEASE 0.2.0
 
 Issue 19: STEP2 is in Fortran
 
@@ -212,7 +285,7 @@ the annual global temperature anomalies from two sets of result data
 compare_results.py, which generates a more detailed report comparing
 two sets of results.
 
-3.3. WHAT WAS FIXED IN RELEASE 0.1.0
+3.4. WHAT WAS FIXED IN RELEASE 0.1.0
 
 ESSENTIAL
 
@@ -272,7 +345,7 @@ separate step driver scripts.  Executables live adjacent to the source
 code. It's all a bit of a mess.
 
 
-3.4. WHAT WAS FIXED IN RELEASE 0.0.3
+3.5. WHAT WAS FIXED IN RELEASE 0.0.3
 
 
 ESSENTIAL
@@ -291,7 +364,7 @@ GISTEMP STEP2/PApars.f has quite a lot of old FORTRAN code which is
 obscure.  The large header comment is also incorrect in places.
 
 
-3.5. WHAT WAS FIXED IN RELEASE 0.0.2
+3.6. WHAT WAS FIXED IN RELEASE 0.0.2
 
 
 ESSENTIAL
@@ -307,7 +380,7 @@ diagnosing a difference between the output of the FORTRAN STEP0 and
 Python step0.py.
 
 
-3.6. WHAT WAS FIXED IN RELEASE 0.0.1
+3.7. WHAT WAS FIXED IN RELEASE 0.0.1
 
 
 ESSENTIAL
@@ -335,7 +408,7 @@ path to Python in the "shebang" #! first line of the file.  This is not
 very portable to say the least.
 
 
-3.7. WHAT WAS FIXED IN RELEASE 0.0.0
+3.8. WHAT WAS FIXED IN RELEASE 0.0.0
 
 
 Nothing.  Release 0.0.0 is just GISTEMP as released on 2007-10-10,
@@ -351,6 +424,7 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
+2010-03-09 DRJ Updated for 0.4.0.
 2010-01-26 NB  Updated for 0.3.0.
 2010-01-11 NB  Updated for 0.2.0.
 2009-12-03 NB  Updated for GoogleCode project.

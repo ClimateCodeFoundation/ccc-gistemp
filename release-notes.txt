@@ -55,12 +55,6 @@ This section lists defects that have been fixed.
 3.1 WHAT'S FIXED IN RELEASE 0.4.0
 
 
-Issue 7: Out-of-date with respect to GISTEMP
-
-In particular the previous release was not using USHCN Version 2
-dataset (that GISTEMP uses), and now we are.
-
-
 Issue 17: Decompressing input files is slow.
 
 We now get input files in zip or gz format which we can decompress. on

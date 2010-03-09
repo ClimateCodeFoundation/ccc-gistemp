@@ -1,4 +1,4 @@
-CLEAR CLIMATE CODE RELEASE NOTES FOR RELEASE 0.3.0
+CLEAR CLIMATE CODE RELEASE NOTES FOR RELEASE 0.4.0
 
 Nick Barnes, Ravenbrook Limited
 David Jones, Ravenbrook Limited
@@ -51,8 +51,76 @@ support@clearclimatecode.org.
 
 This section lists defects that have been fixed.
 
-
 3.1 WHAT'S FIXED IN RELEASE 0.4.0
+
+
+Issue 56: Code is unclear due to Fortran style
+
+Almost all of our code has now been rewritten to remove the Fortran
+style which remained from the original conversion from GISTEMP.
+Previous releases had greatly improved steps 0-2; this release
+continues the improvement work there and also carries those
+improvements through steps 3-5.  Almost all of our Python code now has
+sensible variable and function names, clearer data handling, and
+helpful comments.  Many unused variables and functions have been
+removed.
+
+
+Issue 50: Data are rounded unnecessarily in internal processing.
+
+Rounding was used to exactly emulate the Fortran GISTEMP.  Rounding
+made the code less clear, and Dr Reto Ruedy of NASA GISS confirmed
+that rounding was not important to the algorithm, so it has been
+removed.  All temperature data is now handled internally as floating
+point degrees Celsius (previously it was a mixture of integer tenths,
+floating point tenths, and floating point degrees) and all location
+information is handled as floating point degrees latitude and
+longitude (previously it was a mixture of floating point degrees and
+integer hundredths).
+
+
+Issue 51: Data are passed between steps in intermediate files.
+
+Much of GISTEMP is concerned with generating and consuming
+intermediate files, to separate phases and to avoid keeping the whole
+dataset in memory at once (an important consideration when GISTEMP was
+originally written).  We have now completely replaced this with an
+in-memory pipeline, which is clearer, automatically pipelines all the
+processing where possible, and avoids all code concerned with
+serialization and deserialization.
+
+We have retained code to generate intermediate files between the
+distinct steps of the GISTEMP algorithm, and to allow running a step
+from an intermediate file instead of in a pipeline.  This allows the
+running of single steps, and is useful for testing purposes.
+
+
+Issue 52: Difficult to change some obvious parameters.
+
+Parameters like the 1200 km radius used when gridding, and the number,
+3, of rural stations required to adjust an urban station, were
+scattered throughout the code.  Almost all of these have now been
+placed in code/parameters.py where they can be changed more easily.
+
+
+Issue 53: Core algorithm is mixed with input/output.
+
+All code concerned with file input/output has been moved to the tool/
+directory; the "core GISTEMP algorithm" stays in the code/ directory.
+The code here is now smaller and clearer as a result.
+
+
+Issue 45: Does not produce land-only index
+
+It's now possible to omit Step 4 and produce a land-only index.  It
+matches GISTEMP.
+
+
+Issue 54: Selection of urban stations does not match GISTEMP.
+
+GISTEMP recently switched to using nighttime brightness to determine
+urban/rural stations.  We made the corresponding change. (see also Issue
+7)
 
 
 Issue 17: Decompressing input files is slow.
@@ -67,52 +135,6 @@ Some possible inputs to the "sigma" routine in step1.py could cause an
 exception (due to taking the square root of a negative number).  This
 never occurred with actual data, and now the problem has been
 eliminating by rewriting the calculation.
-
-
-Issue 45: Does not produce land-only index
-
-It's now possible to omit Step 4 and produce a land-only index.  It
-matches GISTEMP.
-
-
-Issue 50: Data are rounded unnecessarily in internal processing.
-
-Rounding was used to exactly emulate the Fortran GISTEMP.  Rounding
-made the code less clear, and it has been removed.  Consequently all
-data is handled internally as floating point degrees Celsius (previously
-it was a mixture of integer tenths, floating point tenths, and floating
-point degrees).
-
-
-Issue 51: Data are passed between steps in intermediate files.
-
-All intermediate files are now unnecessary for a normal run, they are
-only produced for inspection purposes.  Data is passed between steps
-directly.  This allows the rounding steps to be removed (Issue 50) and
-allows a more flexible pipeline that can produce a land index (Issue
-45).
-
-
-Issue 52: Difficult to change some obvious parameters.
-
-Parameters like the 1200 Km radius used when gridding, and the number,
-3, of rural stations required to adjust an urban station, were scattered
-throughout the code.  A lot of these have now been placed in
-code/parameters.py where they can be changed more easily.
-
-
-Issue 53: Core algorithm is mixed with input/output.
-
-All code concerned with file input/output has been moved to the tool/
-directory; the "core GISTEMP algorithm" stays in the code/ directory.
-The code here is now smaller and clearer as a result.
-
-
-Issue 54: Selection of urban stations does not match GISTEMP.
-
-GISTEMP recently switched to using nighttime brightness to determine
-urban/rural stations.  We made the corresponding change. (see also Issue
-7)
 
 
 3.2. WHAT WAS FIXED IN RELEASE 0.3.0

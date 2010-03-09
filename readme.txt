@@ -1,4 +1,4 @@
-CLEAR CLIMATE CODE GISTEMP README FOR RELEASE 0.3.0
+CLEAR CLIMATE CODE GISTEMP README FOR RELEASE 0.4.0
 
 Nick Barnes, Clear Climate Code
 
@@ -31,41 +31,11 @@ ccc-gistemp release 0.4.0 is a release of ccc-gistemp version 0.4.
 The purpose of version 0.4 is to increase clarity by:
   - removing rounding;
   - removing intermediate I/O;
-  - documenting parameters in parameters.py.
+  - gathering and documenting parameters in parameters.py;
+  - general code clarification.
 
-Much of GISTEMP was concerned with generating and consuming
-intermediate files, to separate phases and to avoid keeping the
-whole dataset in memory at once (an important consideration when
-GISTEMP was originally written).  In 0.4.0 this has been replaced
-by an iterator-based approach, which is clearer, automatically
-pipelines all the processing where possible, and avoids all code
-concerned with serialization and deserialization.
-
-We have retained intermediate files between the distinct steps of
-the GISTEMP algorithm, for compatibility with GISTEMP and for testing
-purposes; these files are now produced as diagnostic outputs
-only, data between steps is transferred via an in-memory pipeline.
-
-All intermediate rounding and truncating of data that GISTEMP performs
-(which was necessary when writing certain intermediate files) has been removed
-from ccc-gistemp.  Many of the intermediate files only produce data
-with a resolution of 0.1 C; consequently the data in those files only
-matches the data actually passed between steps of the algorithm to the
-nearest 0.1 C.
-
-
-All of the ccc-gistemp code is now in Python and much of it has been
-clarified in an attempt to remove its Fortran heritage.
-
-There has been a rearrangement of the code: the code/ directory now
-only contains code which we consider part of the GISTEMP algorithm.
-Everything else - input data fetching, run framework, testing,
-debugging utilities - is in the tool/ directory.  This division will
-continue.
-
-There is better code for comparing results, and a regression test
-against genuine GISTEMP results.
-
+Changes since earlier releases are described in more detail in
+release-notes.txt.
 
 URLs for further information:
 
@@ -140,8 +110,8 @@ deleted (if you wish, for example, to have a clean run).
 6. RESULTS
 
 After running run.py, the GISTEMP result files are all in the result/
-directory.  A rough graphical output is made using the Google Chart API;
-this file:
+directory.  A simple graphical chart is made using the Google Chart
+API; this file:
 
     result/google-chart.url
 
@@ -169,9 +139,9 @@ http://ccc-gistemp.googlecode.com/files/ccc-gistemp-test-2009-12-28.tar.gz
 and uncompress it to a local directory ccc-gistemp-test-2009-12-28/.
 This contains input files and result data kindly provided to the
 ccc-gistemp project by Dr Reto Ruedy of NASA GISS, from an actual run
-of GISS on 2009-12-28.  Once the tarball is fetched and unpacked, the
-local ccc-gistemp code will be run on it and the results compared,
-generating a report in index.html.
+of GISTEMP at GISS on 2009-12-28.  Once the tarball is fetched and
+unpacked, the local ccc-gistemp code will be run on it and the results
+compared, generating a report in index.html.
 
 
 A. REFERENCES

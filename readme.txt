@@ -20,37 +20,42 @@ CONTENTS
 
 1. INTRODUCTION
 
-This is release 0.3.0 of the Clear Climate Code GISTEMP project
+This is release 0.4.0 of the Clear Climate Code GISTEMP project
 (ccc-gistemp).
 
-Clear Climate Code is reimplementing GISTEMP (the GISS surface
-temperature analysis system), to make it clearer.
+Clear Climate Code have reimplemented GISTEMP (the GISS surface
+temperature analysis system), to make it clearer.  Work continues
+towards making it more clear and more accessible.
 
-ccc-gistemp release 0.3.0 is a release of ccc-gistemp version 0.3.
-The purpose of version 0.3 is: Removal of intermediate files, general
-clarification, and more accessibility.
+ccc-gistemp release 0.4.0 is a release of ccc-gistemp version 0.4.
+The purpose of version 0.4 is to increase clarity by:
+  - removing rounding;
+  - removing intermediate I/O;
+  - documenting parameters in parameters.py.
 
 Much of GISTEMP was concerned with generating and consuming
-intermediate files, to separate phases and to avoid keeping the whole
-dataset in memory at once (an important consideration when GISTEMP was
-originally written).  In 0.3.0 this has largely been replaced by an
-iterator-based approach, which is clearer, automatically pipelines all
-the processing where possible, and avoids all code concerned with
-serialization and deserialization.
+intermediate files, to separate phases and to avoid keeping the
+whole dataset in memory at once (an important consideration when
+GISTEMP was originally written).  In 0.4.0 this has been replaced
+by an iterator-based approach, which is clearer, automatically
+pipelines all the processing where possible, and avoids all code
+concerned with serialization and deserialization.
 
-We have retained intermediate files between the distinct steps of the
-GISTEMP algorithm, for compatibility with GISTEMP and for testing
-purposes.  We have also retained some code to round or truncate some
-data at the points where Fortran truncates it for serialization.  This
-will be removed in future.
+We have retained intermediate files between the distinct steps of
+the GISTEMP algorithm, for compatibility with GISTEMP and for testing
+purposes; these files are now produced as diagnostic outputs
+only, data between steps is transferred via an in-memory pipeline.
 
-Some of the original GISS code was already in Python, and survived
-almost unchanged in 0.2.0.  Much of the rest of 0.2.0, especially the
-more complex arithmetical processing in step 2, was more-or-less
-transliterated from the Fortran.  A lot of this code has been
-rewritten in 0.3.0, especially improving the clarity of the
-station-combining code (in step1.py) and the peri-urban adjustment
-(now in step2.py).
+All intermediate rounding and truncating of data that GISTEMP performs
+(which was necessary when writing certain intermediate files) has been removed
+from ccc-gistemp.  Many of the intermediate files only produce data
+with a resolution of 0.1 C; consequently the data in those files only
+matches the data actually passed between steps of the algorithm to the
+nearest 0.1 C.
+
+
+All of the ccc-gistemp code is now in Python and much of it has been
+clarified in an attempt to remove its Fortran heritage.
 
 There has been a rearrangement of the code: the code/ directory now
 only contains code which we consider part of the GISTEMP algorithm.
@@ -70,10 +75,11 @@ http://ccc-gistemp.googlecode.com/ ccc-gistemp code repository.
 
 2. DEPENDENCIES
 
-The only dependency is Python 2.4 (or a more recent Python version).
+The only dependency is Python 2.5 (or a more recent Python version).
+Python 2.4 was supported for previous releases but has now been dropped.
 The code should run on OS X, FreeBSD, Windows, and probably a variety of
 other Unix-like operating systems.  A network connection is required to
-download the input files (which need only be done once), and to produce
+download the input files (which need only be done once), and to display
 an optional graph from the results.
 
 Python may already be installed on your machine (for example, it comes
@@ -86,15 +92,15 @@ not work).
 
 3. INSTALLATION
 
-Unpack ccc-gistemp-0.3.0.tar.gz.
+Unpack ccc-gistemp-0.4.0.tar.gz.
 
 
 4. INPUT DATA
 
-ccc-gistemp-0.3.0 uses input data in the subdirectory input/.  This
+ccc-gistemp-0.4.0 uses input data in the subdirectory input/.  This
 input data includes large files of temperature records from GHCN,
 USHCN, and sea surface data, and small files of additional temperature
-records and station tables from GISS.  ccc-gistemp-0.3.0 includes code
+records and station tables from GISS.  ccc-gistemp-0.4.0 includes code
 (tool/preflight.py) to fetch this data from the originating
 organisations over the internet.  It will not download a file if it is
 already present in the input/ directory, so if you wish to run
@@ -106,11 +112,13 @@ directory before you start.
 
 To run ccc-gistemp:
 
-python tool/run.py
+    python tool/run.py
 
-To run only one step (0-5), give a -s <step> argument.  For instance:
+That command runs steps 0 through 5.  To run only a single step or a shorter
+sequence of steps, use the -s argument.  For instance:
 
-python tool/run.py -s 1
+    python tool/run.py -s 3         # Runs just step 3
+    python tool/run.py -s 0-3,5     # Runs steps 0,1,2,3,5 (omitting 4)
 
 We use this directory structure:
 
@@ -154,7 +162,7 @@ including various statistical comparisons of the two result files.
 
 To test ccc-gistemp against GISTEMP:
 
-python tool/regression.py
+    python tool/regression.py
 
 This will fetch a tarball from
 http://ccc-gistemp.googlecode.com/files/ccc-gistemp-test-2009-12-28.tar.gz
@@ -175,6 +183,7 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
+2010-03-09 DRJ Updated to prepare for 0.4.0.
 2010-01-26 NB  Updated to prepare for 0.3.0.
 2010-01-25 DRJ Removed PNG result.
 2010-01-22 NB  Updated to reflect some code moving to tool/.

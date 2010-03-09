@@ -96,8 +96,6 @@ def anomalize(data, reference_period, base_year):
             count += 1
             sum += datum
         if count == 0:
-            sum = 0.0
-            count = 0
             for datum in data[m::12]:
                 if invalid(datum):
                     continue

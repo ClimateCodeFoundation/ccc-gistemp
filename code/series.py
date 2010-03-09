@@ -81,7 +81,7 @@ def combine(average, weight, new, new_weight, first_year, last_year, min_overlap
 def anomalize(data, reference_period, base_year):
     """Turn the series *data* into anomalies, based on monthly
     averages over the *reference_period*, for example (1951, 1980).
-    *base_year* is the first year of the series.  In any month has no
+    *base_year* is the first year of the series.  If any month has no
     data in the reference period, the average for that month is
     computed over the whole series.
     """
@@ -108,7 +108,7 @@ def anomalize(data, reference_period, base_year):
         else:
             average = sum/count
         index = m
-        while (index < len(data)):
+        while index < len(data):
             if valid(data[index]):
                 data[index] -= average
             index += 12

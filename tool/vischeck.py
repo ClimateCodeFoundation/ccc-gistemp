@@ -24,8 +24,6 @@ URLs (in which case the data will be downloaded and used).
 Multiple series (one per file) can be displayed on the same chart,
 simply specify all the files on the command line (although more than 2
 may run into problems with long URLs and the Google Chart API).
-Currently the same beginning and end years have to be used for all the
-series.
 
 Two trend lines are drawn for each series: one for the entire series
 and one for the last thirty years of data.

@@ -238,7 +238,7 @@ def fetch_tar(l, prefix, output):
     """(helper function used by :meth:`fetch`)
 
     *l* is a list of (*place*,*name*) pairs.  Each *name* is a short name,
-    each *place* is a pair ('tar',*url*,*member*).
+    each *place* is a triple ('tar',*url*,*member*).
     """
 
     import itertools
@@ -264,7 +264,7 @@ def fetch_zip(l, prefix, output):
     """(helper function used by :meth:`fetch`)
 
     *l* is a list of (*place*,*name*) pairs.  Each *name* is a short name,
-    each *place* is a pair ('zip',*url*,*member*).
+    each *place* is a triple ('zip',*url*,*member*).
     """
 
     import itertools

@@ -166,11 +166,24 @@ def trendlines(data):
     full_left_y = int(round(a + yearmin * b))
     full_right_y = int(round(a + yearmax * b))
     # thirty-year trend
-    (a,b) = trend(data[-30:])
-    left_y = int(round(a + (yearmax-30) * b))
-    left_x = 100 - int(round((30.0 / (yearmax - yearmin))*200))
-    right_y = int(round(a + yearmax * b))
-    return "-100,100|%d,%d|%d,100|%d,%d" % (full_left_y, full_right_y, left_x, left_y, right_y)
+    # Find most recent 30 years of _valid_ data
+    valid_count = 0
+    last_valid = -9999 # largest index with valid data
+    for i,(x,y) in reversed(list(enumerate(data))):
+        if y is None:
+            continue
+        last_valid = max(last_valid, i)
+        valid_count += 1
+        if valid_count >= 30:
+            break
+    (a,b) = trend(data[i:])
+    left_y = int(round(a + (yearmin+i) * b))
+    left_x = -100 + 200*float(i)/(yearmax-yearmin)
+    right_y = int(round(a + (yearmin+last_valid) * b))
+    right_x = -100 + 200*float(last_valid)/(yearmax-yearmin)
+    return "-100,100|%d,%d|%.0f,%.0f|%d,%d" % (full_left_y, full_right_y,
+      left_x, right_x,
+      left_y, right_y)
 
 def chartsingle(l):
     """Take a list and return a URL fragment for its Google

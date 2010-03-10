@@ -171,8 +171,8 @@ def fetch(files, prefix='input/', output=sys.stdout):
     # Now make the *place* dictionary have short names both with and
     # without the compression suffix.
     def removeZ(d):
-	"""Ensure that we can ask for either the compressed or
-	uncompressed version of a file.  To do this we add a short name
+        """Ensure that we can ask for either the compressed or
+        uncompressed version of a file.  To do this we add a short name
         with the extension removed when the extension is one of:
         '.Z'; '.gz'.
 

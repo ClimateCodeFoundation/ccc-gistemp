@@ -140,11 +140,18 @@ def asgooglechartURL(seq, option):
             scale[12*i+10] -= i*offset
             scale[12*i+11] -= i*offset
     chds = 'chds=' + ','.join(map(str, scale))
-    # red, then black for the underlying graphs
-    colours = ['ff0000','c04040','808080'] + ['000000','004040','008080']*(len(data)-1)
-
+    # red, black, blue, magenta for the underlying graphs
+    colours = ['ff0000', '000000', '0000ff', 'ff00ff']
+    colours = colours[:len(data)]
+    # Replicate each colour by three (for the chart and its two trend
+    # lines).
+    colours = list(itertools.chain(*([c,c,c,] for c in colours)))
     chco = 'chco=' + ','.join(colours)
-    return prefix + '?' + '&'.join(['cht=lxy',chds,chd,chxt,chxl,chco,chs])
+    # Line Style
+    chls = 'chls=' + '|'.join(['1|1,8,2|1']*len(data))
+
+    return prefix + '?' + '&'.join(
+      ['cht=lxy',chds,chd,chxt,chxl,chco,chls,chs])
 
 def pad(data, yearmin, yearmax):
     """pad so that data series starts at yearmin and ends at yearmax."""

@@ -87,7 +87,8 @@ def trend(data):
     ssxy = sxy - (sx * sy) / n
     b = ssxy / ssxx
     a = ybar - b * xbar
-    return (a,b)
+    r2 = (ssxy * ssxy) / (ssxx * ssyy)
+    return (a,b, r2)
 
 def asgooglechartURL(seq, options={}):
     """*seq* is a sequence of iterables (each one assumed to be the
@@ -133,7 +134,8 @@ def asgooglechartURL(seq, options={}):
 
     trends = [trendlines(l) for l in data]
     trenddata = [t[0] for t in trends]
-    slopes = [t[1:] for t in trends]
+    slopes = [t[1:len(data)+1] for t in trends]
+    coefficients = [t[len(data)+1:] for t in trends]
     ds = ['-999|' + chartsingle(l) for l in data] + trenddata
 
     vaxis = '||-0.5|+0.0|+0.5|'
@@ -161,7 +163,7 @@ def asgooglechartURL(seq, options={}):
     colours = ['ff0000', '000000', '0000ff', 'ff00ff']
     colours = colours[:len(data)]
 
-    chm = 'chm=' + '|'.join(slope_markers(slopes, colours))
+    chm = 'chm=' + '|'.join(slope_markers(slopes, coefficients, colours))
 
     # Replicate each colour by three (for the chart and its two trend
     # lines).
@@ -186,31 +188,30 @@ def pad(data, yearmin, yearmax):
       data +
       zip(range(t1+1, yearmax+1), nonelots))
 
-def slope_markers(slopes, colours):
+def slope_markers(slopes, coefficients, colours):
     """Create the markers to denote slopes / trends."""
 
     import itertools
     import urllib
 
-    l = [u'Trends (\N{DEGREE SIGN}C/Century)'.encode('utf-8')] + [format_slope(p) for p in slopes]
+    l = [u'Trend (\N{DEGREE SIGN}C/Century) and R\N{SUPERSCRIPT TWO}'.encode('utf-8')] + [format_slope(['full','30-year'], *pl) for pl in zip(slopes, coefficients)]
     colours = ['000000'] + colours
     return [
       urllib.quote_plus('@t%s,%s,0,%.2f:%.2f,12' % (
         text,
         colour,
-        0.6, 0.2 - 0.05*row)) for text, colour, row in
+        0.4, 0.2 - 0.05*row)) for text, colour, row in
         zip(l, colours, itertools.count())]
 
-def format_slope(p):
-    """Return a string for the slopes in p, which is a tuple."""
-    return ' / '.join('%.2f' % g for g in p)
+def format_slope(texts, slopes, coefficients):
+    """Return a string for the slopes and coefficients in pl, which is a list of pairs."""
+    return ' / '.join('%s: %.2f (%.2f)' % p for p in zip(texts, slopes, coefficients))
 
 def trendlines(data):
     """Return a a triple of (url,slopelong,slopeshort) for
     the full and 30-year trend lines (url is a fragment)."""
     # full trend
-    (a,b) = trend(data)
-    slope = b
+    (a,b,r2) = trend(data)
     yearmin = data[0][0]
     yearmax = data[-1][0]
     full_left_y = int(round(a + yearmin * b))
@@ -226,15 +227,15 @@ def trendlines(data):
         valid_count += 1
         if valid_count >= 30:
             break
-    (a,b) = trend(data[i:])
-    slope = (slope, b)
-    left_y = int(round(a + (yearmin+i) * b))
+    (a_30,b_30,r2_30) = trend(data[i:])
+    left_y = int(round(a_30 + (yearmin+i) * b_30))
     left_x = -100 + 200*float(i)/(yearmax-yearmin)
-    right_y = int(round(a + (yearmin+last_valid) * b))
+    right_y = int(round(a_30 + (yearmin+last_valid) * b_30))
     right_x = -100 + 200*float(last_valid)/(yearmax-yearmin)
     return ("-100,100|%d,%d|%.0f,%.0f|%d,%d" % (full_left_y, full_right_y,
-      left_x, right_x,
-      left_y, right_y),) + slope
+                                                left_x, right_x,
+                                                left_y, right_y),
+            b, b_30, r2, r2_30)
 
 def chartsingle(l):
     """Take a list and return a URL fragment for its Google

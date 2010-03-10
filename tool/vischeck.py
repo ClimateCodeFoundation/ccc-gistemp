@@ -91,7 +91,7 @@ def trend(data):
     a = ybar - b * xbar
     return (a,b)
 
-def asgooglechartURL(seq, offset):
+def asgooglechartURL(seq, option):
     """*seq* is a sequence of iterables (each one assumed to be the
     output from :meth:`asann`) into a URL suitable for passing to the
     Google Chart API.
@@ -99,7 +99,7 @@ def asgooglechartURL(seq, offset):
     Each element of the sequence corresponds to a different data series,
     all the series are plotted on the same chart.
 
-    *offset* corresponds to the -o option
+    See `chartit` for the documentation for *option*.
     """
 
     import itertools
@@ -126,8 +126,9 @@ def asgooglechartURL(seq, offset):
     chxl = 'chxl=0:'+xaxis+'|1:'+vaxis+'|2:'+vaxis
     chxt = 'chxt=x,y,r'
     chd='chd=t:' + '|'.join(ds)
-    chs='chs=600x500'
+    chs='chs=' + 'x'.join(option.size)
     # Choose scale, and deal with offset if we have to.
+    offset = option.offset
     scale = [-100,100]*6
     if offset and len(seq) > 1:
         scale *= len(seq)
@@ -204,18 +205,24 @@ def chartsingle(l):
 
 import sys
 
-def chartit(fs, out=sys.stdout, offset=0):
+def chartit(fs, option, out=sys.stdout):
     """Convert the list of files *fs* to a Google Chart API url and print it
     on *out*.
 
-    *offset* specifies the inter-chart offset, as per the -o option (see
-    module docstring).
+    The attributes of the *option* object are used to control various
+    features:
+
+    option.offset: specifies the inter-chart offset, as per the -o option
+    (see module docstring).
+
+    option.size: specifies the chart size as a tuple (width, height)
+    (width and height are _strings_).
     """
 
     import re
     import urllib
 
-    url = asgooglechartURL(map(asann, fs), offset=offset)
+    url = asgooglechartURL(map(asann, fs), option)
     print >>out, url
 
 def main(argv=None):
@@ -226,23 +233,33 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
+    class Struct(): pass
+    option = Struct()
+
     # offset between each series (-o option)
-    offset = 0
+    option.offset = 0
+    # Chart Size
+    option.size = map(str, (600,500))
 
     try:
-        opt,arg = getopt.getopt(argv[1:], 'o:', ['offset='])
+        opt,arg = getopt.getopt(argv[1:], 'o:', ['offset=', 'size='])
     except getopt.GetoptError, e:
         print >> sys.stderr, e.msg
         print >> sys.stderr, __doc__
         return 2
     for o,v in opt:
         if o in ('-o', '--offset'):
-            offset = float(v)
+            option.offset = float(v)
+        if o == '--size':
+            option.size = v.split(',')
+            if len(option.size) != 2:
+                raise Error("--size w,h is required")
+            
     if len(arg):
         fs = map(urllib.urlopen, arg)
     else:
         fs = [sys.stdin]
-    chartit(fs, offset=offset)
+    chartit(fs, option)
     return 0
 
 if __name__ == '__main__':

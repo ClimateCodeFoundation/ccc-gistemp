@@ -131,7 +131,7 @@ def stats(seq):
     variance = sum(map(lambda x: (x - mean) ** 2, seq)) / n
     return seq.count(0), n, mean, math.sqrt(variance)
 
-def difference(seqs, scale):
+def difference(seqs, scale=1.0):
     """Return a sequence of differences between the second (data) items
     of the pairs in the two sequences *seqs*, multiplied by *scale*."""
     assert len(seqs) == 2
@@ -339,7 +339,7 @@ def compare(dirs, labels, o):
     # Box series
     fs = map(lambda d: open(os.path.join(d, box_file), 'r'), dirs)
     boxes = map(list, map(box_series, fs))
-    diffs = list(difference(boxes, 0.01))
+    diffs = list(difference(boxes))
     box_table = {}
     for d in diffs:
         box = d[0][0]

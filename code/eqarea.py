@@ -33,7 +33,7 @@ import math
 band_altitude = [1, 0.9, 0.7, 0.4, 0]
 
 #: Number of horizontal boxes in each band.
-#: 
+#:
 #: To ensure equal area these should be proportional to the thickness of each
 #: band (Archimedes' Hat Box Theorem).
 band_boxes = [4, 8, 12, 16]
@@ -41,10 +41,10 @@ band_boxes = [4, 8, 12, 16]
 # Please move elsewhere
 def lerp(x, y, p):
     """Interpolate between x and y by the fraction p.
-   
+
     When p == 0 x will be returned, when p == 1 y will be returned.  Note
     that p is not restricted to being between 0 and 1.
-   
+
     :Return:
         The interpolated value.
 
@@ -52,7 +52,7 @@ def lerp(x, y, p):
         The interpolation end-points.
     :Param p:
         The interpolation fraction.
-   
+
     """
     p = float(p)
     return y*p + (1-p)*x
@@ -60,7 +60,7 @@ def lerp(x, y, p):
 
 def northern40() :
     """Generator: Yields the 40 northern hemisphere boxes.
-    
+
     The yielded value is a tuple of::
 
         (southern, northern, western, eastern).
@@ -81,7 +81,7 @@ def northern40() :
 
 def southern40() :
     """Generator: Yields the 40 southern hemisphere boxes.i
-    
+
     The yielded value is a tuple of::
 
         (southern, northern, western, eastern).
@@ -117,13 +117,13 @@ def grid() :
 
     Each box comprises an equal area division of a sphere; each box is
     described by a 4-tuple of its boundaries::
-    
+
         (southern, northern, western, eastern).
-        
+
     Co-ordinates are given as (fractional) degrees of latitude (for
     northern and southern borders) and longitude (for western and eastern
     borders).
-    
+
     """
     return itertools.chain(northern40(), southern40())
 
@@ -232,10 +232,10 @@ def gridR3() :
 
 def gridJSON() :
     """Create array of 80 R3-coordinate boxes in JSON format.
-    
+
     As `gridR3` but in JSON (http://www.json.org/) format.  Returned
     string matches a JSON array production.
-    
+
     """
     return str(list(itertools.imap(lambda x: map(list, x), gridR3())))
 

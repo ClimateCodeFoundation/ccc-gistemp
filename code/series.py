@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # $URL$
 # $Rev$
-# 
+#
 # series.py
 #
 # Nick Barnes, Ravenbrook Limited, 2010-03-08
@@ -38,7 +38,7 @@ def combine(average, weight, new, new_weight, first_year, last_year, min_overlap
 
     *new_weight* can be either a constant or an array of weights for
      each datum in *new*.
-     
+
     The number of month records combined is returned.
 
     Each month of the year is considered separately.  For the set of

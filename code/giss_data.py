@@ -79,7 +79,7 @@ def get_ghcn_last_year():
 
 class StationInventoryReader(object):
     """Reader for files in the format of input/v2.inv.
-    
+
     This can be used as a single-pass iterator, yielding `giss_data.Station`
     instances.
 
@@ -245,7 +245,7 @@ class StationMetaData(object):
 
 class Station(object):
     """A monitoring station's information.
-    
+
     This holds the information about a single monitoring station. Not all the
     fields are used by the CCC code and (currently) the meaning of some of
     these is unknown.
@@ -314,7 +314,7 @@ class Station(object):
         self.US_brightness = US_brightness
         self.global_brightness = global_brightness
 
-           
+
 # TODO: Needs some review. Among things to think about:
 #
 # 1. Might it be seen as too complicated? It is complicated for a reason; to
@@ -334,7 +334,7 @@ class MonthlyTemperatureRecord(object):
     The series coveres the months from `first_month` to `last_month` month
     inclusive. Months are counted from a non-existant year zero. So January,
     1 AD has a month number of 13, February is 14, etc.
-    
+
     Within series, some leading months and some trailing months may be set to
     the `MISSING` value. The `good_start_idx` and `good_end_idx` members define
     the Python range within the series that excludes these missing value.
@@ -371,7 +371,7 @@ class MonthlyTemperatureRecord(object):
     @property
     def good_start_idx(self):
         """Index of the first good value in the `series`.
-        
+
         It is always true that ``series[good_start_idx:good_end_idx]`` will
         either be empty or start and end with a valid value.
 
@@ -381,7 +381,7 @@ class MonthlyTemperatureRecord(object):
     @property
     def good_end_idx(self):
         """Index of the entry after the last good value in the `series`.
-        
+
         It is always true that ``series[good_start_idx:good_end_idx]`` will
         either be empty or start and end with a valid value.
 
@@ -434,7 +434,7 @@ class MonthlyTemperatureRecord(object):
     @property
     def first_good_month(self):
         """The number of the first good month in the series.
-        
+
         See `first_month` for details of how months are counted.
 
         """
@@ -443,7 +443,7 @@ class MonthlyTemperatureRecord(object):
     @property
     def last_good_month(self):
         """The number of the last good month in the series.
-        
+
         See `first_month` for details of how months are counted.
 
         """
@@ -501,11 +501,11 @@ class MonthlyTemperatureRecord(object):
 
     def strip_invalid(self):
         """Strip leading and trailing invalid values.
-        
+
         Adjusts the record so that the series starts and ends with a good (not
         `MISSING`) value. If there are no good values, the series will be
         emptied.
-        
+
         """
         self._first_month = self.first_good_month
         self._series[:] = self._series[self._good_start_idx:self._good_end_idx]
@@ -563,7 +563,7 @@ class MonthlyTemperatureRecord(object):
 
 class StationRecord(MonthlyTemperatureRecord):
     """An average monthly temperature record associated with a `Station`.
-    
+
     There can be multiple temperature series for a single `Station`. The
     `station` property provides the associated `Station` instance.
 
@@ -630,7 +630,7 @@ class StationRecord(MonthlyTemperatureRecord):
     @property
     def discriminator(self):
         """The discriminator code.
-        
+
         This distingushes different records associated with same station.
         This is the last digit of the record's `uid` converted to an
         integer.
@@ -660,7 +660,7 @@ class StationRecord(MonthlyTemperatureRecord):
 
     def get_set_of_years(self, first_year, last_year):
         """Get a set of year records.
-        
+
         :Return:
             A list of lists, where each sub-list contains 12 temperature values
             for a given year. This works for any range of years, missing years
@@ -721,15 +721,15 @@ class StationRecord(MonthlyTemperatureRecord):
                 continue
             s += "   %-10s: [%-4d] = %s...\n" % (n, len(v),
                     str([str(x)[:6] for x in v[:6]])[:-1])
-            s += "   %-10s:            ...%s\n" % ("", 
+            s += "   %-10s:            ...%s\n" % ("",
                     str([str(x)[:6] for x in v[-6:]])[1:])
 
         return s[:-1]
-           
+
 
 class SubboxMetaData(object):
     """The metadata for a set of sub-box records.
-    
+
     :Ivar mo1:
        TBD
     :Ivar kq:
@@ -772,7 +772,7 @@ class SubboxMetaData(object):
 
 class SubboxRecord(MonthlyTemperatureRecord):
     """A sub-box record.
-    
+
     This can hold, for example, a record of data as stored within the
     ``input/SBBX.HadR2`` file.
 
@@ -810,7 +810,7 @@ class SubboxRecord(MonthlyTemperatureRecord):
         while self.n < n:
             self._series.append(MISSING)
     pad_with_missing = clear_cache(pad_with_missing)
-            
+
     def set_value(self, idx, value):
         while idx >= len(self.series):
             self._series.append(MISSING)
@@ -855,7 +855,7 @@ class SubboxRecord(MonthlyTemperatureRecord):
                 continue
             s += "   %-10s: [%-4d] = %s...\n" % (n, len(v),
                     str([str(x)[:6] for x in v[:6]])[:-1])
-            s += "   %-10s:            ...%s\n" % ("", 
+            s += "   %-10s:            ...%s\n" % ("",
                     str([str(x)[:6] for x in v[-6:]])[1:])
 
         return s[:-1]

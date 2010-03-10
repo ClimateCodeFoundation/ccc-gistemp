@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # $URL$
 # $Rev$
-# 
+#
 # step1.py
 #
 # Nick Barnes, Ravenbrook Limited, 2008-08-06
@@ -128,7 +128,7 @@ def monthly_annual(data):
             seasonal_anom_row.append(valid_mean((month_in_season[i][n] for i in range(3)),
                                                 min = 2))
         seasonal_anom.append(seasonal_anom_row)
-    
+
     # Average seasonal means to make annual mean,
     # and average seasonal anomalies to make annual anomalies
     # (note: annual anomalies are December-to-November).
@@ -663,10 +663,10 @@ def step1(record_source):
 # (in years which they do have in common) are on average closer
 # together than the standard deviation of the combined record.  I
 # think.
-# 
+#
 # - drop_strange() is another filter, which discards some station
 # records, or parts of records, under control of a configuration file.
-# 
+#
 # - alter_discont() makes discontinuity adjustments to records under
 # control of a configuration file.  Yes, this is very similar to the
 # St Helena behaviour of comb_pieces().

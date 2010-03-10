@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # $URL$
 # $Rev$
-# 
+#
 # read_config.py
 #
 # Nick Barnes, Ravenbrook Limited, 2010-01-16
@@ -30,7 +30,7 @@ def get_helena_dict():
     """Reads the file config/combine_pieces_helena.in into a dict,
     mapping a station id to a tuple (ID with duplicate marker, year,
     month, summand)."""
-    
+
     helena_ds = {}
     for line in open('config/combine_pieces_helena.in', 'r'):
         id, _, year, month, summand = line.split()

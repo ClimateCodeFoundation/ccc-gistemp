@@ -6,7 +6,7 @@
 #
 # David Jones, Ravenbrook Limited, 2008-08-06
 
-""" 
+"""
 Python code reproducing the STEP3 part of the GISTEMP algorithm.
 """
 
@@ -76,7 +76,7 @@ def incircle(iterable, arc, lat, lon):
     is slightly odd, but makes it independent of sphere size).
 
     The records returned are given weights (attribute .weight) based
-    on its distance from the point.  The weight is 1-(d/arc).  d is 
+    on its distance from the point.  The weight is 1-(d/arc).  d is
     not the angle from the station to the point of interest but is the
     chord length on a unit circle.
     """

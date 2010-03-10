@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # $URL$
 # $Rev$
-# 
+#
 # parameters.py
 #
 # Nick Barnes, Ravenbrook Limited, 2010-02-15

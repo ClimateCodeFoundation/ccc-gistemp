@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # $URL$
 # $Rev$
-# 
+#
 # step5.py
 #
 # David Jones, Ravenbrook Limited, 2009-10-27
@@ -38,7 +38,7 @@ def SBBXtoBX(data):
     combine subboxes into boxes.  *data* should be an iterator of
     (land, ocean) subbox series pairs. Returns an iterator of box data.
     """
-    
+
     # First item from iterator is normally a pair of metadataobjects,
     # one for land, one for ocean.  If we are piping step3 straight into
     # step5 then it is not a pair.  In that case we synthesize missing
@@ -146,7 +146,7 @@ def SBBXtoBX(data):
             wnc = 1 - wocn
 
         bias = [0]*12
-        
+
         # Weights for the box's record.
         wtr = [0]*combined_n_months
         for m,a in enumerate(avg[nc]):
@@ -181,7 +181,7 @@ def SBBXtoBX(data):
 
 
 def zonav(boxed_data):
-    """ 
+    """
     Perform Zonal Averaging.
 
     The input *boxed_data* is an iterator of boxed time series.

@@ -150,7 +150,7 @@ def step0(inputs):
 
     """
     ushcn_records = dict((record.uid, record) for record in inputs.ushcn_source)
-    ghcn_records = asdict(inputs.ghcn_source, 
+    ghcn_records = asdict(inputs.ghcn_source,
                           inputs.antarc_source)
     correct_Hohenpeissenberg(ghcn_records, inputs.hohenpeissenberg)
     adjust_USHCN(ushcn_records, ghcn_records, inputs.ushcn_stations)

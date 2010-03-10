@@ -73,14 +73,14 @@ def annual_anomaly(record):
             last = y
         else:
             annual_anoms.append(MISSING)
-    
+
     if first is None:
         record.anomalies = None
     else:
         record.first = first + record.first_year
         record.last = last + record.first_year
         record.anomalies = annual_anoms[first: last+1]
-    
+
 
 def is_rural(station):
     """Test whether the station described by *station* is rural.
@@ -135,7 +135,7 @@ def urban_adjustments(anomaly_stream):
 
     rural_stations = []
     urban_stations = {}
- 
+
     pi180 = math.pi / 180.0
 
     all = []
@@ -273,7 +273,7 @@ def get_neighbours(us, rural_stations, radius):
     distance fromn the urban station.
     """
     neighbors = []
-    
+
     cos_crit = math.cos(radius / earth.radius)
     rbyrc = earth.radius / radius
 
@@ -365,7 +365,7 @@ def prepare_series(iy1, iyrm, combined, urban_series, counts, f, iyoff, x):
 
     return quorate_count, first, last, quorate_period_total, length
 
-    
+
 def cmbine(combined, weights, counts, data, first, last, weight):
     """Adds the array *data* with weight *weight* into the array of
     weighted averages *combined*, with total weights *weights* and
@@ -419,7 +419,7 @@ def getfit(length, x, f):
                     length - parameters.urban_adjustment_min_leg):
         xknee = x[n]
         sl1, sl2, rms, sl = trend2(x, f, length, xknee, 2)
-        
+
         if rms < rmsmin:
              rmsmin = rms
              fit = (sl1, sl2, xknee, sl)
@@ -461,7 +461,7 @@ def trend2(xc, a, dataLen, xmid, min):
             sxx0 += x ** 2
             sxa0 += x * v_a
 
-    if count0 < min or count1 < min: 
+    if count0 < min or count1 < min:
        return MISSING, MISSING, MISSING, MISSING
 
     count = count0 + count1

@@ -34,7 +34,9 @@ def merge_ocean(ocean, sst, dates):
     meta = reader.next()
     meta.monm = 12 * (last_new_year - IYRBEG + 1)
     meta.monm4 = meta.monm + 8
-    meta.title = (meta.title[:40] + " Had: 1880-11/1981, oi2: 12/1981-%2d/%04d" % (last_new_month, last_new_year))
+    meta.title = (meta.title[:40] +
+                  " Had: 1880-11/1981, oi2: 12/1981-%2d/%04d" %
+                  (last_new_month, last_new_year))
     yield meta
 
     # Average into Sergej's subbox grid
@@ -57,7 +59,8 @@ def merge_ocean(ocean, sst, dates):
             sum = 0.0
             for j in range(js, jn+1):
                 for i in range(iw, ie+1):
-                    if sst[i][j][mm-1] < parameters.sea_surface_cutoff_temp or invalid(clim[i][j][month]):
+                    if (sst[i][j][mm-1] < parameters.sea_surface_cutoff_temp
+                        or invalid(clim[i][j][month])):
                         continue
                     count += 1
                     sum += sst[i][j][mm-1] - clim[i][j][month]

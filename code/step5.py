@@ -104,7 +104,8 @@ def SBBXtoBX(data):
             wgtc[i+nsubbox] = o.good_count
             # :ocean:weight:a: Assign a weight to the ocean cell.
             # A similar calculation appears elsewhere.
-            if wgtc[i+nsubbox] < parameters.subbox_min_valid or landsub[i].d < parameters.subbox_land_range:
+            if (wgtc[i+nsubbox] < parameters.subbox_min_valid
+                or landsub[i].d < parameters.subbox_land_range):
                 wocn = 0
             else:
                 wocn = 1
@@ -136,7 +137,8 @@ def SBBXtoBX(data):
             ncr = nc-nsubbox
         # :ocean:weight:b: Assign weight to ocean cell, see similar
         # calculation, above at :ocean:weight:a.
-        if landsub[ncr].d < parameters.subbox_land_range or (nc == ncr and wgtc[nc+nsubbox] < parameters.subbox_min_valid):
+        if (landsub[ncr].d < parameters.subbox_land_range
+            or (nc == ncr and wgtc[nc+nsubbox] < parameters.subbox_min_valid)):
             wocn = 0
         else:
             wocn = 1
@@ -166,7 +168,9 @@ def SBBXtoBX(data):
             ncr = nc
             if nc >= nsubbox:
                 ncr = nc - nsubbox
-            if landsub[ncr].d < parameters.subbox_land_range or (nc == ncr and wgtc[nc + nsubbox] < parameters.subbox_min_valid):
+            if (landsub[ncr].d < parameters.subbox_land_range
+                or (nc == ncr and
+                    wgtc[nc + nsubbox] < parameters.subbox_min_valid)):
                 wocn = 0
             else:
                 wocn = 1
@@ -174,8 +178,10 @@ def SBBXtoBX(data):
             if nc < nsubbox:
                 wnc = 1 - wocn
             wt1 = wnc
-            series.combine(avgr, wtr, avg[nc], wt1, 0, combined_n_months/12, parameters.box_min_overlap)
-        series.anomalize(avgr, parameters.subbox_reference_period, combined_year_beg)
+            series.combine(avgr, wtr, avg[nc], wt1, 0,
+                           combined_n_months/12, parameters.box_min_overlap)
+        series.anomalize(avgr, parameters.subbox_reference_period,
+                         combined_year_beg)
         ngood = sum(valid(a) for a in avgr)
         yield (avgr, wtr, ngood, box)
 
@@ -244,7 +250,8 @@ def zonav(boxed_data):
             nr = IORD[n]
             if lenr[n] == 0:
                 break
-            series.combine(avg[band], wt[band], ar[nr], wtr[nr], 0,nyrsin, parameters.box_min_overlap)
+            series.combine(avg[band], wt[band], ar[nr], wtr[nr], 0, nyrsin,
+                           parameters.box_min_overlap)
         series.anomalize(avg[band], parameters.box_reference_period, iyrbeg)
         lenz[band] = sum(valid(a) for a in avg[band])
         yield (avg[band], wt[band])
@@ -269,7 +276,8 @@ def zonav(boxed_data):
             band = iord[j]
             if band not in band_in_zone[zone]:
                 continue
-            series.combine(avgg, wtg, avg[band], wt[band], 0,nyrsin, parameters.box_min_overlap)
+            series.combine(avgg, wtg, avg[band], wt[band], 0,nyrsin,
+                           parameters.box_min_overlap)
         series.anomalize(avgg, parameters.box_reference_period, iyrbeg)
         yield(avgg, wtg)
 
@@ -414,7 +422,8 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
                         data[ihem+11][iy][m] = (
                           0.4*data[ihem+3][iy][m] +
                           0.6*data[2*ihem+8][iy][m])
-    return (info, data, wt, ann, annw, parameters.zone_annual_min_months, title)
+    return (info, data, wt, ann, annw,
+            parameters.zone_annual_min_months, title)
 
 def step5(data):
     """Step 5 of GISTEMP.

@@ -36,8 +36,8 @@ GHCN data:
   v2.mean.Z
 
 USHCN data:
-(from ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_200907_F52.avg.gz)
-  9641C_200907_F52.avg.gz
+(from ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_*_F52.avg.gz)
+  ushcnv2.gz
 """
 
 import itertools
@@ -45,8 +45,10 @@ from giss_data import MISSING, valid, invalid
 import parameters
 
 def calc_monthly_USHCN_offsets(u_record, g_record):
-    u_years = u_record.get_set_of_years(parameters.USHCN_offset_start_year, u_record.last_year)
-    g_years = g_record.get_set_of_years(parameters.USHCN_offset_start_year, u_record.last_year)
+    u_years = u_record.get_set_of_years(parameters.USHCN_offset_start_year,
+                                        u_record.last_year)
+    g_years = g_record.get_set_of_years(parameters.USHCN_offset_start_year,
+                                        u_record.last_year)
     reversed_year_pairs = list(reversed(zip(u_years, g_years)))
 
     diffs = [0.0] * 12
@@ -127,7 +129,8 @@ def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg):
                 # replace the data with Hohenpeissenberg plus the recent
                 # years.
                 last_year = record.last_year
-                record.set_series(hohenpeissenberg.first_month, hohenpeissenberg.series)
+                record.set_series(hohenpeissenberg.first_month,
+                                  hohenpeissenberg.series)
                 for i, year in enumerate(range(2003, last_year + 1)):
                     record.add_year(year, new_data[i * 12:(i + 1) * 12])
 
@@ -149,7 +152,8 @@ def step0(inputs):
     `giss_data.StationRecord` instances.
 
     """
-    ushcn_records = dict((record.uid, record) for record in inputs.ushcn_source)
+    ushcn_records = dict((record.uid, record)
+                         for record in inputs.ushcn_source)
     ghcn_records = asdict(inputs.ghcn_source,
                           inputs.antarc_source)
     correct_Hohenpeissenberg(ghcn_records, inputs.hohenpeissenberg)

@@ -28,7 +28,8 @@ def container(item):
     return item
 
 
-def combine(average, weight, new, new_weight, first_year, last_year, min_overlap):
+def combine(average, weight, new, new_weight,
+            first_year, last_year, min_overlap):
     """Run the GISTEMP combining algorithm.  This combines the data
     in the *new* array into the *average* array.  *new* has weight
     *new_weight*, *average* has weights in the *weight* array.
@@ -73,7 +74,8 @@ def combine(average, weight, new, new_weight, first_year, last_year, min_overlap
             if invalid(new[i]):
                 continue
             new_month_weight = weight[i] + new_weight[i]
-            average[i] = (weight[i]*average[i] + new_weight[i]*(new[i]+bias))/new_month_weight
+            average[i] = (weight[i]*average[i]
+                          + new_weight[i]*(new[i]+bias))/new_month_weight
             weight[i] = new_month_weight
             months_combined += 1
     return months_combined

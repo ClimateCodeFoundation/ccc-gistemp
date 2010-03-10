@@ -125,8 +125,9 @@ def monthly_annual(data):
             month_in_season.append(row)
         seasonal_anom_row = []
         for n in range(years):
-            seasonal_anom_row.append(valid_mean((month_in_season[i][n] for i in range(3)),
-                                                min = 2))
+            m = valid_mean((month_in_season[i][n] for i in range(3)),
+                           min = 2)
+            seasonal_anom_row.append(m)
         seasonal_anom.append(seasonal_anom_row)
 
     # Average seasonal means to make annual mean,
@@ -240,13 +241,15 @@ def get_longest_overlap(new_data, begin, records):
 
 def combine(sums, wgts, begin, years, records, log, new_id=None):
     while records:
-        record, rec_id, diff = get_longest_overlap(average(sums, wgts, years), begin, records)
+        record, rec_id, diff = get_longest_overlap(average(sums, wgts, years),
+                                                   begin, records)
         if invalid(diff):
             log.write("\tno other records okay\n")
             return
         del records[rec_id]
         add(sums, wgts, diff, begin, record)
-        log.write("\t %s %d %d %f\n" % (rec_id, record.first_year, record.last_year - 1, diff))
+        log.write("\t %s %d %d %f\n" % (rec_id, record.first_year,
+                                        record.last_year - 1, diff))
 
 def get_best(records):
     """Given a set of records (a dict really), return the best one, and
@@ -305,7 +308,8 @@ def fresh_arrays(record, begin, years):
     nmonths = years * 12
 
     rec_data = record.series
-    rec_begin, rec_years = record.first_year, record.last_year - record.first_year + 1
+    rec_begin = record.first_year
+    rec_years = record.last_year - record.first_year + 1
     # Number of months in record.
     rec_months = rec_years * 12
     assert rec_months == record.n
@@ -338,7 +342,7 @@ def comb_records(stream):
 def adjust_helena(stream):
     """Modifies records as specified in config/combine_pieces_helena.in,
     by adding the delta to every datum for that station prior to the
-    specified month.  Returns an iterator.
+    specified month.
     """
     helena_ds = read_config.get_helena_dict()
     for record in stream:
@@ -455,7 +459,8 @@ def find_quintuples(new_sums, new_wgts,
                 if valid(anom2):
                     sum2 += anom2 + rec_ann_mean
                     count2 += 1
-        if count1 >= parameters.station_combine_min_mid_years and count2 >= parameters.station_combine_min_mid_years:
+        if (count1 >= parameters.station_combine_min_mid_years
+            and count2 >= parameters.station_combine_min_mid_years):
             log.write("overlap success: %s %s\n" % (new_id, rec_id))
             ov_success = 1
             avg1 = sum1 / float(count1)
@@ -475,11 +480,12 @@ def find_quintuples(new_sums, new_wgts,
 
 def pieces_combine(sums, wgts, begin, years, records, log, new_id):
     while records:
-        record, rec_id = pieces_get_longest_overlap(average(sums, wgts, years), begin, records)
+        record, rec_id = pieces_get_longest_overlap(average(sums, wgts, years),
+                                                    begin, records)
         rec_begin = record.first_year
         rec_end = rec_begin + record.last_year - record.first_year
 
-        log.write("\t %s %d %d\n" % (rec_id, rec_begin, record.last_year - record.first_year + rec_begin - 1))
+        log.write("\t %s %d %d\n" % (rec_id, rec_begin, rec_end - 1))
 
         is_okay = find_quintuples(sums, wgts,
                                   begin, years, record, rec_begin,
@@ -488,7 +494,7 @@ def pieces_combine(sums, wgts, begin, years, records, log, new_id):
         if is_okay:
             del records[rec_id]
             add(sums, wgts, 0.0, begin, record)
-            log.write("\t %s %d %d\n" % (rec_id, rec_begin, record.last_year - record.first_year + rec_begin - 1))
+            log.write("\t %s %d %d\n" % (rec_id, rec_begin, rec_end - 1))
         else:
             log.write("\t***no other pieces okay***\n")
             return
@@ -555,12 +561,20 @@ def do_combine(stream, log, select_func, combine_func):
 
 
 def comb_pieces(stream):
-    return do_combine(stream, open('log/pieces.log','w'), get_longest, pieces_combine)
+    """comb_pieces() attempts to further combine the records produced
+    by comb_records() - which have shorter overlaps - by comparing the
+    annual anomalies of the years in which they do overlap, and
+    finding ones for which the temperatures (in years which they do
+    have in common) are on average closer together than the standard
+    deviation of the combined record."""
+
+    return do_combine(stream, open('log/pieces.log','w'),
+                      get_longest, pieces_combine)
 
 
 def drop_strange(data):
-    """Drops data from station records, under control of the file
-    'config/Ts.strange.RSU.list.IN' file.  Returns an iterator.
+    """Drops station records, or parts of records, under control of
+    the file 'config/Ts.strange.RSU.list.IN' file.
     """
 
     changes_dict = read_config.get_changes_dict()
@@ -607,7 +621,7 @@ def drop_strange(data):
 def alter_discont(data):
     """Modifies records as specified in config/Ts.discont.RS.alter.IN,
     by adding the delta to every datum for that station prior to the
-    specified month.  Returns an iterator.
+    specified month.  Yes, this is very similar to adjust_helena().
     """
 
     alter_dict = read_config.get_alter_dict()
@@ -642,33 +656,3 @@ def step1(record_source):
     without_strange = drop_strange(combined_pieces)
     for record in alter_discont(without_strange):
         yield record
-
-
-# Notes:
-#
-# - comb_records() is a filter, combining several separate "scribal"
-# station records into a single record, based on a minimum overlap
-# (number of years with both stations valid) between pairs of records,
-# attempting to make single coherent records.
-#
-# - adjust_helena() makes discontinuity adjustments to particular
-# records, under control of a configuration file.  In fact, the
-# configuration file specifies a single adjustment to a single record
-# (St Helena).
-#
-# - comb_pieces() is another filter, which further attempts to combine
-# the records produced by comb_records() - which therefore have
-# shorter overlaps - by comparing the annual anomalies of the years in
-# which they do overlap, and finding ones for which the temperatures
-# (in years which they do have in common) are on average closer
-# together than the standard deviation of the combined record.  I
-# think.
-#
-# - drop_strange() is another filter, which discards some station
-# records, or parts of records, under control of a configuration file.
-#
-# - alter_discont() makes discontinuity adjustments to records under
-# control of a configuration file.  Yes, this is very similar to the
-# St Helena behaviour of comb_pieces().
-#
-# - write_to_file() writes the results to work/Ts.txt

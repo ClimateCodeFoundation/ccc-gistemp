@@ -49,7 +49,8 @@ def annual_anomaly(record):
     annual_anoms = []
     first = None
     for y in range(len(series)/12):
-        # Seasons are Dec-Feb, Mar-May, Jun-Aug, Sep-Nov.  Dec from previous year.
+        # Seasons are Dec-Feb, Mar-May, Jun-Aug, Sep-Nov.
+        # (Dec from previous year).
         total = [0.0] * 4 # total monthly anomaly for each season
         count = [0] * 4   # number of valid months in each season
         for m in range(-1, 11):
@@ -88,8 +89,9 @@ def is_rural(station):
     if parameters.use_global_brightness:
         return station.global_brightness <= 10
     else:
-        return station.US_brightness == '1' or (station.US_brightness == ' ' and
-                                                station.pop == 'R')
+        return (station.US_brightness == '1' or
+                (station.US_brightness == ' ' and
+                 station.pop == 'R'))
 
 class Struct(object):
     pass
@@ -123,9 +125,6 @@ def urban_adjustments(anomaly_stream):
         larger radius.  If there is still not enough data, discard the
         urban station.
      """
-
-    f = [0.0] * 900
-    x = [0.0] * 900
 
     last_year = giss_data.get_ghcn_last_year()
     first_year = 1880
@@ -181,8 +180,8 @@ def urban_adjustments(anomaly_stream):
             yield record
             continue
 
-        iyu1 = us.first_year + iyoff - 1           # subtract 1 for a possible partial yr
-        iyu2 = us.last_year + iyoff + 1            # add 1 for partial year
+        iyu1 = us.first_year + iyoff - 1 # subtract 1 for a possible partial yr
+        iyu2 = us.last_year + iyoff + 1  # add 1 for partial year
 
         usingFullRadius = False
         dropStation = False
@@ -207,8 +206,8 @@ def urban_adjustments(anomaly_stream):
                 iy1 = 1
                 needNewNeighbours = False
 
-            quorate_count, first, last, quorate_period_total, length = prepare_series(
-                iy1, iyrm, combined, urban_series, counts, f, iyoff, x)
+            points, quorate_count, first, last = prepare_series(
+                iy1, iyrm, combined, urban_series, counts, iyoff)
 
             if quorate_count < parameters.urban_adjustment_min_years:
                 if usingFullRadius:
@@ -218,23 +217,27 @@ def urban_adjustments(anomaly_stream):
                 needNewNeighbours = True
                 continue
 
-            if float(quorate_count) >= parameters.urban_adjustment_proportion_good * (last - first + 0.9):
+            if quorate_count >= (parameters.urban_adjustment_proportion_good
+                                 * (last - first + 0.9)):
                 break
 
             # Not enough good years for the given range.  Try to save
             # cases in which the gaps are in the early part, by
             # dropping that part and going around to prepare_series
             # again.
-            iy1 = int(last - (quorate_count - 1) / parameters.urban_adjustment_proportion_good)
+            iy1 = int(last - (quorate_count - 1) /
+                      parameters.urban_adjustment_proportion_good)
             if iy1 < first + 1:
                 iy1 = first + 1                  # avoid infinite loop
 
         if dropStation:
             continue
 
-        fit = getfit(length, x, f)
+        fit = getfit(points)
         # find extended range
-        iyxtnd = int(round(quorate_count / parameters.urban_adjustment_proportion_good)) - (last - first + 1)
+        iyxtnd = int(round(quorate_count /
+                           parameters.urban_adjustment_proportion_good)
+                     - (last - first + 1))
         n1x = first + iyoff
         n2x = last + iyoff
         if iyxtnd < 0:
@@ -254,11 +257,13 @@ def urban_adjustments(anomaly_stream):
         m1 = record.rel_first_month + record.good_start_idx
         m2 = record.rel_first_month + record.good_end_idx - 1
         offset = record.good_start_idx # index of first valid month
-        a, b = adjust(first_year, record, series, fit, n1x, n2x, first + iyoff, last + iyoff, m1, m2, offset)
+        a, b = adjust(first_year, record, series, fit, n1x, n2x,
+                      first + iyoff, last + iyoff, m1, m2, offset)
         # a and b are numbers of new first and last valid months
         aa = a - m1
         bb = b - a + 1
-        record.set_series(a-1 + first_year * 12 + 1, series[aa + offset:aa + offset + bb])
+        record.set_series(a-1 + first_year * 12 + 1,
+                          series[aa + offset:aa + offset + bb])
         record.begin = ((a-1) / 12) + first_year
         record.first = record.begin
         record.end = ((b-1) / 12) + first_year
@@ -321,29 +326,30 @@ def combine_neighbors(us, iyrm, iyoff, neighbors):
     for i, rs in enumerate(neighbors[1:]):
         dnew = [MISSING] * iyrm
         dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
-        cmbine(combined, weights, counts, dnew, rs.first_year, rs.last_year, rs.weight)
+        cmbine(combined, weights, counts, dnew,
+               rs.first_year, rs.last_year, rs.weight)
 
     return counts, urban_series, combined
 
 
-def prepare_series(iy1, iyrm, combined, urban_series, counts, f, iyoff, x):
-    """Prepares for the linearity fitting by populating the arrays *f*
-    and *x* with coordinates.  *x* gets a year number and *f* gets the
+def prepare_series(iy1, iyrm, combined, urban_series, counts, iyoff):
+    """Prepares for the linearity fitting by returning a series of
+    data points *(x,f)*, where *x* is a year number and *f* is the
     difference between the combined rural station anomaly series
     *combined* and the urban station series *urban_series*.  The
-    arrays are only populated with valid years, from the first quorate
-    year onwards.  A valid year is one in which both the urban station
-    and the combined rural series have valid data.  A quorate year is
-    a year in which there are at least *parameters.urban_adjustment_min_rural_stations*
-    contributing (obtained from the *counts* series).
+    points only include valid years, from the first quorate year to
+    the last.  A valid year is one in which both the urban station and
+    the combined rural series have valid data.  A quorate year is a
+    valid year in which there are at least
+    *parameters.urban_adjustment_min_rural_stations* contributing
+    (obtained from the *counts* series).
 
-    Also returns a 5-tuple: (*c*, *f*, *l*, *t*, *v*). *c* is a count
-    of the valid quorate years.  *f* is the first such year.  *l* is
-    the last such year.  *t* is the total of the *f* series between
-    those two years inclusive.  *v* is the number of entries in the
-    *f* and *x* series between those two years inclusive.
+    Returns a 4-tuple: (*p*, *c*, *f*, *l*). *p* is the series of
+    points, *c* is a count of the valid quorate years.  *f* is the
+    first such year.  *l* is the last such year.
     """
-    total = first = last = i = quorate_count = length = quorate_period_total = 0
+    first = last = i = quorate_count = length = 0
+    points = []
 
     for iy in xrange(iy1 - 1, iyrm):
         if valid(combined[iy]) and valid(urban_series[iy]):
@@ -355,15 +361,12 @@ def prepare_series(iy1, iyrm, combined, urban_series, counts, f, iyoff, x):
             if quorate_count <= 0:
                 continue
 
-            f[i] = combined[iy] - urban_series[iy]
-            total += f[i]
-            x[i] = iy + iyoff + 1
+            points.append((iy + iyoff + 1, combined[iy] - urban_series[iy]))
             i += 1
             if counts[iy] >= parameters.urban_adjustment_min_rural_stations:
                  length = i
-                 quorate_period_total = total
 
-    return quorate_count, first, last, quorate_period_total, length
+    return points[:length], quorate_count, first, last
 
 
 def cmbine(combined, weights, counts, data, first, last, weight):
@@ -375,8 +378,9 @@ def cmbine(combined, weights, counts, data, first, last, weight):
     *data* before combining.
 
     Only combines in the range [*first*, *last*); only combines valid
-    values from *data*, and if there are fewer than *parameters.rural_station_min_overlap*
-    entries valid in both arrays then it doesn't combine at all.
+    values from *data*, and if there are fewer than
+    *parameters.rural_station_min_overlap* entries valid in both
+    arrays then it doesn't combine at all.
 
     Note: if *data[i]* is valid and *combined[i]* is not, the weighted
     average code runs and still produces the right answer, because
@@ -407,8 +411,8 @@ def cmbine(combined, weights, counts, data, first, last, weight):
         counts[n] += 1
 
 
-def getfit(length, x, f):
-    """ Finds the best two-part linear fit between *x* and *f*, and
+def getfit(points):
+    """ Finds the best two-part linear fit for *points*, and
     returns the fit parameters.
     """
 
@@ -416,9 +420,9 @@ def getfit(length, x, f):
     rmsmin = 1.e20
 
     for n in xrange(parameters.urban_adjustment_min_leg,
-                    length - parameters.urban_adjustment_min_leg):
-        xknee = x[n]
-        sl1, sl2, rms, sl = trend2(x, f, length, xknee, 2)
+                    len(points) - parameters.urban_adjustment_min_leg):
+        xknee = points[n][0]
+        sl1, sl2, rms, sl = trend2(points, xknee, 2)
 
         if rms < rmsmin:
              rmsmin = rms
@@ -427,11 +431,11 @@ def getfit(length, x, f):
     return fit
 
 
-def trend2(xc, a, dataLen, xmid, min):
-    """Finds a fit to the data *xc[]*, *a[]*, using regression
-    analysis, by a line with a change in slope at *xmid*. Returned is
-    a 4-tuple (*sl1*, *sl2*, *rms*, *sl*): the left-hand slope, the
-    right-hand slope, the RMS error, and the slope of an overall linear fit.
+def trend2(points, xmid, min):
+    """Finds a fit to the data *points[]*, using regression analysis,
+    by a line with a change in slope at *xmid*. Returned is a 4-tuple
+    (*sl1*, *sl2*, *rms*, *sl*): the left-hand slope, the right-hand
+    slope, the RMS error, and the slope of an overall linear fit.
     """
 
     # Todo: incorporate into getfit.
@@ -443,23 +447,22 @@ def trend2(xc, a, dataLen, xmid, min):
     sa = 0.0
     saa = 0.0
 
-    for n in xrange(dataLen):
-        if invalid(a[n]):
+    for (x,v) in points:
+        if invalid(v):
             continue
-        x = xc[n] - xmid
-        v_a = a[n]
-        sa += v_a
-        saa += v_a ** 2
+        x -= xmid
+        sa += v
+        saa += v ** 2
         if x > 0.0:
             count1 += 1
             sx1 += x
             sxx1 += x ** 2
-            sxa1 += x * v_a
+            sxa1 += x * v
         else:
             count0 += 1
             sx0 += x
             sxx0 += x ** 2
-            sxa0 += x * v_a
+            sxa0 += x * v
 
     if count0 < min or count1 < min:
        return MISSING, MISSING, MISSING, MISSING
@@ -491,7 +494,8 @@ def trend2(xc, a, dataLen, xmid, min):
     return sl1, sl2, rms, sl
 
 
-def adjust(first_year, station, series, fit, iy1, iy2, iy1a, iy2a, m1, m2, offset):
+def adjust(first_year, station, series, fit, iy1, iy2,
+           iy1a, iy2a, m1, m2, offset):
     (sl1, sl2, knee, sl0) = fit
     if not good_two_part_fit(fit, iy1a, iy2a):
         # Use linear approximation

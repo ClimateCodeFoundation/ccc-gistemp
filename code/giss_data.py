@@ -656,7 +656,8 @@ class StationRecord(MonthlyTemperatureRecord):
     def get_a_year(self, year):
         """Get the time series data for a year."""
         start_month = year * 12 + 1
-        return [self.get_a_month(m) for m in range(start_month, start_month + 12)]
+        return [self.get_a_month(m)
+                for m in range(start_month, start_month + 12)]
 
     def get_set_of_years(self, first_year, last_year):
         """Get a set of year records.
@@ -694,7 +695,7 @@ class StationRecord(MonthlyTemperatureRecord):
         """Format neatly for reporting purposes."""
 
         s = "StationRecord: %s - %s\n" % (self.station.name, self.uid)
-        s += "   All data  : %d:%02d - %d:%02d  [%3d:%02d - %3d:%02d]" % (
+        s += "   All data  : %d:%02d - %d:%02d [%3d:%02d - %3d:%02d]" % (
                 self.first_year, (self.first_month - 1) % 12 + 1,
                 self.last_year, (self.last_month  - 1) % 12 + 1,
                 self.rel_first_year, (self.first_month - 1) % 12 + 1,
@@ -704,7 +705,7 @@ class StationRecord(MonthlyTemperatureRecord):
                 self.first_month, self.last_month,
                 self.rel_first_month, self.rel_last_month,
                 )
-        s += "   Good data : %d:%02d - %d:%02d  [%3d:%02d - %3d:%02d]  %d-%d" % (
+        s += "   Good data : %d:%02d - %d:%02d [%3d:%02d - %3d:%02d] %d-%d" % (
                 self.first_good_year, (self.first_good_month - 1) % 12 + 1,
                 self.last_good_year, (self.last_good_month - 1) % 12 + 1,
                 self.rel_first_good_year, (self.first_good_month - 1) % 12 + 1,
@@ -838,7 +839,7 @@ class SubboxRecord(MonthlyTemperatureRecord):
                 self.first_month, self.last_month,
                 self.rel_first_month, self.rel_last_month,
                 )
-        s += "   Good data : %d:%02d - %d:%02d  [%3d:%02d - %3d:%02d]  %d-%d" % (
+        s += "   Good data : %d:%02d - %d:%02d [%3d:%02d - %3d:%02d] %d-%d" % (
                 self.first_good_year, (self.first_good_month - 1) % 12 + 1,
                 self.last_good_year, (self.last_good_month - 1) % 12 + 1,
                 self.rel_first_good_year, (self.first_good_month - 1) % 12 + 1,

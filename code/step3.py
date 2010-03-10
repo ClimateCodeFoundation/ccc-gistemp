@@ -230,9 +230,10 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                 new = [MISSING] * max_months
                 aa, bb = record.rel_first_month, record.rel_last_month
                 new[aa - 1:bb] = record.series
-                station_months = series.combine(subbox_series, weight, new, record.weight,
-                                                record.rel_first_year, record.rel_last_year + 1,
-                                                parameters.gridding_min_overlap)
+                station_months = series.combine(
+                    subbox_series, weight, new, record.weight,
+                    record.rel_first_year, record.rel_last_year + 1,
+                    parameters.gridding_min_overlap)
                 total_good_months += station_months
                 if station_months == 0:
                     continue
@@ -241,10 +242,12 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                 if max_weight < record.weight:
                     max_weight = record.weight
 
-            series.anomalize(subbox_series, parameters.gridding_reference_period, first_year)
+            series.anomalize(subbox_series,
+                             parameters.gridding_reference_period, first_year)
             box_obj = giss_data.SubboxRecord(n=max_months,
                     lat_S=subbox[0], lat_N=subbox[1], lon_W=subbox[2],
-                    lon_E=subbox[3], stations=total_stations, station_months=total_good_months,
+                    lon_E=subbox[3], stations=total_stations,
+                    station_months=total_good_months,
                     d=radius*(1-max_weight), series=subbox_series)
             yield box_obj
 

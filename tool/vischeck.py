@@ -61,9 +61,9 @@ def asann(f):
         if re.match(r'\d{4}', l):
             year = int(l[:4])
             try:
-                yield((year, int(l[65:72])))
+                yield (year, int(l[65:72]))
             except ValueError:
-                yield((year, None))
+                yield (year, None)
 
 def trend(data):
     """Computes linear regression parameters (a,b) on the *data*."""

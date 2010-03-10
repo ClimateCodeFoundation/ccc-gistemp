@@ -591,8 +591,8 @@ def read_USHCN(path, stations):
             temps.append(temp)
         if valid: # some valid data found
             # We cannot add using 'add_year' because that breaks
-            # things when years are duplicated in the data; (see not
-            # above). The record is actually filled using ``fil_record``.
+            # things when years are duplicated in the data (see note
+            # above). The record is actually filled using ``fill_record``.
             years_data.setdefault(year, [])
             years_data[year] = temps
 

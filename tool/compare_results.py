@@ -301,7 +301,7 @@ def compare(dirs, labels, o):
         # Annual series
         fs = map(lambda d: open(os.path.join(d, anomaly_file % code), 'r'), dirs)
         anns = map(list, map(asann_values_only, fs))
-        url = vischeck.asgooglechartURL(anns, offset=0)
+        url = vischeck.asgooglechartURL(anns)
         print >>o, '<h2>%s annual temperature anomaly</h2>' % region.capitalize()
         print >>o, '<p>%s in red, %s in black.</p>' % tuple(labels) 
         print >>o, '<img src="%s">' % escape(url)

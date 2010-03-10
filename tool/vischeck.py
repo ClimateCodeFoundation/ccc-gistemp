@@ -89,7 +89,7 @@ def trend(data):
     a = ybar - b * xbar
     return (a,b)
 
-def asgooglechartURL(seq, option):
+def asgooglechartURL(seq, options={}):
     """*seq* is a sequence of iterables (each one assumed to be the
     output from :meth:`asann`) into a URL suitable for passing to the
     Google Chart API.
@@ -97,10 +97,22 @@ def asgooglechartURL(seq, option):
     Each element of the sequence corresponds to a different data series,
     all the series are plotted on the same chart.
 
-    See `chartit` for the documentation for *option*.
+    *Options* is a dict mapping keywords to optional attributes:
+
+    option.offset: specifies the inter-chart offset, as per the -o option
+    (see module docstring).  The default is zero.
+
+    option.size: specifies the chart size as a tuple (width,
+    height). The default is (600, 500).
     """
 
     import itertools
+
+    # default options
+    default_options = dict(offset=0,
+                           size=(600,500))
+    default_options.update(options)
+    options = default_options
 
     prefix = 'http://chart.apis.google.com/chart'
 
@@ -129,9 +141,9 @@ def asgooglechartURL(seq, option):
     chxl = 'chxl=0:'+xaxis+'|1:'+vaxis+'|2:'+vaxis
     chxt = 'chxt=x,y,r'
     chd='chd=t:' + '|'.join(ds)
-    chs='chs=' + 'x'.join(option.size)
+    chs='chs=' + 'x'.join(map(str, options['size']))
     # Choose scale, and deal with offset if we have to.
-    offset = option.offset
+    offset = options['offset']
     scale = [-100,100]*6
     if offset and len(seq) > 1:
         scale *= len(seq)
@@ -240,24 +252,17 @@ def chartsingle(l):
 
 import sys
 
-def chartit(fs, option, out=sys.stdout):
+def chartit(fs, options={}, out=sys.stdout):
     """Convert the list of files *fs* to a Google Chart API url and print it
     on *out*.
-
-    The attributes of the *option* object are used to control various
-    features:
-
-    option.offset: specifies the inter-chart offset, as per the -o option
-    (see module docstring).
-
-    option.size: specifies the chart size as a tuple (width, height)
-    (width and height are _strings_).
+    
+    For documentation on *options* see `asgooglechartURL`.
     """
 
     import re
     import urllib
 
-    url = asgooglechartURL(map(asann, fs), option)
+    url = asgooglechartURL(map(asann, fs), options)
     print >>out, url
 
 def main(argv=None):
@@ -268,14 +273,7 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
-    class Struct(): pass
-    option = Struct()
-
-    # offset between each series (-o option)
-    option.offset = 0
-    # Chart Size
-    option.size = map(str, (600,500))
-
+    options={}
     try:
         opt,arg = getopt.getopt(argv[1:], 'o:', ['offset=', 'size='])
     except getopt.GetoptError, e:
@@ -284,10 +282,10 @@ def main(argv=None):
         return 2
     for o,v in opt:
         if o in ('-o', '--offset'):
-            option.offset = float(v)
+            options['offset'] = float(v)
         if o == '--size':
-            option.size = v.split(',')
-            if len(option.size) != 2:
+            options['size'] = v.split(',')
+            if len(options['size']) != 2:
                 raise Error("--size w,h is required")
             
     if len(arg):

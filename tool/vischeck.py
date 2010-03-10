@@ -66,7 +66,9 @@ def asann(f):
                 yield (year, None)
 
 def trend(data):
-    """Computes linear regression parameters (a,b) on the *data*."""
+    """Computes linear regression parameters (a,b) on the *data*.  The
+    line y = a + b*x gives the best fit line to data.
+    """
     sxx = sxy = syy = sx = sy = n = 0
     for (x,y) in data:
         if y is not None:
@@ -76,11 +78,15 @@ def trend(data):
             sy += y
             sxy += x * y
             n += 1
-    xbar = float(sx) / n
-    ybar = float(sy) / n
-    ssxx = sxx - float(sx * sx) / n
-    ssyy = syy - float(sy * sy) / n
-    ssxy = sxy - float(sx * sy) / n
+    # Make n a float. This contaminates all the subsequent divisions, making
+    # them floating point divisions with floating point answers, which
+    # is what we want.
+    n = float(n)
+    xbar = sx / n
+    ybar = sy / n
+    ssxx = sxx - (sx * sx) / n
+    ssyy = syy - (sy * sy) / n
+    ssxy = sxy - (sx * sy) / n
     b = ssxy / ssxx
     a = ybar - b * xbar
     return (a,b)
@@ -152,6 +158,7 @@ def pad(data, yearmin, yearmax):
       zip(range(t1+1, yearmax+1), nonelots))
 
 def trendlines(data):
+    """Return a URL fragment for the full and 30-year trend lines."""
     # full trend
     (a,b) = trend(data)
     yearmin = data[0][0]

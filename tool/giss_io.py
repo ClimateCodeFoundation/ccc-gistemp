@@ -1,5 +1,15 @@
 #!/usr/bin/env python
-"""Readers and writers for GISS data.
+# $URL$
+# $Rev$
+#
+# giss_io.py
+#
+# Paul Ollis and David Jones, 2010-03-10
+
+"""Readers and writers for datafiles used by NASA GISS GISTEMP.
+
+Some of these file formats are peculiar to GISS, others are defined and
+used by other bodies (such as NOAA's v2.mean format).
 
 This is just a stepping stone.
 """
@@ -171,14 +181,17 @@ class SubboxWriter(object):
         self.f.close()
 
 
+# Obsolescent.
 class StationRecordWriter(object):
-    """Writes station records into a binary format that is the usual
-    output of Step 2.  This format is partly documented in the header
-    comment of the program STEP3/to.SBBXgrid.f from the GISTEMP sources,
-    where a comment says "READS NCAR FILES".  NCAR is the National
-    Center for Atmospheric Research (as US government agency).
+    """Writes station records into a binary format that is the
+    traditional output of Step 2 (but more recent versions of
+    ccc-gistemp use a v2.mean style output).
+    
+    This format is partly documented in the header comment of the
+    program STEP3/to.SBBXgrid.f from the GISTEMP sources, where a
+    comment says "READS NCAR FILES".  NCAR is the National Center
+    for Atmospheric Research (as US government agency).
 
-    Step 3 takes files in this format as input.
     """
     def __init__(self, rawfile, bos='>'):
         self.bos = bos
@@ -234,9 +247,11 @@ class StationRecordWriter(object):
         self.f.close()
 
 
+# Obsolescent.
 class StationReader(object):
     """Reads files in the format produced by StationRecordWriter.  Files
-    is this format are the input to Step 3 (and the output from Step 2).
+    in this format are the traditional input to Step 3, but more modern
+    ccc-gistemp uses a v2.mean style input.
     """
     def __init__(self, rawfile, bos='>'):
         self.bos = bos
@@ -319,9 +334,11 @@ class SubboxReader(object):
         return getattr(self.meta, name)
 
 
+# Obsolescent.
 def StationTsReader(path):
-    """Opens a file in Ts.txt file format (output by step 1) and yields
-    each station.
+    """Opens a file in Ts.txt file format and yields each station.
+    This is the traditional output of Step 1, but modern ccc-gistemp
+    uses a v2.mean style output.
 
     """
 
@@ -350,9 +367,10 @@ def StationTsReader(path):
             yield record
 
 
+# Obsolescent.
 class StationTsWriter(object):
     """Writes a file in Ts.txt format.  The traditional output of
-    step1.
+    step1, but modern ccc-gistemp output uses a v2.mean style output.
     """
 
     def __init__(self, path):
@@ -377,7 +395,11 @@ def V2MeanReader(path, year_min=-9999):
     """Reads a file in GHCN v2.mean format and yields each station.
     
     If `year_min` is specified, then only years >= year_min are kept
-    (the default, -9999, effectively keeps all years)."""
+    (the default, -9999, effectively keeps all years).
+    
+    Traditionally this file was the output of Step 0 (and of course the
+    GHCN source), but modern ccc-gistemp produces this format for the
+    outputs of Steps 0, 1, and 2."""
 
     f = open(path)
     def id12(l):
@@ -413,7 +435,7 @@ def V2MeanReader(path, year_min=-9999):
 
 
 class V2MeanWriter(object):
-    """Write a file in GHCN v2.mean format."""
+    """Write a file in GHCN v2.mean format. See also V2MeanReader."""
 
     def __init__(self, path):
         self.f = open(path, "w")
@@ -600,7 +622,7 @@ def read_USHCN_stations(ushcn_v1_station_path, ushcn_v2_station_path):
 
 
 def read_hohenpeissenberg(path):
-    """reads the Hohenpeissenberg data from
+    """Reads the Hohenpeissenberg data from
     input/t_hohenpeissenberg_200306.txt_as_received_July17_2003
     which has a header line and then one line per year from 1781.
     We only want data from 1880 to 2002.

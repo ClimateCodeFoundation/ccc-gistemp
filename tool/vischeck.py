@@ -134,8 +134,7 @@ def asgooglechartURL(seq, options={}):
     trends = [trendlines(l) for l in data]
     trenddata = [t[0] for t in trends]
     slopes = [t[1:] for t in trends]
-    ds = ['-999|' + chartsingle(l)+'|'+trend for l,trend in
-      zip(data, trenddata)]
+    ds = ['-999|' + chartsingle(l) for l in data] + trenddata
 
     vaxis = '||-0.5|+0.0|+0.5|'
     chxl = 'chxl=0:'+xaxis+'|1:'+vaxis+'|2:'+vaxis
@@ -148,12 +147,15 @@ def asgooglechartURL(seq, options={}):
     if offset and len(seq) > 1:
         scale *= len(seq)
         for i in range(len(seq)):
-            scale[12*i+2] -= i*offset
-            scale[12*i+3] -= i*offset
-            scale[12*i+6] -= i*offset
-            scale[12*i+7] -= i*offset
-            scale[12*i+10] -= i*offset
-            scale[12*i+11] -= i*offset
+            # Y range of actual data series
+            scale[4*i+2] -= i*offset
+            scale[4*i+3] -= i*offset
+            # Y range of first trend
+            scale[4*len(seq) + 8*i + 2] -= offset
+            scale[4*len(seq) + 8*i + 3] -= offset
+            # Y range of second trend
+            scale[4*len(seq) + 8*i + 6] -= offset
+            scale[4*len(seq) + 8*i + 7] -= offset
     chds = 'chds=' + ','.join(map(str, scale))
     # red, black, blue, magenta for the underlying graphs
     colours = ['ff0000', '000000', '0000ff', 'ff00ff']
@@ -163,10 +165,11 @@ def asgooglechartURL(seq, options={}):
 
     # Replicate each colour by three (for the chart and its two trend
     # lines).
-    series_colours = list(itertools.chain(*([c,c,c,] for c in colours)))
+    series_colours = colours + list(itertools.chain(*([c,c] for
+      c in colours)))
     chco = 'chco=' + ','.join(series_colours)
     # Line Style
-    chls = 'chls=' + '|'.join(['1|1,8,2|1']*len(data))
+    chls = 'chls=' + '|'.join(['1']*len(data) + ['1,8,2', '1']*len(data))
 
     return prefix + '?' + '&'.join(
       ['cht=lxy',chds,chd,chxt,chxl,chco,chls,chm,chs])
@@ -292,7 +295,7 @@ def main(argv=None):
         fs = map(urllib.urlopen, arg)
     else:
         fs = [sys.stdin]
-    chartit(fs, option)
+    chartit(fs, options)
     return 0
 
 if __name__ == '__main__':

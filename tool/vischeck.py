@@ -117,9 +117,14 @@ def asgooglechartURL(seq, option):
     for i in range(1,len(y)-1):
         if y[i]%10:
             y[i]=''
-    ds = ['-999|' + chartsingle(l)+'|'+trendlines(l) for l in data]
-
     xaxis = '|' + '|'.join(map(str, y))
+
+    trends = [trendlines(l) for l in data]
+    trenddata = [t[0] for t in trends]
+    slopes = [t[1:] for t in trends]
+    ds = ['-999|' + chartsingle(l)+'|'+trend for l,trend in
+      zip(data, trenddata)]
+
     vaxis = '||-0.5|+0.0|+0.5|'
     chxl = 'chxl=0:'+xaxis+'|1:'+vaxis+'|2:'+vaxis
     chxt = 'chxt=x,y,r'
@@ -141,15 +146,18 @@ def asgooglechartURL(seq, option):
     # red, black, blue, magenta for the underlying graphs
     colours = ['ff0000', '000000', '0000ff', 'ff00ff']
     colours = colours[:len(data)]
+
+    chm = 'chm=' + '|'.join(slope_markers(slopes, colours))
+
     # Replicate each colour by three (for the chart and its two trend
     # lines).
-    colours = list(itertools.chain(*([c,c,c,] for c in colours)))
-    chco = 'chco=' + ','.join(colours)
+    series_colours = list(itertools.chain(*([c,c,c,] for c in colours)))
+    chco = 'chco=' + ','.join(series_colours)
     # Line Style
     chls = 'chls=' + '|'.join(['1|1,8,2|1']*len(data))
 
     return prefix + '?' + '&'.join(
-      ['cht=lxy',chds,chd,chxt,chxl,chco,chls,chs])
+      ['cht=lxy',chds,chd,chxt,chxl,chco,chls,chm,chs])
 
 def pad(data, yearmin, yearmax):
     """pad so that data series starts at yearmin and ends at yearmax."""
@@ -163,10 +171,30 @@ def pad(data, yearmin, yearmax):
       data +
       zip(range(t1+1, yearmax+1), nonelots))
 
+def slope_markers(slopes, colours):
+    """Create the markers to denote slopes / trends."""
+
+    import itertools
+
+    l = ['Trends+(K/Century)'] + [format_slope(p) for p in slopes]
+    colours = ['000000'] + colours
+    return [
+    '@t%s,%s,0,%.2f:%.2f,12' % (
+      text,
+      colour,
+      0.6, 0.2 - 0.05*row) for text, colour, row in
+      zip(l, colours, itertools.count())]
+
+def format_slope(p):
+    """Return a string for the slopes in p, which is a tuple."""
+    return '+/+'.join('%.2f' % g for g in p)
+
 def trendlines(data):
-    """Return a URL fragment for the full and 30-year trend lines."""
+    """Return a a triple of (url,slopelong,slopeshort) for
+    the full and 30-year trend lines (url is a fragment)."""
     # full trend
     (a,b) = trend(data)
+    slope = b
     yearmin = data[0][0]
     yearmax = data[-1][0]
     full_left_y = int(round(a + yearmin * b))
@@ -183,13 +211,14 @@ def trendlines(data):
         if valid_count >= 30:
             break
     (a,b) = trend(data[i:])
+    slope = (slope, b)
     left_y = int(round(a + (yearmin+i) * b))
     left_x = -100 + 200*float(i)/(yearmax-yearmin)
     right_y = int(round(a + (yearmin+last_valid) * b))
     right_x = -100 + 200*float(last_valid)/(yearmax-yearmin)
-    return "-100,100|%d,%d|%.0f,%.0f|%d,%d" % (full_left_y, full_right_y,
+    return ("-100,100|%d,%d|%.0f,%.0f|%d,%d" % (full_left_y, full_right_y,
       left_x, right_x,
-      left_y, right_y)
+      left_y, right_y),) + slope
 
 def chartsingle(l):
     """Take a list and return a URL fragment for its Google

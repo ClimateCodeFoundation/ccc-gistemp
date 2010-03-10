@@ -175,19 +175,20 @@ def slope_markers(slopes, colours):
     """Create the markers to denote slopes / trends."""
 
     import itertools
+    import urllib
 
-    l = ['Trends+(K/Century)'] + [format_slope(p) for p in slopes]
+    l = [u'Trends (\N{DEGREE SIGN}C/Century)'.encode('utf-8')] + [format_slope(p) for p in slopes]
     colours = ['000000'] + colours
     return [
-    '@t%s,%s,0,%.2f:%.2f,12' % (
-      text,
-      colour,
-      0.6, 0.2 - 0.05*row) for text, colour, row in
-      zip(l, colours, itertools.count())]
+      urllib.quote_plus('@t%s,%s,0,%.2f:%.2f,12' % (
+        text,
+        colour,
+        0.6, 0.2 - 0.05*row)) for text, colour, row in
+        zip(l, colours, itertools.count())]
 
 def format_slope(p):
     """Return a string for the slopes in p, which is a tuple."""
-    return '+/+'.join('%.2f' % g for g in p)
+    return ' / '.join('%.2f' % g for g in p)
 
 def trendlines(data):
     """Return a a triple of (url,slopelong,slopeshort) for

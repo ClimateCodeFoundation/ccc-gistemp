@@ -1,4 +1,4 @@
-CLEAR CLIMATE CODE GISTEMP README FOR RELEASE 0.4.0
+CLEAR CLIMATE CODE GISTEMP README FOR RELEASE 0.4.1
 
 Nick Barnes, Clear Climate Code
 
@@ -20,14 +20,14 @@ CONTENTS
 
 1. INTRODUCTION
 
-This is release 0.4.0 of the Clear Climate Code GISTEMP project
+This is release 0.4.1 of the Clear Climate Code GISTEMP project
 (ccc-gistemp).
 
 Clear Climate Code have reimplemented GISTEMP (the GISS surface
 temperature analysis system), to make it clearer.  Work continues
 towards making it more clear and more accessible.
 
-ccc-gistemp release 0.4.0 is a release of ccc-gistemp version 0.4.
+ccc-gistemp release 0.4.1 is a release of ccc-gistemp version 0.4.
 The purpose of version 0.4 is to increase clarity by:
   - removing rounding;
   - removing intermediate I/O;
@@ -62,15 +62,15 @@ not work).
 
 3. INSTALLATION
 
-Unpack ccc-gistemp-0.4.0.tar.gz.
+Unpack ccc-gistemp-0.4.1.tar.gz.
 
 
 4. INPUT DATA
 
-ccc-gistemp-0.4.0 uses input data in the subdirectory input/.  This
+ccc-gistemp-0.4.1 uses input data in the subdirectory input/.  This
 input data includes large files of temperature records from GHCN,
 USHCN, and sea surface data, and small files of additional temperature
-records and station tables from GISS.  ccc-gistemp-0.4.0 includes code
+records and station tables from GISS.  ccc-gistemp-0.4.1 includes code
 (tool/preflight.py) to fetch this data from the originating
 organisations over the internet.  It will not download a file if it is
 already present in the input/ directory, so if you wish to run
@@ -143,6 +143,15 @@ of GISTEMP at GISS on 2009-12-28.  Once the tarball is fetched and
 unpacked, the local ccc-gistemp code will be run on it and the results
 compared, generating a report in index.html.
 
+Note that there are indeed some changes between the results of the
+reference run and 0.4.1, mainly caused by a change to the GISTEMP
+algorithm, for rural/urban station distinction, made at GISS since the
+reference run.  We have replicated that change in ccc-gistemp (see
+http://ccc-gistemp.googlecode.com/issues/detail?id=54).  To test
+ccc-gistemp running the same algorithm as the reference GISTEMP run,
+edit code/parameters.py to set use_global_brightness = False before
+running tool/regression.py.
+
 
 A. REFERENCES
 
@@ -153,6 +162,7 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
+2010-03-11 DRJ Updated to prepare for 0.4.1.
 2010-03-09 DRJ Updated to prepare for 0.4.0.
 2010-01-26 NB  Updated to prepare for 0.3.0.
 2010-01-25 DRJ Removed PNG result.

@@ -1,15 +1,20 @@
 #!/usr/bin/env python
-"""A script to run CCC code on 'official' test data and compare with GISS
-results.
+"""regression.py [options]
 
-This script temporarily replaces the ``input`` directory with a copy of the
-``ccc-gistemp-test-2009-12-28/input`` directory. Then it executes all steps of
-the CCC code, using the `run.py` module and finally used the `compare_results`
-module to generate the comparison web page ``index.html``.
+Compares results from ccc-gistemp with those from GISTEMP as run at GISS.
+
+Options:
+   --help          Print this text.
+   --skip-run      Do not do the run phase, skip to the compare.
+
+This script temporarily replaces the ``input`` directory with a copy
+of the ``ccc-gistemp-test-2009-12-28/input`` directory. Then it
+executes all steps of the CCC code, using the `run.py` module and
+finally used the `compare_results` module to generate the comparison
+web page ``index.html``.
 
 When this script exits, it restores the ``input`` directory to its former
 state.
-
 """
 __docformat__ = "restructuredtext"
 
@@ -17,6 +22,7 @@ __docformat__ = "restructuredtext"
 import os
 import sys
 import shutil
+import getopt
 
 # Make sure we can import from other CCC packages.
 import extend_path
@@ -24,12 +30,6 @@ import extend_path
 import ref_test_data
 import run
 import compare_results
-from code import script_support
-
-
-# Dummy options for when used as a module.
-options = script_support.options
-
 
 #: The path of a temporary directory used to save backups of files
 #: that get modified while the script is running.
@@ -48,18 +48,16 @@ Normally the %(safe)s directory is deleted when the program exits.
 """
 
 
-_readme_txt = """This was created byt the script tool/regression.py.
+_readme_txt = """This was created by the script tool/regression.py.
 
-Normally this get automatically removed when the script finishes.
+Normally this gets automatically removed when the script finishes.
 """
-
 
 #: A list of functions that need to be called in order to undo
 #: changes made during the test run.
 undo_actions = []
 
 
-#{ General helper functions
 def mkdir(path):
     """Make a directory, if it does not already exist.
 
@@ -72,7 +70,6 @@ def mkdir(path):
         os.makedirs(path)
 
 
-#{ Clean up functions
 def rm_safe():
     """Cleanup function: Remove the `safe_dir` directory.
 
@@ -99,7 +96,7 @@ def restore_inputs():
     try:
         shutil.move(source, "input")
     except (OSError, shutil.Error), exc:
-        sys.sdterr.write("BAD CLEANUP: Failed to move %s to %s\n" % (
+        sys.stderr.write("BAD CLEANUP: Failed to move %s to %s\n" % (
             source, "input", dest))
         sys.sdterr.write("             %s\n" % exc)
 
@@ -132,7 +129,6 @@ def clean_up():
             sys.stderr.write("             %s\n" % exc)
 
 
-#{ Test execution functions
 def install_inputs():
     """Install the 'official' input files in the ``input`` directory.
 
@@ -162,7 +158,7 @@ def install_inputs():
     return 0
 
 
-def run_test():
+def run_test(skip_run):
     """Run the regression test on the 'official' test data and check results.
 
     This is invoked once the `safe_dir` has been set up. This will install the
@@ -178,12 +174,9 @@ def run_test():
     if install_inputs() != 0:
         return 1
 
-    if not options.skip_run:
-        #ret = run.main([sys.argv, "--steps", "3"])
+    if not skip_run:
         sys.stdout.write("Executing CCC code...\n")
-        options.save_work = True
-        options.steps = range(6)
-        ret = run.main(options, [])
+        ret = run.main()
         if ret != 0:
             return 1
 
@@ -194,15 +187,10 @@ def run_test():
         return 1
 
 
-#{ Main 
-def main(args=[]):
+def regression(skip_run = False):
     """Prepare for and run the regression test.
 
-    The this module's documentation for an outline of what this does.
-
-    :Param args:
-        The command line arguments, parsed using ``optparse``.
-
+    See this module's documentation for an outline of what this does.
     """
     # Do initial checks and setup. If this fails then the program exits without
     # returning.
@@ -219,28 +207,42 @@ def main(args=[]):
         f = open(os.path.join(safe_dir, "README.txt"), "w")
         f.write(_readme_txt)
         f.close
-        run_test()
+        run_test(skip_run)
     finally:
         clean_up()
 
 
-def run_as_script():
-    """Invoke this module as a script.
+class Fatal(Exception):
+    def __init__(self, msg):
+        self.msg = msg
 
-    This is invoked when this module is run as a script. This expects
-    ``sys.argv`` to be correctly set up.
+def main(argv = None):
+    if argv is None:
+        argv = sys.argv
+    try:
+        # Parse command-line arguments.
+        skip_run = False
+        try:
+            opts, args = getopt.getopt(argv[1:], 'hs',
+                                       ['help', 'skip-run'])
+            for o, a in opts:
+                if o in ('-h', '--help'):
+                    print __doc__
+                    return 0
+                elif o in ('-s', '--skip-run'):
+                    skip_run = True
+                else:
+                    raise Fatal("Unsupported option: %s" % o)
+        except getopt.error, msg:
+            raise Fatal(str(msg))
 
-    """
-    import optparse
-    usage = "usage: %prog [options]"
-    parser = script_support.makeParser(usage)
-    parser.add_option("--skip-run", action="store_true",
-            help="Do not do the run phase, skip to the compare.")
-
-    global options
-    options, args = script_support.parseArgs(parser, __doc__, (0, 0))
-    main(args)
-
+        # Do the comparison.
+        regression(skip_run)
+        return 0
+    except Fatal, err:
+        sys.stderr.write(err.msg)
+        sys.stderr.write('\n')
+        return 2
 
 if __name__ == "__main__":
-    sys.exit(run_as_script())
+    sys.exit(main())

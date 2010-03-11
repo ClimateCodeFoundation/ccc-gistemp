@@ -1,10 +1,13 @@
 #!/usr/bin/env python
-"""Management of the reference test data used to test CCC code.
+"""ref_test_data.py [options]
 
-This provides support for automatically downloading, unpacking
-and verifying the test data in the ``ccc-gistemp-test-2009-12-28``
+Downloads and unpacks test data in the ``ccc-gistemp-test-2009-12-28``
 directory.
 
+Options:
+   --help            Print this text.
+   --check-md5-sums  Checks the MD5 checksum of each input file.
+   --gen-md5-sums    Calculates and prints MD5 checksums for each input file.
 """
 __docformat__ = "restructuredtext"
 
@@ -207,31 +210,41 @@ def install_and_check_test_files():
     return 1
 
 
+class Fatal(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
 def main(args):
-    ret = install_and_check_test_files()
-    return ret
+    try:
+        gen_md5_sums = False
+        check_md5_sums = False
+        try:
+            opts, args = getopt.getopt(argv[1:], 'hgc',
+                                       ['help', 'gen-md5-sums', 'check-md5-sums'])
+            for o, a in opts:
+                if o in ('-h', '--help'):
+                    print __doc__
+                    return 0
+                elif o in ('-g', '--gen-md5-sums'):
+                    gen_md5_sums = True
+                elif o in ('-c', '--check-md5-sums'):
+                    check_md5_sums = True
+                else:
+                    raise Fatal("Unsupported option: %s" % o)
+        except getopt.error, msg:
+            raise Fatal(str(msg))
 
+        if gen_md5_sums:
+            gen_test_data_checksums()
+        elif check_md5_sums:
+            check_test_files_are_ok()
+        else:
+            install_and_check_test_files()
+        return 0
+    except Fatal, err:
+        sys.stderr.write(err.msg)
+        sys.stderr.write('\n')
+        return 2
 
-
-if __name__ == "__main__":
-    import optparse
-    usage = "usage: %prog [options] <+argument-list+>"
-    parser = optparse.OptionParser(usage)
-
-    parser.add_option("--gen-md5-sums", action="store_true", 
-        help="Generate MD5 sums for test data files,"
-             " as a Python code snippet.")
-    parser.add_option("--check-md5-sums", action="store_true", 
-        help="Check the MD5 checksums of the test data files")
-
-    options, args = parser.parse_args()
-    if len(args) != 0:
-        parser.error("Wrong number of arguments")
-    
-    if options.gen_md5_sums:
-        sys.exit(gen_test_data_checksums())
-
-    if options.check_md5_sums:
-        sys.exit(check_test_files_are_ok())
-
-    main(args)
+if __name__ == '__main__':
+    sys.exit(main())

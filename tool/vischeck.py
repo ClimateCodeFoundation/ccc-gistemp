@@ -111,7 +111,9 @@ def asgooglechartURL(seq, options={}):
 
     # default options
     default_options = dict(offset=0,
-                           size=(600,500))
+                           size=(600,500),
+                           colour=['ff0000', '000000', '0000ff', 'ff00ff'],
+                           )
     default_options.update(options)
     options = default_options
 
@@ -160,7 +162,7 @@ def asgooglechartURL(seq, options={}):
             scale[4*len(seq) + 8*i + 7] -= offset
     chds = 'chds=' + ','.join(map(str, scale))
     # red, black, blue, magenta for the underlying graphs
-    colours = ['ff0000', '000000', '0000ff', 'ff00ff']
+    colours = options['colour']
     colours = colours[:len(data)]
 
     chm = 'chm=' + '|'.join(slope_markers(slopes, coefficients, colours))
@@ -279,7 +281,8 @@ def main(argv=None):
 
     options={}
     try:
-        opt,arg = getopt.getopt(argv[1:], 'o:', ['offset=', 'size='])
+        opt,arg = getopt.getopt(argv[1:], 'o:',
+          ['offset=', 'size=', 'colour='])
     except getopt.GetoptError, e:
         print >> sys.stderr, e.msg
         print >> sys.stderr, __doc__
@@ -291,6 +294,8 @@ def main(argv=None):
             options['size'] = v.split(',')
             if len(options['size']) != 2:
                 raise Error("--size w,h is required")
+        if o == '--colour':
+            options['colour'] = v.split(',')
             
     if len(arg):
         fs = map(urllib.urlopen, arg)

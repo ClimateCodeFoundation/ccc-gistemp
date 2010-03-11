@@ -53,9 +53,9 @@ with at least this many valid data values, otherwise it is dropped
 immediately prior to the peri-urban adjustment step."""
 
 use_global_brightness = True
-"""If this is True, the global brightness field from station metadata
+"""If this is true, the global brightness field from station metadata
 is used to identify rural stations (global brightness less than 11).
-If this is False, the US brightness field is used if it is present (US
+If this is false, the US brightness field is used if it is present (US
 brightness equal to 1), and the population index is used otherwise
 ('R' for rural)."""
 

@@ -6,7 +6,7 @@ is that any script in the ``tool`` directory can import code in the
 ``code`` package, for example, as follows::
 
     import extend_path
-    from code import script_support
+    from code import step5
 
 """
 __docformat__ = "restructuredtext"

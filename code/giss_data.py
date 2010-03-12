@@ -777,6 +777,9 @@ class SubboxRecord(MonthlyTemperatureRecord):
     This can hold, for example, a record of data as stored within the
     ``input/SBBX.HadR2`` file.
 
+    Traditionally the following keyword arguments are supplied to the
+    constructor:
+
     :Ivar lat_S, lat_N, lon_W, lon_E:
         Coordinates describing the box's area.
     :Ivar stations:
@@ -784,19 +787,12 @@ class SubboxRecord(MonthlyTemperatureRecord):
     :Ivar station_months:
         The number of months that contributed to this sub-box.
     :Ivar d:
-        Unknown.
+        Characteristic distance to station closest to centre.
 
     """
-    def __init__(self, lat_S, lat_N, lon_W, lon_E,
-            stations, station_months, d, series, **_ignored):
+    def __init__(self, series, **k):
         super(SubboxRecord, self).__init__()
-        self.lat_S = lat_S
-        self.lat_N = lat_N
-        self.lon_W = lon_W
-        self.lon_E = lon_E
-        self.stations = stations
-        self.station_months = station_months
-        self.d = d
+        self.__dict__.update(k)
         self.set_series(series)
 
     @property
@@ -805,7 +801,7 @@ class SubboxRecord(MonthlyTemperatureRecord):
         return self._series
 
     def set_series(self, series):
-        self._set_series(BASE_YEAR * 12, series)
+        self._set_series(BASE_YEAR*12+1, series)
 
     def pad_with_missing(self, n):
         while self.n < n:

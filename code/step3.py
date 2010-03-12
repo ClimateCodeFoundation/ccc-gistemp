@@ -181,14 +181,15 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
         # will change the results.
         sort(region_records, lambda x,y: y.good_count - x.good_count)
 
+        # Count how many cells are empty
+        n_empty_cells = 0
         # Used to generate the "subbox at" rows in the log.
         lastcentre = (None, None)
         for subbox in subboxes:
             # Select and weight stations
             centre = eqarea.centre(subbox)
-            if centre[0] != lastcentre[0]:
-                log.write("\nsubbox at %+05.1f" % centre[0])
-            log.write('%+06.1f' % centre[1])
+            log.write("\rsubbox at %+05.1f%+06.1f (%d empty)" % (
+              centre + (n_empty_cells,)))
             log.flush()
             lastcentre = centre
             # Of possible station records for this region, filter for those
@@ -203,8 +204,7 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                     lat_S=subbox[0], lat_N=subbox[1], lon_W=subbox[2],
                     lon_E=subbox[3], stations=0, station_months=0,
                     d=MISSING)
-                log.write('*')
-                log.flush()
+                n_empty_cells += 1
                 yield box_obj
                 continue
 
@@ -250,8 +250,10 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                     station_months=total_good_months,
                     d=radius*(1-max_weight))
             yield box_obj
-
-    print >>log
+        log.write(
+          '\rRegion (%+03.0f/%+03.0f S/N %+04.0f/%+04.0f W/E): %d empty cells.\n' %
+            (tuple(box) + (n_empty_cells,)))
+    log.write("\n")
 
 
 def step3(records, radius=parameters.gridding_radius, year_begin=1880):

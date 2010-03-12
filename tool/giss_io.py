@@ -772,24 +772,22 @@ def step1_input():
 
 def step1_output(data):
     out = V2MeanWriter("work/v2.step1.out")
-    try:
-        for thing in data:
-            out.write(thing)
-            yield thing
-    finally:
-        out.close()
+    for thing in data:
+        out.write(thing)
+        yield thing
+    print "Step1: closing output file"
+    out.close()
 
 def step2_input():
     return V2MeanReader("work/v2.step1.out")
 
 def step2_output(data):
     out = V2MeanWriter("work/v2.step2.out")
-    try:
-        for thing in data:
-            out.write(thing)
-            yield thing
-    finally:
-        out.close()
+    for thing in data:
+        out.write(thing)
+        yield thing
+    print "Step2: closing output file"
+    out.close()
 
 def step3_input():
     return V2MeanReader("work/v2.step2.out")

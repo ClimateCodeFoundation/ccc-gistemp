@@ -935,18 +935,17 @@ def step5_bx_output(data):
     boxf.writeline(struct.pack('%s8i' % bos, *info) + title)
     yield (info, title)
 
-    try:
-        for record in data:
-            (avgr, wtr, ngood, box) = record
-            n = len(avgr)
-            fmt = '%s%df' % (bos, n)
-            boxf.writeline(struct.pack(fmt, *avgr) +
-                           struct.pack(fmt, *wtr) +
-                           struct.pack('%si' % bos, ngood) +
-                           struct.pack('%s4i' % bos, *box))
-            yield record
-    finally:
-        boxf.close()
+    for record in data:
+        (avgr, wtr, ngood, box) = record
+        n = len(avgr)
+        fmt = '%s%df' % (bos, n)
+        boxf.writeline(struct.pack(fmt, *avgr) +
+                       struct.pack(fmt, *wtr) +
+                       struct.pack('%si' % bos, ngood) +
+                       struct.pack('%s4i' % bos, *box))
+        yield record
+    print "Step5: Closing box file"
+    boxf.close()
 
 def step5_zone_titles():
     # Boundaries (degrees latitude, +ve North) of the 8 basic belts.

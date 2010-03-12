@@ -560,10 +560,11 @@ class MonthlyTemperatureRecord(object):
                 self._good_end_idx = max(self._good_end_idx, len(self._series))
     add_year = clear_cache(add_year)
 
+    # Year's worth of missing data
+    missing_year = [MISSING]*12
+
     def has_data_for_year(self, year):
-        for t in self.get_a_year(year):
-            if t != MISSING:
-                return True
+        return self.get_a_year(year) != self.missing_year
 
     def get_a_month(self, month):
         """Get the value for a single month."""
@@ -578,6 +579,11 @@ class MonthlyTemperatureRecord(object):
     def get_a_year(self, year):
         """Get the time series data for a year."""
         start_month = year * 12 + 1
+        start_index = start_month - self.first_month
+        data = self.series[start_index:start_index+12]
+        if len(data) == 12:
+            return data
+        # Do it the slow way:
         return [self.get_a_month(m)
                 for m in range(start_month, start_month + 12)]
 

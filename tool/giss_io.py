@@ -308,26 +308,34 @@ class SubboxReader(object):
         assert self.meta.mavg == 6, "Only monthly averages supported"
 
     def info(self):
+        """Return a length 8 sequence corresponding to the INFO array
+        record in the binary file.
+        """
         m = self.meta
-        return [self.mo1, m.kq, m.mavg, m.monm, m.monm4, m.yrbeg, m.missing_flag,
-                m.precipitation_flag]
+        return [self.mo1, m.kq, m.mavg, m.monm,
+                m.monm4, m.yrbeg, m.missing_flag, m.precipitation_flag]
 
     def __iter__(self):
-        return self._it()
-
-    def _it(self):
         yield self.meta
 
         for rec in self.f:
             mo1 = self.mo1
             fmt = "iiiiiiif%df" % mo1
-            fields = struct.unpack(self.bos + fmt, rec)
+            fields = list(struct.unpack(self.bos + fmt, rec))
             series = fields[8:]
-            (self.mo1, lat_S, lat_N, lon_W, lon_E, stations,
-                    station_months, d) = fields[:8]
-            subbox = code.giss_data.SubboxRecord(
-                    lat_S/100.0, lat_N/100.0, lon_W/100.0, lon_E/100.0,
-                    stations, station_months, d, series)
+            self.mo1 = fields[0]
+            # Make an attributes dictionary.
+            # The box boundaries are fields[1:5], but we need to scale
+            # them to fractional degrees first:
+            for i in range(1,5):
+                fields[i] /= 100.0
+            attr = dict(zip(
+              ['lat_S', 'lat_N', 'lon_W', 'lon_E',
+              'stations', 'station_months', 'd'],
+              fields[1:8]))
+            attr['box'] = fields[1:5]
+            subbox = code.giss_data.SubboxRecord(series,
+               **attr)
             yield subbox
 
     def __getattr__(self, name):

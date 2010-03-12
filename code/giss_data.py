@@ -560,6 +560,27 @@ class MonthlyTemperatureRecord(object):
                 self._good_end_idx = max(self._good_end_idx, len(self._series))
     add_year = clear_cache(add_year)
 
+    def has_data_for_year(self, year):
+        for t in self.get_a_year(year):
+            if t != MISSING:
+                return True
+
+    def get_a_month(self, month):
+        """Get the value for a single month."""
+        idx = month - self.first_month
+        if idx < 0:
+            return MISSING
+        try:
+            return self.series[month - self.first_month]
+        except IndexError:
+            return MISSING
+
+    def get_a_year(self, year):
+        """Get the time series data for a year."""
+        start_month = year * 12 + 1
+        return [self.get_a_month(m)
+                for m in range(start_month, start_month + 12)]
+
 
 class StationRecord(MonthlyTemperatureRecord):
     """An average monthly temperature record associated with a `Station`.
@@ -637,27 +658,6 @@ class StationRecord(MonthlyTemperatureRecord):
 
         """
         return int(self.uid[-1])
-
-    def has_data_for_year(self, year):
-        for t in self.get_a_year(year):
-            if t != MISSING:
-                return True
-
-    def get_a_month(self, month):
-        """Get the value for a single month."""
-        idx = month - self.first_month
-        if idx < 0:
-            return MISSING
-        try:
-            return self.series[month - self.first_month]
-        except IndexError:
-            return MISSING
-
-    def get_a_year(self, year):
-        """Get the time series data for a year."""
-        start_month = year * 12 + 1
-        return [self.get_a_month(m)
-                for m in range(start_month, start_month + 12)]
 
     def get_set_of_years(self, first_year, last_year):
         """Get a set of year records.

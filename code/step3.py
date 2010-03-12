@@ -148,8 +148,8 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
     dataset which is returned as an iterator.
 
     *max_months* is the maximum number of months in any station
-     record.  *first_year* is the first year in the dataset.  *radius*
-     is the combining radius in kilometres.
+    record.  *first_year* is the first year in the dataset.  *radius*
+    is the combining radius in kilometres.
     """
 
     station_records = list(station_records)
@@ -199,10 +199,10 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
             subbox_series = [MISSING] * max_months
 
             if len(incircle_records) == 0:
-                box_obj = giss_data.SubboxRecord(
+                box_obj = giss_data.SubboxRecord(subbox_series,
                     lat_S=subbox[0], lat_N=subbox[1], lon_W=subbox[2],
                     lon_E=subbox[3], stations=0, station_months=0,
-                    d=MISSING, series=subbox_series)
+                    d=MISSING)
                 log.write('*')
                 log.flush()
                 yield box_obj
@@ -244,11 +244,11 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
 
             series.anomalize(subbox_series,
                              parameters.gridding_reference_period, first_year)
-            box_obj = giss_data.SubboxRecord(n=max_months,
+            box_obj = giss_data.SubboxRecord(subbox_series, n=max_months,
                     lat_S=subbox[0], lat_N=subbox[1], lon_W=subbox[2],
                     lon_E=subbox[3], stations=total_stations,
                     station_months=total_good_months,
-                    d=radius*(1-max_weight), series=subbox_series)
+                    d=radius*(1-max_weight))
             yield box_obj
 
     print >>log

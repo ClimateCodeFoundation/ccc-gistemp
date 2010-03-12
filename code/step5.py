@@ -54,13 +54,13 @@ def SBBXtoBX(data):
             """Augment a land-only data series with blank ocean data."""
             for land_box in data:
                 ocean_series = [MISSING] * len(land_box.series)
-                ocean_box = giss_data.SubboxRecord(
+                ocean_box = giss_data.SubboxRecord(ocean_series,
                     lat_S=land_box.lat_S,
                     lat_N=land_box.lat_N,
                     lon_W=land_box.lon_W,
                     lon_E=land_box.lon_E,
                     stations=0, station_months=0,
-                    d=MISSING, series=ocean_series)
+                    d=MISSING)
                 yield land_box, ocean_box
         data = blank_ocean_data(data)
 

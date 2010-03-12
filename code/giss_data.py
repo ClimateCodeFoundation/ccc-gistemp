@@ -582,7 +582,7 @@ class StationRecord(MonthlyTemperatureRecord):
         self.source = v2_sources().get(uid, "UNKNOWN")
         self.ann_anoms = []
 
-    def __str__(self):
+    def __repr__(self):
         return "StationRecord(uid=%r)" % self.uid
 
     @property
@@ -763,7 +763,7 @@ class SubboxMetaData(object):
         self.title = title
 
     def __repr__(self):
-        return '<StationMetadata %r>' % self.__dict__
+        return 'SubboxMetadata(%r)' % self.__dict__
 
     def copy(self):
         return SubboxMetaData(self.mo1, self.kq, self.mavg, self.monm,

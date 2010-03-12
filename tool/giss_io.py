@@ -457,6 +457,73 @@ class V2MeanWriter(object):
     def close(self):
         self.f.close()
 
+def DecimalReader(path, year_min=-9999):
+    """Reads a file in Decimal format and yields each station.
+    
+    If `year_min` is specified, then only years >= year_min are kept
+    (the default, -9999, effectively keeps all years).
+    """
+
+    f = open(path)
+    def id12(l):
+        """Extract the 12-digit station record identifier."""
+        return l[:12]
+
+    def readt(s):
+        v = float(s)
+        if v == -9999:
+            return MISSING
+        return v
+
+    for (id, lines) in itertools.groupby(f, id12):
+        # lines is a set of lines which all begin with the same 12
+        # character id
+        record = code.giss_data.StationRecord(id)
+        prev_line = None
+        for line in lines:
+            if line != prev_line:
+                year = int(line[12:16])
+                if year >= year_min:
+                    temps = [readt(n) for n in line[16:].split()]
+                    record.add_year(year, temps)
+                prev_line = line
+            else:
+                print ("NOTE: repeated record found: Station %s year %s;"
+                       " data are identical" % (line[:12],line[12:16]))
+
+        if not record.is_empty():
+            yield record
+
+    f.close()
+
+
+class DecimalWriter(object):
+    """Decimal is a novel text file format, very similar to GHCN
+    v2.mean format.  Each lines conists of a 12 digit record identifier
+    immediately followed by a 4 digit year, then followed by the decimal
+    temperature values (in degrees C) for the 12 months of the year,
+    with each temperature value preceded by a space.  Missing data are
+    marked with -9999."""
+
+    def __init__(self, path):
+        self.f = open(path, "w")
+
+    def to_text(self, t):
+        if t == MISSING:
+            return '-9999'
+        return repr(t)
+
+    def write(self, record):
+        for year in range(record.first_year, record.last_year + 1):
+            if not record.has_data_for_year(year):
+                continue
+            temps = [self.to_text(t) for t in record.get_a_year(year)]
+            self.f.write('%s%04d %s\n' % (record.uid, year, ' '.join(temps)))
+
+    def close(self):
+        self.f.close()
+
+
 
 antarc_discard_re = re.compile(r'^$|^Get |^[12A-Z]$')
 antarc_temperature_re = re.compile(r'^(.*) .* *temperature')

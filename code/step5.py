@@ -85,12 +85,9 @@ def SBBXtoBX(data):
     info[4] = 2 * land_meta.monm + 5
     yield(info, land_meta.title)
 
-    # TODO: Use giss_data
-    XBAD = land_meta.missing_flag
-
     for box_number,box in enumerate(eqarea.grid()):
         # Averages for the land and ocean (one series per subbox)...
-        avg = [[XBAD]*combined_n_months for _ in range(2*nsubbox)]
+        avg = [[MISSING]*combined_n_months for _ in range(2*nsubbox)]
         wgtc = [0] * (nsubbox*2)
         # Eat the records from land and ocean 100 (nsubbox) at a time.
         # In other words, all 100 subboxes for the box.
@@ -152,7 +149,7 @@ def SBBXtoBX(data):
         # Weights for the box's record.
         wtr = [0]*combined_n_months
         for m,a in enumerate(avg[nc]):
-            if a < XBAD:
+            if a != MISSING:
                 wtr[m] = wnc
         # Create the box record by copying the subbox record
         # into AVGR
@@ -221,7 +218,6 @@ def zonav(boxed_data):
     """
 
     (info, titlei) = boxed_data.next()
-    XBAD = info[6] # 9999
     iyrbeg = info[5]
     monm = info[3]
     nyrsin = monm/12
@@ -371,7 +367,6 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
     monm = info[3]
     iyrs = monm // 12
     iyrend = iyrs + iyrbeg
-    XBAD = float(info[6])
 
     # Allocate the 2- and 3- dimensional arrays.
     # The *data* and *wt* arrays are properly 3 dimensional
@@ -379,7 +374,7 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
     # when we read the data, see :read:zonal below.
     data = [ None for _ in range(zones)]
     wt =   [ None for _ in range(zones)]
-    ann =  [ [XBAD]*iyrs for _ in range(zones)]
+    ann =  [ [MISSING]*iyrs for _ in range(zones)]
     annw = [ [0]*iyrs for _ in range(zones)]
 
     # Collect zonal means.
@@ -398,7 +393,7 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
             annwiy = 0.
             mon = 0
             for m in range(12):
-                if data[zone][iy][m] == XBAD:
+                if data[zone][iy][m] == MISSING:
                     continue
                 mon += 1
                 anniy += data[zone][iy][m]
@@ -420,20 +415,20 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
         wtsp = [3.,2.,2.,3.]
         for iy in range(iyrs):
             glob = 0.
-            ann[-1][iy] = XBAD
+            ann[-1][iy] = MISSING
             for z,w in zip(zone, wtsp):
-                if ann[z][iy] == XBAD:
+                if ann[z][iy] == MISSING:
                     # Note: Rather ugly use of "for...else" to emulate GOTO.
                     break
                 glob += ann[z][iy]*w
             else:
                 ann[-1][iy] = .1 * glob
         for iy in range(iyrs):
-            data[-1][iy] = [XBAD]*12
+            data[-1][iy] = [MISSING]*12
             for m in range(12):
                 glob = 0.
                 for z,w in zip(zone, wtsp):
-                    if data[z][iy][m] == XBAD:
+                    if data[z][iy][m] == MISSING:
                         break
                     glob += data[z][iy][m]*w
                 else:
@@ -446,15 +441,16 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
         # zonav().
         for ihem in range(2):
             for iy in range(iyrs):
-                ann[ihem+11][iy] = XBAD
-                if ann[ihem+3][iy] != XBAD and ann[2*ihem+8][iy] != XBAD:
+                ann[ihem+11][iy] = MISSING
+                if (ann[ihem+3][iy] != MISSING and
+                  ann[2*ihem+8][iy] != MISSING):
                     ann[ihem+11][iy] = (0.4*ann[ihem+3][iy] +
                                         0.6*ann[2*ihem+8][iy])
             for iy in range(iyrs):
-                data[ihem+11][iy] = [XBAD]*12
+                data[ihem+11][iy] = [MISSING]*12
                 for m in range(12):
-                    if (data[ihem+3][iy][m] != XBAD and
-                      data[2*ihem+8][iy][m] != XBAD):
+                    if (data[ihem+3][iy][m] != MISSING and
+                      data[2*ihem+8][iy][m] != MISSING):
                         data[ihem+11][iy][m] = (
                           0.4*data[ihem+3][iy][m] +
                           0.6*data[2*ihem+8][iy][m])

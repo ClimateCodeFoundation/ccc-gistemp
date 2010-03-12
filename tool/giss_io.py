@@ -944,7 +944,7 @@ def step5_bx_output(data):
                            struct.pack(fmt, *wtr) +
                            struct.pack('%si' % bos, ngood) +
                            struct.pack('%s4i' % bos, *box))
-            yield (avgr, wtr, ngood, box)
+            yield record
     finally:
         boxf.close()
 

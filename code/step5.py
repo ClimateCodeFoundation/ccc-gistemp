@@ -195,16 +195,16 @@ def zonav(boxed_data):
     various latitudinal zones.  Returns an iterator of
     (averages, weights, title) tuples, one per zone.
 
-    14 belts are produced.  The first 8 are the basic belts that are used
+    14 zones are produced.  The first 8 are the basic belts that are used
     for the equal area grid, the remaining 6 are combinations:
 
       0 64N - 90N               \
-      1 44N - 64N (asin 0.9)    |-  8 24N - 90 N  (0 + 1 + 2)
+      1 44N - 64N (asin 0.9)     -  8 24N - 90 N  (0 + 1 + 2)
       2 24N - 44N (asin 0.7)    /
       3 Equ - 24N (asin 0.4)    \_  9 24S - 24 N  (3 + 4)
       4 24S - Equ               /
       5 44S - 24S               \
-      6 64S - 44S               |- 10 90S - 24 S  (5 + 6 + 7)
+      6 64S - 44S                - 10 90S - 24 S  (5 + 6 + 7)
       7 90S - 64S               /
 
      11 northern hemisphere (0 + 1 + 2 + 3)
@@ -226,37 +226,64 @@ def zonav(boxed_data):
 
     bands = len(boxes_in_band)
 
-    lenz = [None]*bands
+    lenz = [None] * bands
     wt = [None] * bands
     avg = [None] * bands
+    # For each band, combine all the boxes in that band to create a band
+    # record.
     for band in range(bands):
-        ar = [None] * boxes_in_band[band]
-        wtr = [None] * boxes_in_band[band]
-        lenr = [None] * boxes_in_band[band]
+        # The temperature (anomaly) series for each of the boxes in this
+        # band.
+        box_series = [None] * boxes_in_band[band]
+        # The weight series for each of the boxes in this band.
+        box_weights = [None] * boxes_in_band[band]
+        # "length" is the number of months (with valid data) in the box
+        # series.  For each box in this band.
+        box_length = [None] * boxes_in_band[band]
         for box in range(boxes_in_band[band]):
-            (ar[box], wtr[box], lenr[box], _) = boxed_data.next()
-        lntot = sum(lenr)
-        if lntot == 0:
-            continue
-        lenr,IORD = sort_perm(lenr)
-        nr = IORD[0]
-        # Copy the longest box record into *wt* and *avg*.
-        # Using list both performs a copy and converts into a mutable
-        # list.
-        wt[band] = list(wtr[nr])
-        avg[band] = list(ar[nr])
-        # And combine the remaining series.
-        for n in range(1,boxes_in_band[band]):
-            nr = IORD[n]
-            if lenr[n] == 0:
-                break
-            series.combine(avg[band], wt[band], ar[nr], wtr[nr], 0, nyrsin,
-                           parameters.box_min_overlap)
+            # The last element in the tuple is the boundaries of the
+            # box.  We ignore it.
+            box_series[box], box_weights[box], box_length[box], _ = (
+              boxed_data.next())
+        # total number of valid data in band's boxes
+        total_length = sum(box_length)
+        if total_length == 0:
+            wt[band] = [0.0]*monm
+            avg[band] = [MISSING]*monm
+        else:
+            box_length,IORD = sort_perm(box_length)
+            nr = IORD[0]
+            # Copy the longest box record into *wt* and *avg*.
+            # Using list both performs a copy and converts into a mutable
+            # list.
+            wt[band] = list(box_weights[nr])
+            avg[band] = list(box_series[nr])
+            # And combine the remaining series.
+            for n in range(1,boxes_in_band[band]):
+                nr = IORD[n]
+                if box_length[n] == 0:
+                    # Nothing in this box, and since we sorted by length,
+                    # all the remaining boxes will also be empty.  We can
+                    # stop combining boxes.
+                    break
+                series.combine(avg[band], wt[band],
+                  box_series[nr], box_weights[nr], 0, nyrsin,
+                  parameters.box_min_overlap)
         series.anomalize(avg[band], parameters.box_reference_period, iyrbeg)
         lenz[band] = sum(valid(a) for a in avg[band])
         yield (avg[band], wt[band])
 
-    # *lenz* contains the lemgths of each zone 0 to 7 (the number of
+    # We expect to have consumed all the boxes (the first 8 bands form a
+    # partition of the boxes).  We check that the boxed_data stream is
+    # exhausted and contains no more boxes.
+    try:
+        boxed_data.next()
+        assert 0, "Too many boxes found"
+    except StopIteration:
+        # We fully expect to get here.
+        pass
+
+    # *lenz* contains the lengths of each zone 0 to 7 (the number of
     # valid months in each zone).
     lenz, iord = sort_perm(lenz)
     for zone in range(len(band_in_zone)):
@@ -267,6 +294,7 @@ def zonav(boxed_data):
             if iord[j1] in band_in_zone[zone]:
                 break
         else:
+            # Should be an assertion really.
             raise Error('No band in special zone %d.' % zone)
         band = iord[j1]
         wtg = list(wt[band])
@@ -407,7 +435,7 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
     if alternate['hemi']:
         # For the computations it will be useful to recall how the zones
         # are numbered.  There is a useful docstring at the beginning of
-        # zonav.py.
+        # zonav().
         for ihem in range(2):
             for iy in range(iyrs):
                 ann[ihem+11][iy] = XBAD

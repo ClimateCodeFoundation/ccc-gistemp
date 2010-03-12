@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 # $URL$
 # $Rev$
+#
+# eqarea.py
+#
+# David Jones, Ravenbrook Limited.
 
 """Routines for computing an equal area grid.
 
@@ -245,14 +249,14 @@ def centre(box) :
 
     This the the "equal area" centre in the sense that the area to the
     north will equal the area to the south, and the same for east/west.
-    box is specified as a 4-tuple (as returned as an element of grid()
-    for example).
 
     :Return:
         The ``(latitude,longitude)`` for the box or subbox.
 
     :Param box:
-        The box or subbox to find the centre of.
+        The box (or subbox) to find the centre of. Specified as a 4-tuple
+        of its boundaries (same convention used by grid()):
+        (southern, northern, western, eastern).
 
     """
     sinc = 0.5*(math.sin(box[0]*math.pi/180) + math.sin(box[1]*math.pi/180))

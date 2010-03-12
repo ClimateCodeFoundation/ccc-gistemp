@@ -184,6 +184,14 @@ def SBBXtoBX(data):
                          combined_year_beg)
         ngood = sum(valid(a) for a in avgr)
         yield (avgr, wtr, ngood, box)
+    # We've now consumed all 8000 input boxes and yield 80 boxes.  We
+    # need to tickle the input to check that it is exhausted and to
+    # cause it to the final tail of its generator.
+    # We expect the call to .next() to raise StopIteration, which is
+    # just what we want.
+    data.next()
+    # Ordinarily we never reach here.
+    assert 0, "Too many input records"
 
 
 def zonav(boxed_data):

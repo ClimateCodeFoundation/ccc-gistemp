@@ -795,12 +795,11 @@ def step3_input():
 def step3_output(data):
     out = SubboxWriter(open('work/SBBX1880.Ts.GHCN.CL.PA.1200', 'wb'),
       trimmed=False)
-    try:
-        for thing in data:
-            out.write(thing)
-            yield thing
-    finally:
-        out.close()
+    for thing in data:
+        out.write(thing)
+        yield thing
+    print "Step3: closing output file"
+    out.close()
 
 def make_3d_array(a, b, c):
     """Create an array with three dimensions.

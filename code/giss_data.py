@@ -44,14 +44,101 @@ _stations = None
 _v2_sources = None
 _ghcn_last_year = None
 
-def _load_v2_inv():
-    """Load the v2.inv file.
 
-    :Return:
-        A dictionary of `Station` instances, keyed by the station's `uid`.
+class Station(object):
+    """A monitoring station's information.
 
+    This holds the information about a single monitoring station. Not
+    all the attributes are used by the CCC code.  For a list of
+    attributes and documentation, see the stations() function.
     """
-    return dict((s.uid, s) for s in StationInventoryReader("input/v2.inv"))
+    def __init__(self, **values):
+        self.__dict__.update(values)
+
+
+def stations():
+    """Return a dictionary of all known Stations, keyed by
+    Station.uid.  The first time this is called, it reads the station
+    inventory file input/v2.inv.
+
+    The input file is in the same format as the GHCN V2 file v2.temperature.inv
+    (in fact, it's the same file, but with records added for the Antarctic
+    stations that GHCN doesn't have).   Descriptions of that file's
+    format can be found in the Fortran programs:
+    ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.read.inv.f
+    ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.read.data.f
+
+    Here are two typical lines, with a record diagram
+
+    id---------xname--------------------------xlat---xlon----x1---2----34----5-6-7-8-910grveg-----------GU--11
+    0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345
+    40371148001 ALMASIPPI,MA                    49.55  -98.20  274  287R   -9FLxxno-9x-9COOL FIELD/WOODSA1   0
+    42572530000 CHICAGO/O'HARE, ILLINOIS        42.00  -87.90  205  197U 6216FLxxno-9A 1COOL CROPS      C3 125
+
+       uid                 40371148001          42572530000
+          The unique ID of the station. This is held as an 11 digit string.
+       name                ALMASIPPI,MA         CHICAGO/O'HARE, ILLINOIS
+        The station's name.
+       lat                 49.55                42.00
+        The latitude, in degrees to two decimal places.
+       lon                 -98.20               -87.90
+        The longitude, in degrees to two decimal places.
+    1  elevs               274                  205
+        The station elevation? in metres?
+    2  elevg               287                  197
+        The ground elevation? in metres?
+    3  pop                 R                    U
+        'R' for rural,  'S' for semi-urban, 'U' for urban
+    4  ipop                -9                   6216
+    5  topo                FL                   FL
+        The topography
+    6  stveg               xx                   xx
+    7  stloc               no                   no
+    8  iloc                -9                   -9
+    9  airstn              x                    A
+    10 itowndis            -9                   1
+       grveg               COOL FIELD/WOODS     COOL CROPS
+        An indication of the type of ground vegetation. For example,
+        'TROPICAL DRY FOR'.
+    G  GHCN_brightness     A                    C
+    U  US_brightness       1                    3
+        Brighness indication for US stations, or ' ' for non-US
+        stations.  '1' is dark, '3' is bright.
+    11 global_brightness   0                    125
+        A global brightness index, range 0-186 (at least)
+    """
+
+    global _stations
+    if _stations is None:
+        fields = (
+            (0,   11,  'uid',              str),
+            (12,  42,  'name',             str),
+            (43,  49,  'lat',              float),
+            (50,  57,  'lon',              float),
+            (58,  62,  'elevation',        int),
+            (62,  67,  'ground_elevation', int),
+            (67,  68,  'pop',              str),
+            (68,  73,  'ipop',             int),
+            (73,  75,  'topo',             str),
+            (75,  77,  'stveg',            str),
+            (77,  79,  'stloc',            str),
+            (79,  81,  'iloc',             str),    #int?
+            (81,  82,  'airstn',           str),
+            (82,  84,  'itowndis',         str),    #int?
+            (84,  100, 'grveg',            str),
+            (100, 101, 'GHCN_brightness',  str),
+            (101, 102, 'US_brightness',    str),
+            (102, 106, 'global_brightness',int),
+        )
+
+        _stations = {}
+        for line in open("input/v2.inv"):
+            dd = dict((name, conv(line[a:b]))
+                      for a, b, name, conv in fields)
+            _stations[dd['uid']] = Station(**dd)
+
+    return _stations
+
 
 
 def get_ghcn_last_year():
@@ -75,106 +162,6 @@ def get_ghcn_last_year():
         f.close()
 
     return _ghcn_last_year
-
-
-class StationInventoryReader(object):
-    """Reader for files in the format of input/v2.inv.
-
-    This can be used as a single-pass iterator, yielding `giss_data.Station`
-    instances.
-
-    For a list of metadata fields, see *fields*.
-
-    The input file is in the same format as the GHCN V2 file v2.temperature.inv
-    (in fact, it's the same file, but with records added for the Antarctic
-    stations that GHCN doesn't have).  The best description of that file's
-    format is the Fortran program:
-    ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.read.inv.f
-
-    Here are two typical lines, with a record diagram
-
-    40371148001 ALMASIPPI,MA                    49.55  -98.20  274  287R   -9FLxxno-9x-9COOL FIELD/WOODSA1   0
-    42572530000 CHICAGO/O'HARE, ILLINOIS        42.00  -87.90  205  197U 6216FLxxno-9A 1COOL CROPS      C3 125
-
-    0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345
-    id---------xname--------------------------xlat---xlon----x1---2----34----5-6-7-8-910grveg-----------GU--11
-
-       id                  40371148001          42572530000
-       name                ALMASIPPI,MA         CHICAGO/O'HARE, ILLINOIS
-       lat                 49.55                42.00
-       lon                 -98.20               -87.90
-    1  elevs               274                  205
-    2  elevg               287                  197
-    3  pop                 R                    U
-    4  ipop                -9                   6216
-    5  topo                FL                   FL
-    6  stveg               xx                   xx
-    7  stloc               no                   no
-    8  iloc                -9                   -9
-    9  airstn              x                    A
-    10 itowndis            -9                   1
-       grveg               COOL FIELD/WOODS     COOL CROPS
-    G  GHCN_brightness     A                    C
-    U  US_brightness       1                    3
-    11 global_brightness   0                    125
-    """
-    fields = (
-        (0,   11,  'uid',              str),
-        (12,  42,  'name',             str),
-        (43,  49,  'lat',              float),
-        (50,  57,  'lon',              float),
-        (58,  62,  'elevation',        int),
-        (62,  67,  'ground_elevation', int),
-        (67,  68,  'pop',              str),
-        (68,  73,  'ipop',             int),
-        (73,  75,  'topo',             str),
-        (75,  77,  'stveg',            str),
-        (77,  79,  'stloc',            str),
-        (79,  81,  'iloc',             str),    #int
-        (81,  82,  'airstn',           str),
-        (82,  84,  'itowndis',         str),    #int
-        (84,  100, 'grveg',            str),
-        (100, 101, 'GHCN_brightness',  str),
-        (101, 102, 'US_brightness',    str),
-        (102, 106, 'global_brightness',int),
-    )
-
-    def __init__(self, path):
-        """Constructor:
-
-        :Param path:
-            The path of the inventory file.
-
-        """
-        self.f = open(path)
-
-    def __iter__(self):
-        return self._it()
-
-    def _it(self):
-        for line in self.f:
-            dd = dict((name, conv(line[a:b]))
-                    for a, b, name, conv in self.fields)
-            yield Station(**dd)
-        self.f.close()
-
-
-def stations():
-    """Return a dictionary of all known stations.
-
-    Note: This uses information from the ``input/v2.inv`` file. This file
-    is loaded the first time this function is called. The time is reasonably
-    short (around 0.3 second on a 2GHz celeron).
-
-    :Return:
-        A dictionary, keyed by a `Station.uid`. Each entry is a `Station`
-        instance.
-
-    """
-    global _stations
-    if _stations is None:
-        _stations = _load_v2_inv()
-    return _stations
 
 
 def v2_sources():
@@ -241,78 +228,6 @@ class StationMetaData(object):
 
     def __repr__(self):
         return 'StationMetadata(%r)' % self.__dict__
-
-
-class Station(object):
-    """A monitoring station's information.
-
-    This holds the information about a single monitoring station. Not all the
-    fields are used by the CCC code and (currently) the meaning of some of
-    these is unknown.
-
-    :Ivar lat, lon:
-        The location of the station as floats, representing degrees.
-    :Ivar elevation:
-        The station's height in metres.
-    :Ivar uid:
-        The unique ID of the station. This is held as an 11 digit string.
-    :Ivar name:
-        The station's name.
-    :Ivar GHCN_brightness:
-        TODO: Some indication of brightness.
-    :Ivar US_brightness:
-        Brighness indication for US stations. A value of '1' or ' ' is taken
-        to indicate that the station is in a rural area.
-    :Ivar airstn:
-        Unknown.
-    :Ivar ground_elevation, elevation:
-        The ground elevation at the station's location and
-        the elevation of the station above the ground level. Both in metres.
-    :Ivar grveg:
-        An indication of the type of ground vegetation. For example,
-        'TROPICAL DRY FOR'.
-    :Ivar stveg:
-        Unknown.
-    :Ivar iloc:
-        Unknown.
-    :Ivar ipop:
-        Unknown.
-    :Ivar itowndis:
-        Unknown.
-    :Ivar pop:
-        Unknown.
-    :Ivar stloc:
-        Unknown.
-    :Ivar topo:
-        Unknown.
-    :Ivar global_brightness:
-        A global brightness index, range 0-186 (at least)
-
-    """
-    def __init__(self, name=None, lat=None, lon=None, uid=None,
-            ground_elevation=None,
-            elevation=None, pop=None, ipop=None, topo=None, stveg=None,
-            stloc=None, iloc=None, airstn=None, itowndis=None,
-            grveg=None, GHCN_brightness=None, US_brightness=None,
-            global_brightness=None):
-        self.name = name
-        self.lat = lat
-        self.lon = lon
-        self.uid = uid
-        self.ground_elevation = ground_elevation
-        self.elevation = elevation
-        self.pop = pop
-        self.ipop = ipop
-        self.topo = topo
-        self.stveg = stveg
-        self.stloc = stloc
-        self.iloc = iloc
-        self.airstn = airstn
-        self.itowndis = itowndis
-        self.grveg = grveg
-        self.GHCN_brightness = GHCN_brightness
-        self.US_brightness = US_brightness
-        self.global_brightness = global_brightness
 
 
 # TODO: Needs some review. Among things to think about:
@@ -644,27 +559,6 @@ class StationRecord(MonthlyTemperatureRecord):
         """
         return int(self.uid[3:])
 
-    @property
-    def country_code(self):
-        """The country code as an integer.
-
-        This is the first three characters of the `uid`, converted to an
-        integer.
-
-        """
-        return int(self.uid[:3])
-
-    @property
-    def discriminator(self):
-        """The discriminator code.
-
-        This distingushes different records associated with same station.
-        This is the last digit of the record's `uid` converted to an
-        integer.
-
-        """
-        return int(self.uid[-1])
-
     def get_set_of_years(self, first_year, last_year):
         """Get a set of year records.
 
@@ -696,42 +590,6 @@ class StationRecord(MonthlyTemperatureRecord):
         r = StationRecord(self.uid)
         r.set_series(self.first_month, self.series)
         return r
-
-    def report_str(self):
-        """Format neatly for reporting purposes."""
-
-        s = "StationRecord: %s - %s\n" % (self.station.name, self.uid)
-        s += "   All data  : %d:%02d - %d:%02d [%3d:%02d - %3d:%02d]" % (
-                self.first_year, (self.first_month - 1) % 12 + 1,
-                self.last_year, (self.last_month  - 1) % 12 + 1,
-                self.rel_first_year, (self.first_month - 1) % 12 + 1,
-                self.rel_last_year, (self.last_month  - 1) % 12 + 1,
-                )
-        s += "  %5d - %5d  (%4d - %4d)\n" % (
-                self.first_month, self.last_month,
-                self.rel_first_month, self.rel_last_month,
-                )
-        s += "   Good data : %d:%02d - %d:%02d [%3d:%02d - %3d:%02d] %d-%d" % (
-                self.first_good_year, (self.first_good_month - 1) % 12 + 1,
-                self.last_good_year, (self.last_good_month - 1) % 12 + 1,
-                self.rel_first_good_year, (self.first_good_month - 1) % 12 + 1,
-                self.rel_last_good_year, (self.last_good_month - 1) % 12 + 1,
-                self.good_start_idx, self.good_end_idx,
-                )
-        s += "  %5d - %5d  (%4d - %4d)\n" % (
-                self.first_good_month, self.last_good_month,
-                self.rel_first_good_month, self.rel_last_good_month,
-                )
-        for n in ("series", "anomalies"):
-            v = getattr(self, n, None)
-            if v is None:
-                continue
-            s += "   %-10s: [%-4d] = %s...\n" % (n, len(v),
-                    str([str(x)[:6] for x in v[:6]])[:-1])
-            s += "   %-10s:            ...%s\n" % ("",
-                    str([str(x)[:6] for x in v[-6:]])[1:])
-
-        return s[:-1]
 
 
 class SubboxMetaData(object):
@@ -827,38 +685,3 @@ class SubboxRecord(MonthlyTemperatureRecord):
     def __repr__(self):
         return ('<Subbox (%+06.2f,%+06.2f) (%+07.2f,%+07.2f): %d>' %
                 (self.lat_S, self.lat_N, self.lon_W, self.lon_E, self.n))
-    def report_str(self):
-        """Format neatly for reporting purposes."""
-
-        s = "SubboxRecord:\n"
-        s += "   All data  : %d:%02d - %d:%02d  [%3d:%02d - %3d:%02d]" % (
-                self.first_year, (self.first_month - 1) % 12 + 1,
-                self.last_year, (self.last_month  - 1) % 12 + 1,
-                self.rel_first_year, (self.first_month - 1) % 12 + 1,
-                self.rel_last_year, (self.last_month  - 1) % 12 + 1,
-                )
-        s += "  %5d - %5d  (%4d - %4d)\n" % (
-                self.first_month, self.last_month,
-                self.rel_first_month, self.rel_last_month,
-                )
-        s += "   Good data : %d:%02d - %d:%02d [%3d:%02d - %3d:%02d] %d-%d" % (
-                self.first_good_year, (self.first_good_month - 1) % 12 + 1,
-                self.last_good_year, (self.last_good_month - 1) % 12 + 1,
-                self.rel_first_good_year, (self.first_good_month - 1) % 12 + 1,
-                self.rel_last_good_year, (self.last_good_month - 1) % 12 + 1,
-                self.good_start_idx, self.good_end_idx,
-                )
-        s += "  %5d - %5d  (%4d - %4d)\n" % (
-                self.first_good_month, self.last_good_month,
-                self.rel_first_good_month, self.rel_last_good_month,
-                )
-        for n in ("series", "anomalies"):
-            v = getattr(self, n, None)
-            if v is None:
-                continue
-            s += "   %-10s: [%-4d] = %s...\n" % (n, len(v),
-                    str([str(x)[:6] for x in v[:6]])[:-1])
-            s += "   %-10s:            ...%s\n" % ("",
-                    str([str(x)[:6] for x in v[-6:]])[1:])
-
-        return s[:-1]

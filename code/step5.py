@@ -145,6 +145,8 @@ def SBBXtoBX(data):
         if nc < nsubbox:
             wnc = 1 - wocn
 
+        assert wnc == 1
+
         bias = [0]*12
 
         # Weights for the box's record.
@@ -177,6 +179,7 @@ def SBBXtoBX(data):
             if nc < nsubbox:
                 wnc = 1 - wocn
             wt1 = wnc
+            assert wt1 == 1
             series.combine(avgr, wtr, avg[nc], wt1, 0,
                            combined_n_months/12, parameters.box_min_overlap)
         series.anomalize(avgr, parameters.subbox_reference_period,

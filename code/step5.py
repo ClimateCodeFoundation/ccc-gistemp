@@ -120,68 +120,24 @@ def SBBXtoBX(data):
         # :todo: should probably import from a purpose built module.
         from step3 import sort
         IORDR = range(2*nsubbox)
-        # We only want to compare the weights (because we want to emulate
-        # the GISTEMP sort exactly), so we use only the first part of the
-        # tuple (that's why we can't just use `cmp`).
         sort(IORDR, lambda x,y: wgtc[y] - wgtc[x])
 
         # From here to the "for" loop over the cells (below) we are
         # initialising data for the loop.  Primarily the AVGR and WTR
         # arrays.
         nc = IORDR[0]
-        ncr = nc
-        if ncr >= nsubbox:
-            ncr = nc-nsubbox
-        # :ocean:weight:b: Assign weight to ocean cell, see similar
-        # calculation, above at :ocean:weight:a.
-        if (landsub[ncr].d < parameters.subbox_land_range
-            or (nc == ncr and wgtc[nc+nsubbox] < parameters.subbox_min_valid)):
-            wocn = 0
-            assert wgtc[ncr + nsubbox] == 0
-        else:
-            wocn = 1
-
-        wnc = wocn
-        if nc < nsubbox:
-            wnc = 1 - wocn
-
-        assert wnc == 1
-
-        bias = [0]*12
 
         # Weights for the box's record.
-        wtr = [0]*combined_n_months
-        for m, a in enumerate(avg[nc]):
-            if a != MISSING:
-                wtr[m] = wnc
-        # Create the box record by copying the subbox record
-        # into AVGR
+        wtr = [a != MISSING for a in avg[nc]]
+        # Box record
         avgr = avg[nc][:]
 
         # Loop over the remaining cells.
-        for n in range(1,2*nsubbox):
-            nc = IORDR[n]
-            # :todo: Can it be correct to use [n]?  It's what the
-            # Fortran does.
-            if wgtc[nc] < parameters.subbox_min_valid:
-                continue
-            ncr = nc
-            if nc >= nsubbox:
-                ncr = nc - nsubbox
-            if (landsub[ncr].d < parameters.subbox_land_range
-                or (nc == ncr and
-                    wgtc[nc + nsubbox] < parameters.subbox_min_valid)):
-                wocn = 0
-                assert wgtc[ncr + nsubbox] == 0
-            else:
-                wocn = 1
-            wnc = wocn
-            if nc < nsubbox:
-                wnc = 1 - wocn
-            wt1 = wnc
-            assert wt1 == 1
-            series.combine(avgr, wtr, avg[nc], wt1, 0,
+        for nc in IORDR[1:]:
+            if wgtc[nc] >= parameters.subbox_min_valid:
+                series.combine(avgr, wtr, avg[nc], 1, 0,
                            combined_n_months/12, parameters.box_min_overlap)
+
         series.anomalize(avgr, parameters.subbox_reference_period,
                          combined_year_beg)
         ngood = sum(valid(a) for a in avgr)

@@ -94,7 +94,7 @@ def SBBXtoBX(data):
         # In other words, all 100 subboxes for the box.
         landsub,oceansub = zip(*itertools.islice(data, nsubbox))
         # :todo: combine below zip with above zip?
-        for i,l,o in zip(range(nsubbox),landsub,oceansub):
+        for i, l, o in zip(range(nsubbox), landsub, oceansub):
             avg[i][land_offset:land_offset+len(l.series)] = l.series
             avg[i+nsubbox][ocean_offset:ocean_offset+len(o.series)] = o.series
             # Count the number of valid entries.
@@ -102,13 +102,13 @@ def SBBXtoBX(data):
             wgtc[i+nsubbox] = o.good_count
             # :ocean:weight:a: Assign a weight to the ocean cell.
             # A similar calculation appears elsewhere.
-            if (wgtc[i+nsubbox] < parameters.subbox_min_valid
-                or landsub[i].d < parameters.subbox_land_range):
-                wocn = 0
+            use_land = (wgtc[i+nsubbox] < parameters.subbox_min_valid
+                or l.d < parameters.subbox_land_range)
+            if use_land:
+                wgtc[i+nsubbox] = 0
             else:
-                wocn = 1
-            wgtc[i] *= (1 - wocn)
-            wgtc[i+nsubbox] *= wocn
+                wgtc[i] = 0
+
 
         # GISTEMP sort.
         # We want to end up with IORDR, the permutation array that
@@ -124,7 +124,7 @@ def SBBXtoBX(data):
         # the GISTEMP sort exactly), so we use only the first part of the
         # tuple (that's why we can't just use `cmp`).
         sort(z, lambda x,y: y[0]-x[0])
-        wgtc,IORDR = zip(*z)
+        wgtc, IORDR = zip(*z)
 
         # From here to the "for" loop over the cells (below) we are
         # initialising data for the loop.  Primarily the AVGR and WTR
@@ -138,6 +138,7 @@ def SBBXtoBX(data):
         if (landsub[ncr].d < parameters.subbox_land_range
             or (nc == ncr and wgtc[nc+nsubbox] < parameters.subbox_min_valid)):
             wocn = 0
+            assert wgtc[ncr + nsubbox] == 0
         else:
             wocn = 1
 
@@ -149,7 +150,7 @@ def SBBXtoBX(data):
 
         # Weights for the box's record.
         wtr = [0]*combined_n_months
-        for m,a in enumerate(avg[nc]):
+        for m, a in enumerate(avg[nc]):
             if a != MISSING:
                 wtr[m] = wnc
         # Create the box record by copying the subbox record
@@ -170,6 +171,7 @@ def SBBXtoBX(data):
                 or (nc == ncr and
                     wgtc[nc + nsubbox] < parameters.subbox_min_valid)):
                 wocn = 0
+                assert wgtc[ncr + nsubbox] == 0
             else:
                 wocn = 1
             wnc = wocn

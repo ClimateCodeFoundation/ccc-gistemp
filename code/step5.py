@@ -119,12 +119,11 @@ def SBBXtoBX(data):
         # (permuted) indexes into IORDR.
         # :todo: should probably import from a purpose built module.
         from step3 import sort
-        z = zip(wgtc, range(2*nsubbox))
+        IORDR = range(2*nsubbox)
         # We only want to compare the weights (because we want to emulate
         # the GISTEMP sort exactly), so we use only the first part of the
         # tuple (that's why we can't just use `cmp`).
-        sort(z, lambda x,y: y[0]-x[0])
-        wgtc, IORDR = zip(*z)
+        sort(IORDR, lambda x,y: wgtc[y] - wgtc[x])
 
         # From here to the "for" loop over the cells (below) we are
         # initialising data for the loop.  Primarily the AVGR and WTR
@@ -162,7 +161,7 @@ def SBBXtoBX(data):
             nc = IORDR[n]
             # :todo: Can it be correct to use [n]?  It's what the
             # Fortran does.
-            if wgtc[n] < parameters.subbox_min_valid:
+            if wgtc[nc] < parameters.subbox_min_valid:
                 continue
             ncr = nc
             if nc >= nsubbox:

@@ -88,38 +88,35 @@ def SBBXtoBX(data):
 
     for box_number,box in enumerate(eqarea.grid()):
         # Averages for the land and ocean (one series per subbox)...
-        avg = [[MISSING]*combined_n_months for _ in range(2*nsubbox)]
-        wgtc = [0] * (nsubbox*2)
+        avg = []
+        wgtc = []
         # Eat the records from land and ocean 100 (nsubbox) at a time.
         # In other words, all 100 subboxes for the box.
         landsub,oceansub = zip(*itertools.islice(data, nsubbox))
         # :todo: combine below zip with above zip?
         for i, l, o in zip(range(nsubbox), landsub, oceansub):
-            avg[i][land_offset:land_offset+len(l.series)] = l.series
-            avg[i+nsubbox][ocean_offset:ocean_offset+len(o.series)] = o.series
-            # Count the number of valid entries.
-            wgtc[i] = l.good_count
-            wgtc[i+nsubbox] = o.good_count
-            # :ocean:weight:a: Assign a weight to the ocean cell.
-            # A similar calculation appears elsewhere.
-            use_land = (wgtc[i+nsubbox] < parameters.subbox_min_valid
-                or l.d < parameters.subbox_land_range)
-            if use_land:
-                wgtc[i+nsubbox] = 0
+            a = [MISSING]*combined_n_months
+            if (o.good_count < parameters.subbox_min_valid
+                or l.d < parameters.subbox_land_range):
+                # use land series for this subbox
+                a[land_offset:land_offset+len(l.series)] = l.series
+                wgtc.append(l.good_count)
             else:
-                wgtc[i] = 0
-
+                # use ocean series for this subbox
+                a[ocean_offset:ocean_offset+len(o.series)] = o.series
+                wgtc.append(o.good_count)
+            avg.append(a)
 
         # GISTEMP sort.
         # We want to end up with IORDR, the permutation array that
         # represents the sorter order.  IORDR[0] is the index (into the
         # *wgtc* array) of the longest record, IORDR[1] the index of the
         # next longest record, and so on.  We do that by decorating the
-        # *wgtc* array with indexes 0 to 199, and then extracting the
+        # *wgtc* array with indexes 0 to 99, and then extracting the
         # (permuted) indexes into IORDR.
         # :todo: should probably import from a purpose built module.
         from step3 import sort
-        IORDR = range(2*nsubbox)
+        IORDR = range(nsubbox)
         sort(IORDR, lambda x,y: wgtc[y] - wgtc[x])
 
         # From here to the "for" loop over the cells (below) we are

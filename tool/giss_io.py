@@ -793,7 +793,7 @@ def step3_input():
     return V2MeanReader("work/v2.step2.out")
 
 def step3_output(data):
-    out = SubboxWriter(open('work/SBBX1880.Ts.GHCN.CL.PA.1200', 'wb'),
+    out = SubboxWriter(open('result/SBBX1880.Ts.GHCN.CL.PA.1200', 'wb'),
       trimmed=False)
     for thing in data:
         out.write(thing)
@@ -909,7 +909,7 @@ def step4_output(data):
     # We only want to write the records from the right-hand item (the
     # ocean data).  The left-hand items are land data, already written
     # by Step 3.
-    out = SubboxWriter(open('work/SBBX.HadR2', 'wb'))
+    out = SubboxWriter(open('result/SBBX.HadR2', 'wb'))
     try:
         for land,ocean in data:
             out.write(ocean)
@@ -918,15 +918,14 @@ def step4_output(data):
         out.close()
 
 def step5_input():
-    land = SubboxReader(
-      open(os.path.join('work', 'SBBX1880.Ts.GHCN.CL.PA.1200'), 'rb'))
-    ocean = SubboxReader(open("work/SBBX.HadR2", "rb"))
+    land = SubboxReader(open('result/SBBX1880.Ts.GHCN.CL.PA.1200', 'rb'))
+    ocean = SubboxReader(open('result/SBBX.HadR2', 'rb'))
 
     return itertools.izip(land, ocean)
 
 def step5_bx_output(data):
     bos = '>'
-    box = open(os.path.join('result', 'BX.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
+    box = open('result/BX.Ts.ho2.GHCN.CL.PA.1200', 'wb')
     boxf = fort.File(box, bos=bos)
     (info, title) = data.next()
     boxf.writeline(struct.pack('%s8i' % bos, *info) + title)
@@ -972,32 +971,26 @@ def step5_zone_titles():
 
 
 def step5_output(data):
-    (info, data, wt, ann, annw, monmin, title) = data
+    (info, data, wt, ann, monmin, title) = data
     XBAD = 9999
     iy1tab = 1880
 
     zone_titles = step5_zone_titles()
 
     titl2 = ' zones:  90->64.2->44.4->23.6->0->-23.6->-44.4->-64.2->-90                      '
-    titleo = 'ANNUALLY AVERAGED (%d OR MORE MONTHS) TEMPERATURE ANOMALIES (C)' % monmin
     iyrbeg = info[5]
     jzm = len(ann)
     iyrs = len(ann[0])
     monm = iyrs * 12
-    infoo = list(info)
-    infoo[2] = 5
-    infoo[3] //= 12
     
     out = ['ZonAnn', 'GLB', 'NH', 'SH']
-    out = [open(os.path.join('result', bit+'.Ts.ho2.GHCN.CL.PA.txt'), 'w')
+    out = [open('result/'+bit+'.Ts.ho2.GHCN.CL.PA.txt', 'w')
             for bit in out]
-    zono = open(os.path.join('work', 'ZON.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
-    annzono = open(os.path.join('work', 'ANNZON.Ts.ho2.GHCN.CL.PA.1200'), 'wb')
+    zono = open('result/ZON.Ts.ho2.GHCN.CL.PA.1200', 'wb')
 
     bos = '>'
 
     zono = fort.File(zono, bos)
-    annzono = fort.File(annzono, bos)
 
     # Create and write out the header record of the output files.
     print >> out[0], ' Annual Temperature Anomalies (.01 C) - ' + title[28:80]
@@ -1121,20 +1114,12 @@ Year  Glob  NHem  SHem    -90N  -24N  -24S    -90N  -64N  -44N  -24N  -EQU  -24S
               [iyr] + sout + [iyr])
         print >> outf, banner
 
-    # Save annual and monthly means on disk.
-    annzono.writeline(struct.pack(bos+'8i', *infoo) +
-                      titleo +
-                      title[28:80] +
-                      ' '*28)
+    # Save monthly means on disk.
     zono.writeline(struct.pack(bos + '8i', *info) +
                    title + titl2)
 
-    fmt_ann = bos + '%df' % (monm//12)
     fmt_mon = bos + '%df' % monm
     for jz in range(jzm):
-        annzono.writeline(struct.pack(fmt_ann, *ann[jz]) +
-                          struct.pack(fmt_ann, *annw[jz]) +
-                          zone_titles[jz])
         zono.writeline(struct.pack(fmt_mon, *itertools.chain(*data[jz])) +
                        struct.pack(fmt_mon, *itertools.chain(*wt[jz])) +
                        zone_titles[jz])

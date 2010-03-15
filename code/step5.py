@@ -336,7 +336,6 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
     data = [ None for _ in range(zones)]
     wt =   [ None for _ in range(zones)]
     ann =  [ [MISSING]*iyrs for _ in range(zones)]
-    annw = [ [0]*iyrs for _ in range(zones)]
 
     # Collect zonal means.
     for zone in range(zones):
@@ -351,17 +350,14 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
     for zone in range(zones):
         for iy in range(iyrs):
             anniy = 0.
-            annwiy = 0.
             mon = 0
             for m in range(12):
                 if data[zone][iy][m] == MISSING:
                     continue
                 mon += 1
                 anniy += data[zone][iy][m]
-                annwiy += wt[zone][iy][m]
             if mon >= parameters.zone_annual_min_months:
                 ann[zone][iy] = float(anniy)/mon
-            annw[zone][iy] = annwiy/12.
 
     # Alternate global mean.
     if alternate['global']:
@@ -415,8 +411,7 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
                         data[ihem+11][iy][m] = (
                           0.4*data[ihem+3][iy][m] +
                           0.6*data[2*ihem+8][iy][m])
-    return (info, data, wt, ann, annw,
-            parameters.zone_annual_min_months, title)
+    return (info, data, wt, ann, parameters.zone_annual_min_months, title)
 
 def step5(data):
     """Step 5 of GISTEMP.

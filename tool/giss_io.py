@@ -760,12 +760,11 @@ def step0_input():
 
 def step0_output(data):
     out = V2MeanWriter("work/v2.mean_comb")
-    try:
-        for thing in data:
-            out.write(thing)
-            yield thing
-    finally:
-        out.close()
+    for thing in data:
+        out.write(thing)
+        yield thing
+    print "Step0: closing output file"
+    out.close()
 
 def step1_input():
     return V2MeanReader("work/v2.mean_comb")

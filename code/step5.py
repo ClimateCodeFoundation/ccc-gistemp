@@ -74,7 +74,7 @@ def SBBXtoBX(data):
     combined_year_beg = min(land_meta.yrbeg, ocean_meta.yrbeg)
     # Index into the combined array of the first year of the land data.
     land_offset = 12*(land_meta.yrbeg-combined_year_beg)
-    # As I1TIN but for ocean data.
+    # As land_offset but for ocean data.
     ocean_offset = 12*(ocean_meta.yrbeg-combined_year_beg)
     combined_n_months = max(land_meta.monm + land_offset,
                             land_meta.monm + ocean_offset)
@@ -139,9 +139,9 @@ def SBBXtoBX(data):
                          combined_year_beg)
         ngood = sum(valid(a) for a in avgr)
         yield (avgr, wtr, ngood, box)
-    # We've now consumed all 8000 input boxes and yield 80 boxes.  We
+    # We've now consumed all 8000 input boxes and yielded 80 boxes.  We
     # need to tickle the input to check that it is exhausted and to
-    # cause it to the final tail of its generator.
+    # cause it to run the final tail of its generator.
     # We expect the call to .next() to raise StopIteration, which is
     # just what we want.
     data.next()

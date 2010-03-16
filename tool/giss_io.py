@@ -909,12 +909,11 @@ def step4_output(data):
     # ocean data).  The left-hand items are land data, already written
     # by Step 3.
     out = SubboxWriter(open('result/SBBX.HadR2', 'wb'))
-    try:
-        for land,ocean in data:
-            out.write(ocean)
-            yield land,ocean
-    finally:
-        out.close()
+    for land,ocean in data:
+        out.write(ocean)
+        yield land,ocean
+    print "Step4: closing output file"
+    out.close()
 
 def step5_input():
     land = SubboxReader(open('result/SBBX1880.Ts.GHCN.CL.PA.1200', 'rb'))

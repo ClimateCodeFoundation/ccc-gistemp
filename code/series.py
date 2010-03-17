@@ -80,15 +80,24 @@ def combine(average, weight, new, new_weight,
             months_combined += 1
     return months_combined
 
-def anomalize(data, reference_period, base_year):
+def anomalize(data, reference_period=None, base_year=-9999):
     """Turn the series *data* into anomalies, based on monthly
     averages over the *reference_period*, for example (1951, 1980).
-    *base_year* is the first year of the series.  If any month has no
-    data in the reference period, the average for that month is
-    computed over the whole series.
+    *base_year* is the first year of the series.  If *reference_period*
+    is None then the averages are computed over the whole series.
+    Similarly, If any month has no data in the reference period,
+    the average for that month is computed over the whole series.
+
+    The *data* sequence is mutated.
     """
-    base = reference_period[0] - base_year
-    limit = reference_period[1] - base_year + 1
+    if reference_period:
+        base = reference_period[0] - base_year
+        limit = reference_period[1] - base_year + 1
+    else:
+        # Setting base, limit to (0,0) is a bit of a hack, but it
+        # does work.
+        base = 0
+        limit = 0
     for m in range(12):
         sum = 0.0
         count = 0

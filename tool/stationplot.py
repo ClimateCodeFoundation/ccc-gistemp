@@ -215,8 +215,8 @@ def plot(arg, mode, inp, out, meta, timewindow=None):
 """ % ('display: none', '')[config.debug])
     assert len(datadict) <= len(colour_list)
     for id12,colour in zip(datadict, colour_list):
-        cssidescaped = cssidescape(id12)
-        out.write("    g#record%s { stroke: %s }\n" % (cssidescaped, colour))
+        cssidescaped = cssidescape('record' + id12)
+        out.write("    g#%s { stroke: %s }\n" % (cssidescaped, colour))
     out.write("  </style>\n</defs>\n")
 
     # push chart down and right to give a bit of a border
@@ -494,8 +494,8 @@ def asdict(arg, inp, mode):
             data,begin = from_lines(series)
             if mode == 'anom':
                 # Clear Climate Code, code directory
-                from code.step1 import month_anomaly
-                _,data = month_anomaly(data)
+                from code.series import anomalize
+                anomalize(data, None)
             table[id12] = (data,begin)
 
     return table

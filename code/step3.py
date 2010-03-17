@@ -201,8 +201,7 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
 
             if len(incircle_records) == 0:
                 box_obj = giss_data.SubboxRecord(subbox_series,
-                    lat_S=subbox[0], lat_N=subbox[1], lon_W=subbox[2],
-                    lon_E=subbox[3], stations=0, station_months=0,
+                    box=list(subbox), stations=0, station_months=0,
                     d=MISSING)
                 n_empty_cells += 1
                 yield box_obj
@@ -245,8 +244,7 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
             series.anomalize(subbox_series,
                              parameters.gridding_reference_period, first_year)
             box_obj = giss_data.SubboxRecord(subbox_series, n=max_months,
-                    lat_S=subbox[0], lat_N=subbox[1], lon_W=subbox[2],
-                    lon_E=subbox[3], stations=total_stations,
+                    box=list(subbox), stations=total_stations,
                     station_months=total_good_months,
                     d=radius*(1-max_weight))
             yield box_obj

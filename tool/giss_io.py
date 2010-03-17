@@ -145,22 +145,28 @@ class SubboxWriter(object):
                     m.precipitation_flag, m.title)
         else:
             b = self.buf_record
+            # Bounding box; to be converted to integer hundredths.
+            # Conventionally the 4 elements of the box are southern
+            # latitude, northern latitude, western longitude, eastern
+            # longitude (but the code doesn't care).
+            box = b.box
+            box = [int(round(x * 100)) for x in box]
             if self.trimmed and b.station_months == 0:
                 # Write as trimmed record.
                 fmt = "iiiiiiif1f"
                 rec = struct.pack(self.bos + fmt, mo1,
-                                  int(round(b.lat_S * 100)),
-                                  int(round(b.lat_N * 100)),
-                                  int(round(b.lon_W * 100)),
-                                  int(round(b.lon_E * 100)),
+                                  box[0],
+                                  box[1],
+                                  box[2],
+                                  box[3],
                                   b.stations, b.station_months, b.d, 9999.0)
             else:
                 fmt = "iiiiiiif%df" % b.n
                 rec = struct.pack(self.bos + fmt, mo1,
-                                  int(round(b.lat_S * 100)),
-                                  int(round(b.lat_N * 100)),
-                                  int(round(b.lon_W * 100)),
-                                  int(round(b.lon_E * 100)),
+                                  box[0],
+                                  box[1],
+                                  box[2],
+                                  box[3],
                                   b.stations, b.station_months, b.d, *b.series)
         self.f.writeline(rec)
 
@@ -794,8 +800,13 @@ def step3_input():
 def step3_output(data):
     out = SubboxWriter(open('result/SBBX1880.Ts.GHCN.CL.PA.1200', 'wb'),
       trimmed=False)
+    v2out = V2MeanWriter('work/v2.step3.out')
+    gotmeta = False
     for thing in data:
         out.write(thing)
+        if gotmeta:
+            v2out.write(thing)
+        gotmeta = True
         yield thing
     print "Step3: closing output file"
     out.close()

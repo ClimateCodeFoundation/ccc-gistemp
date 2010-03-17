@@ -657,6 +657,13 @@ class SubboxRecord(MonthlyTemperatureRecord):
     def __init__(self, series, **k):
         super(SubboxRecord, self).__init__()
         self.__dict__.update(k)
+        # Synthesize a uid attribute if necessary, based on the box's
+        # centre.
+        if not hasattr(self, 'uid'):
+            if hasattr(self, 'box'):
+                import eqarea
+                lat,lon = eqarea.centre(self.box)
+                self.uid = "%+05.1f%+06.1fC" % (lat,lon)
         self.set_series(series)
 
     @property
@@ -683,5 +690,5 @@ class SubboxRecord(MonthlyTemperatureRecord):
                 MISSING)
 
     def __repr__(self):
-        return ('<Subbox (%+06.2f,%+06.2f) (%+07.2f,%+07.2f): %d>' %
-                (self.lat_S, self.lat_N, self.lon_W, self.lon_E, self.n))
+        return ('Subbox(box=(%+06.2f,%+06.2f,%+07.2f,%+07.2f))' %
+          self.box)

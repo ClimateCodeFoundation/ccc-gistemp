@@ -33,15 +33,12 @@ import struct
 import os
 import sys
 
-def _blank_ocean_data(data):
+def blank_ocean_data(data):
     """Augment a land-only data series with blank ocean data."""
     for land_box in data:
         ocean_series = [MISSING] * len(land_box.series)
         ocean_box = giss_data.SubboxRecord(ocean_series,
-            lat_S=land_box.lat_S,
-            lat_N=land_box.lat_N,
-            lon_W=land_box.lon_W,
-            lon_E=land_box.lon_E,
+            box=land_box.box,
             stations=0, station_months=0,
             d=MISSING)
         yield land_box, ocean_box
@@ -59,11 +56,11 @@ def SBBXtoBX(data):
     meta = data.next()
     try:
         land_meta, ocean_meta = meta
-    except (TypeError, ValueError), _:
+    except (TypeError, ValueError):
         # Use the land meta object for both land and ocean data
         land_meta,ocean_meta = meta, meta
         print "No ocean data; using land data only"
-        data = _blank_ocean_data(data)
+        data = blank_ocean_data(data)
 
     # number of subboxes within each box
     nsubbox = 100

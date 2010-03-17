@@ -215,7 +215,8 @@ def plot(arg, mode, inp, out, meta, timewindow=None):
 """ % ('display: none', '')[config.debug])
     assert len(datadict) <= len(colour_list)
     for id12,colour in zip(datadict, colour_list):
-        out.write("    g#record%s { stroke: %s }\n" % (id12, colour))
+        cssidescaped = cssidescape(id12)
+        out.write("    g#record%s { stroke: %s }\n" % (cssidescaped, colour))
     out.write("  </style>\n</defs>\n")
 
     # push chart down and right to give a bit of a border
@@ -300,6 +301,26 @@ def plot(arg, mode, inp, out, meta, timewindow=None):
         out.write("</g>\n")
     out.write("</g>\n" * 6)
     out.write("</svg>\n")
+
+def cssidescape(identifier):
+    """Escape an identifier so that it is suitable for use as a CSS
+    identifier.  See http://www.w3.org/TR/CSS2/syndata.html ."""
+
+    import re
+
+    def f(m):
+       return '\\'+m.group()
+
+    x0 = identifier[0]
+
+    # Escape all but initial character.
+    x = re.sub(r'([^a-zA-Z0-9_-])', f, identifier[1:])
+    # Initial character needs escaping too.
+    if x0 in '0123456789':
+        x0 = '\\%02x' % ord(x0)
+    elif not re.match(r'^[a-zA-Z_]', x0):
+        x0 = '\\' + x0
+    return x0 + x
 
 def window(datadict, timewindow):
     """Restrict the data series in *datadict* to be between the two

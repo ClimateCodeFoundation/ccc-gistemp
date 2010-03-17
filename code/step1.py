@@ -63,7 +63,13 @@ def valid_mean(seq, min=1):
 def monthly_anomalies(data):
     """Calculate monthly anomalies, by subtracting from every datum
     the mean for its month.  A pair of (monthly_mean, monthly_anom) is
-    returned.
+    returned.  *monthly_mean* is a 12-long sequence giving the mean for
+    each of the 12 months; *monthly_anom* is a 12-long sequence giving
+    the anomalized series for each of the 12 months.
+    
+    The input data is a flat sequence, one datum per month.
+    Effectively the data changes shape as it passes through this
+    function.
     """
 
     years = len(data) // 12

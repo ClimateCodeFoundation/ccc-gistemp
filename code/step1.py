@@ -42,6 +42,7 @@ import itertools
 import read_config
 from giss_data import valid, invalid, MISSING
 import parameters
+import series
 
 
 def valid_mean(seq, min=1):
@@ -60,45 +61,17 @@ def valid_mean(seq, min=1):
     else:
         return MISSING
 
-def monthly_anomalies(data):
-    """Calculate monthly anomalies, by subtracting from every datum
-    the mean for its month.  A pair of (monthly_mean, monthly_anom) is
-    returned.  *monthly_mean* is a 12-long sequence giving the mean for
-    each of the 12 months; *monthly_anom* is a 12-long sequence giving
-    the anomalized series for each of the 12 months.
-    
-    The input data is a flat sequence, one datum per month.
-    Effectively the data changes shape as it passes through this
-    function.
-    """
-
-    years = len(data) // 12
-    monthly_mean = []
-    monthly_anom = []
-    for m in range(12):
-        row = data[m::12]
-        mean = valid_mean(row)
-        monthly_mean.append(mean)
-        if valid(mean):
-            def asanom(datum):
-                """Convert a single datum to anomaly."""
-                if valid(datum):
-                    return datum - mean
-                return MISSING
-            monthly_anom.append(map(asanom, row))
-        else:
-            monthly_anom.append([MISSING]*years)
-    return monthly_mean, monthly_anom
-
 def monthly_annual(data):
     """Computing a mean and set of annual anomalies.  This has a
     particular algorithm (via monthly and then seasonal means and
     anomalies), which must be maintained for bit-for-bit compatibility
     with GISTEMP; maybe we can drop it later.
     """
+    
+    from series import valid_mean
 
     years = len(data) // 12
-    monthly_mean, monthly_anom = monthly_anomalies(data)
+    monthly_mean, monthly_anom = series.monthly_anomalies(data)
 
     # :todo:
     # The seasonal calculation shoud be abstracted into a function.
@@ -108,13 +81,11 @@ def monthly_annual(data):
     # and monthly anomalies to make seasonal anomalies.
     seasonal_mean = []
     seasonal_anom = []
-    # compute seasonal anomalies
-    for s in range(4):
-        # The months in the season.
-        months = [[11, 0, 1],
-                  [2, 3, 4],
-                  [5, 6, 7],
-                  [8, 9, 10],][s]
+    # Compute seasonal anomalies; each season consists of 3 months.
+    for months in [[11, 0, 1],
+                   [2, 3, 4],
+                   [5, 6, 7],
+                   [8, 9, 10],]:
         # Need at least two valid months for a valid season.
         seasonal_mean.append(valid_mean((monthly_mean[m] for m in months),
                                         min = 2))

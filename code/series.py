@@ -7,7 +7,7 @@
 # Nick Barnes, Ravenbrook Limited, 2010-03-08
 
 import itertools
-from giss_data import valid, invalid
+from giss_data import valid, invalid, MISSING
 
 """
 Shared series-processing code in the GISTEMP algorithm.
@@ -90,6 +90,48 @@ def anomalize(data, reference_period=None, base_year=-9999):
 
     The *data* sequence is mutated.
     """
+
+    means, anoms = monthly_anomalies(data, reference_period, base_year)
+    # Each of the elements in *anoms* are the anomalies for one of the
+    # months of the year (for example, January).  We need to splice each
+    # month back into a single linear series.
+    for m in range(12):
+        data[m::12] = anoms[m]
+
+def valid_mean(seq, min=1):
+    """Takes a sequence, *seq*, and computes the mean of the valid
+    items (using the valid() function).  If there are fewer than *min*
+    valid items, the mean is MISSING."""
+
+    count = 0
+    sum = 0.0
+    for x in seq:
+        if valid(x):
+            sum += x
+            count += 1
+    if count >= min:
+        return sum/float(count)
+    else:
+        return MISSING
+
+def monthly_anomalies(data, reference_period=None, base_year=-9999):
+    """Calculate monthly anomalies, by subtracting from every datum
+    the mean for its month.  A pair of (monthly_mean, monthly_anom) is
+    returned.  *monthly_mean* is a 12-long sequence giving the mean for
+    each of the 12 months; *monthly_anom* is a 12-long sequence giving
+    the anomalized series for each of the 12 months.
+
+    If *reference_period* is supplied then it should be a pair (*first*,
+    *last) and the mean for a month is taken over the period (an example
+    would be reference_period=(1951,1980)).  *base_year* specifies the
+    first year of the data.
+    
+    The input data is a flat sequence, one datum per month.
+    Effectively the data changes shape as it passes through this
+    function.
+    """
+
+    years = len(data) // 12
     if reference_period:
         base = reference_period[0] - base_year
         limit = reference_period[1] - base_year + 1
@@ -98,26 +140,22 @@ def anomalize(data, reference_period=None, base_year=-9999):
         # does work.
         base = 0
         limit = 0
+    monthly_mean = []
+    monthly_anom = []
     for m in range(12):
-        sum = 0.0
-        count = 0
-        for datum in data[m+12*base:m+12*limit:12]:
-            if invalid(datum):
-                continue
-            count += 1
-            sum += datum
-        if count == 0:
-            for datum in data[m::12]:
-                if invalid(datum):
-                    continue
-                count += 1
-                sum += datum
-        if count == 0:
-            average = 0.0
+        row = data[m::12]
+        mean = valid_mean(row[base:limit])
+        if invalid(mean):
+            # Fall back to using entire period
+            mean = valid_mean(row)
+        monthly_mean.append(mean)
+        if valid(mean):
+            def asanom(datum):
+                """Convert a single datum to anomaly."""
+                if valid(datum):
+                    return datum - mean
+                return MISSING
+            monthly_anom.append(map(asanom, row))
         else:
-            average = sum/count
-        index = m
-        while index < len(data):
-            if valid(data[index]):
-                data[index] -= average
-            index += 12
+            monthly_anom.append([MISSING]*years)
+    return monthly_mean, monthly_anom

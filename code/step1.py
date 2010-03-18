@@ -110,28 +110,29 @@ def monthly_annual(data):
     seasonal_anom = []
     # compute seasonal anomalies
     for s in range(4):
-        if s == 0:
-            months = [11, 0, 1]
-        else:
-            months = range(s*3-1, s*3+2)
-        # need at least two valid months for a valid season
+        # The months in the season.
+        months = [[11, 0, 1],
+                  [2, 3, 4],
+                  [5, 6, 7],
+                  [8, 9, 10],][s]
+        # Need at least two valid months for a valid season.
         seasonal_mean.append(valid_mean((monthly_mean[m] for m in months),
                                         min = 2))
         # A list of 3 data series, each being an extract for a
-        # particular month
+        # particular month.
         month_in_season = []
         for m in months:
             row = monthly_anom[m] # the list of anomalies for month m
             if m == 11:
                 # For December, we take the December of the previous
-                # year.  Which we do by offsetting the array, and not
+                # year.  Which we do by shifting the array, and not
                 # using the most recent December.
                 row[1:] = row[:-1]
                 row[0] = MISSING
             month_in_season.append(row)
         seasonal_anom_row = []
         for n in range(years):
-            m = valid_mean((month_in_season[i][n] for i in range(3)),
+            m = valid_mean((data[n] for data in month_in_season),
                            min = 2)
             seasonal_anom_row.append(m)
         seasonal_anom.append(seasonal_anom_row)
@@ -142,7 +143,7 @@ def monthly_annual(data):
     annual_mean = valid_mean(seasonal_mean, min = 3)
     annual_anom = []
     for n in range(years):
-        annual_anom.append(valid_mean((seasonal_anom[s][n] for s in range(4)),
+        annual_anom.append(valid_mean((data[n] for data in seasonal_anom),
                                       min = 3))
     return (annual_mean, annual_anom)
 

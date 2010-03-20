@@ -28,15 +28,19 @@ def map(when, inp, out):
     month = int(month) - 1
     assert 0 <= month < 12
 
+    out.write("""<g transform='translate(180,90)'>\n""")
     for (lat,lon),v in filter_month(inp, year, month):
         x,y = topixel(lat, lon)
+        y = -y
         if v > 0:
             fill = 'red'
         else:
             fill = 'blue'
-        r = math.sqrt(abs(v))
+        radius_scale = 0.5
+        r = math.sqrt(abs(v)) * 0.5
         out.write("""<circle cx='%.1f' cy='%.1f' r='%.1f' fill='%s' />\n""" %
           (x, y, r, fill))
+    out.write('</g>\n')
     out.write("""</svg>\n""")
 
 def topixel(lat, lon):

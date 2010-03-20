@@ -248,9 +248,12 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                     station_months=total_good_months,
                     d=radius*(1-max_weight))
             yield box_obj
+        plural_suffix = 's'
+        if n_empty_cells == 1:
+            plural_suffix = ''
         log.write(
-          '\rRegion (%+03.0f/%+03.0f S/N %+04.0f/%+04.0f W/E): %d empty cells.\n' %
-            (tuple(box) + (n_empty_cells,)))
+          '\rRegion (%+03.0f/%+03.0f S/N %+04.0f/%+04.0f W/E): %d empty cell%s.\n' %
+            (tuple(box) + (n_empty_cells,plural_suffix)))
     log.write("\n")
 
 

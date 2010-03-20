@@ -36,8 +36,8 @@ def map(when, inp, out):
             fill = 'red'
         else:
             fill = 'blue'
-        radius_scale = 0.5
-        r = math.sqrt(abs(v)) * 0.5
+        radius_scale = 0.25
+        r = math.sqrt(abs(v)) * radius_scale
         out.write("""<circle cx='%.1f' cy='%.1f' r='%.1f' fill='%s' />\n""" %
           (x, y, r, fill))
     out.write('</g>\n')

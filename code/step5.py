@@ -37,7 +37,7 @@ def blank_ocean_data(data):
     """Augment a land-only data series with blank ocean data."""
     for land_box in data:
         ocean_series = [MISSING] * len(land_box.series)
-        ocean_box = giss_data.SubboxRecord(ocean_series,
+        ocean_box = giss_data.Series(series=ocean_series,
             box=land_box.box,
             stations=0, station_months=0,
             d=MISSING)

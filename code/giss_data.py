@@ -4,16 +4,18 @@
 
 """Classes for GISTEMP data.
 
-Primarily, the classes herein support temperature records, which
-are composed of series of monthly averages. There two types of record,
-derived from the `MonthlyTemperatureRecord` class:
+Primarily, the classes herein support monthly temperature series.
+Typically these are either for stations (station records) or subboxes
+(subbox series).  In either case the same class is used, `Series`,
+differing in what keyword arguments are supplied.
 
-`StationRecord`
+station records
     Stores a set of monthly averages associated with a particular monitoring
     `Station`.
 
-`SubboxRecord`
-    Stores combined monthly averages for StationRecords within a sub-box.
+subbox series
+    Stores monthly averages for a subbox, typically synthesized by
+    combining several station records together.
 
 Both types of record can be grouped in collections, often (in the original
 GISTEMP code) in files. Collections of records have associated metadata,
@@ -236,11 +238,10 @@ class StationMetaData(object):
 #    make the code that manipulates temperature series more readable.
 # 2. Should we use properties or convert the properties to methods?
 # 3. Some of the names are open to improvement.
-class MonthlyTemperatureRecord(object):
-    """Base class for monthly temperature records.
+class Series(object):
+    """Monthly temperature Series.
 
-    This is the base class for both the `StationRecord` and `SubboxRecord`
-    classes. It contains a series of average monthly temperatures, which are
+    Instances contain a series of average monthly temperatures, which are
     accessible via the `series` property. The series propery always provides
     an array of floating point values in celsius. This property should
     **always** be treated as read-only; the effect of modifying elements is
@@ -265,14 +266,75 @@ class MonthlyTemperatureRecord(object):
     treated as read-only and you should only set values in the data series
     using the provided methods.
 
+    There are no subclasses of this class.  Some instances represent
+    station records, other instances represent subbox series.
+
+    For station records there can be multiple series for a single `Station`.
+    The `station` property provides the associated `Station` instance.
+    For a given station the different series are called "duplicates" in
+    GHCN terminology; they have a 12-digit uid that is made up of an
+    11-digit station identifier and a single extra digit to distinguish
+    each of the station's series.
+
+    Generally a station record will have its uid supplied as a keyword
+    argument to the constructor (accessing the `station` property relies
+    on this):
+
+    :Ivar uid:
+        An integer that acts as a unique ID for the time series. This
+        is generally a 12-digit identifier taken from the GHCN file; the
+        first 11 digits comprise an identifier for the station.
+	The last digit distinguishes this series from other series
+	from the same station.
+
+    When used to hold a series for a subbox, for example a record of data
+    as stored in the ``input/SBBX.HadR2`` file, then the following
+    keyword arguments are traditionally supplied to the constructor:
+
+    :Ivar lat_S, lat_N, lon_W, lon_E:
+        Coordinates describing the box's area.
+    :Ivar stations:
+        The number of stations that contributed to this sub-box.
+    :Ivar station_months:
+        The number of months that contributed to this sub-box.
+    :Ivar d:
+        Characteristic distance to station closest to centre.
+
     """
-    def __init__(self):
+    def __init__(self, **k):
         self._first_month = sys.maxint
         self._good_start_idx = sys.maxint
         self._good_end_idx = 0
         self._series = []
         self._good_count = None
         self._ann_anoms_good_count = None
+        self.ann_anoms = []
+        series = None
+        if 'series' in k:
+            series = k['series']
+            del k['series']
+            self.set_series(BASE_YEAR*12+1, series)
+        self.__dict__.update(k)
+
+        if hasattr(self, 'uid'):
+            # Generally applies to station records
+            self.source = v2_sources().get(self.uid, "UNKNOWN")
+        elif hasattr(self, 'box'):
+            # Generally applies to subbox series.
+            # Synthesize a uid attribute based on the box's centre.
+            import eqarea
+            lat,lon = eqarea.centre(self.box)
+            self.uid = "%+05.1f%+06.1fC" % (lat,lon)
+
+    def __repr__(self):
+        # A bit ugly, because it tries to do something sensible for both
+        # station records and subbox series.
+        if hasattr(self, 'box'):
+            return ('Series(box=(%+06.2f,%+06.2f,%+07.2f,%+07.2f))' %
+              self.box)
+        else:
+            # Assume it is a station record with a uid.
+            return "Series(uid=%r)" % self.uid
 
     @property
     def series(self):
@@ -540,34 +602,10 @@ class MonthlyTemperatureRecord(object):
         self.station_months = len(self._series) - self._series.count(
                 MISSING)
 
-
-class StationRecord(MonthlyTemperatureRecord):
-    """An average monthly temperature record associated with a `Station`.
-
-    There can be multiple temperature series for a single `Station`. The
-    `station` property provides the associated `Station` instance.
-
-    :Ivar uid:
-        An integer that acts as a unique ID for the time series. This
-        is generated by taking the last 8 digits of the `Station` uid, and
-        adding an additional digit. The last digit distinguished this series
-        from other series from the same station.
-    :Ivar source:
-        The source of the data, which defaults to 'UNKNOWN'.
-
-    """
-    def __init__(self, uid, **kwargs):
-        super(StationRecord, self).__init__()
-        self.uid = uid
-        self.source = v2_sources().get(uid, "UNKNOWN")
-        self.ann_anoms = []
-
-    def __repr__(self):
-        return "StationRecord(uid=%r)" % self.uid
-
     @property
     def station(self):
-        """The corresponding `Station` instance."""
+        """The corresponding `Station` instance.  Only works for station
+        records."""
         st = stations().get(self.station_uid)
         if st is None:
             print "BUM!", self.uid, self.station_uid
@@ -576,7 +614,7 @@ class StationRecord(MonthlyTemperatureRecord):
     @property
     def station_uid(self):
         """The unique ID of the corresponding station."""
-        return self.uid[:-1]
+        return self.uid[:11]
 
 
 class SubboxMetaData(object):
@@ -616,38 +654,3 @@ class SubboxMetaData(object):
     def __repr__(self):
         return 'SubboxMetadata(%r)' % self.__dict__
 
-
-class SubboxRecord(MonthlyTemperatureRecord):
-    """A sub-box record.
-
-    This can hold, for example, a record of data as stored within the
-    ``input/SBBX.HadR2`` file.
-
-    Traditionally the following keyword arguments are supplied to the
-    constructor:
-
-    :Ivar lat_S, lat_N, lon_W, lon_E:
-        Coordinates describing the box's area.
-    :Ivar stations:
-        The number of stations that contributed to this sub-box.
-    :Ivar station_months:
-        The number of months that contributed to this sub-box.
-    :Ivar d:
-        Characteristic distance to station closest to centre.
-
-    """
-    def __init__(self, series, **k):
-        super(SubboxRecord, self).__init__()
-        self.__dict__.update(k)
-        # Synthesize a uid attribute if necessary, based on the box's
-        # centre.
-        if not hasattr(self, 'uid'):
-            if hasattr(self, 'box'):
-                import eqarea
-                lat,lon = eqarea.centre(self.box)
-                self.uid = "%+05.1f%+06.1fC" % (lat,lon)
-        self.set_series(BASE_YEAR*12+1, series)
-
-    def __repr__(self):
-        return ('Subbox(box=(%+06.2f,%+06.2f,%+07.2f,%+07.2f))' %
-          self.box)

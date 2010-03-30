@@ -622,10 +622,11 @@ def alter_discont(data):
 
 def step1(record_source):
     """An iterator for step 1.  Produces a stream of
-    `giss_data.StationRecord` instances.
+    `giss_data.Series` instances.
 
     :Param record_source:
-        An iterable source of `giss_data.StationRecord` instances.
+        An iterable source of `giss_data.Series` instances (which it
+        will assume are station records).
 
     """
     records = comb_records(record_source)

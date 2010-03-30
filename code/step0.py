@@ -149,7 +149,7 @@ def asdict(ghcn_source, antarc_source):
 
 def step0(inputs):
     """An iterator for step 1.  Produces a stream of
-    `giss_data.StationRecord` instances.
+    `giss_data.Series` instances.
 
     """
     ushcn_records = dict((record.uid, record)

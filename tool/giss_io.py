@@ -292,7 +292,7 @@ class StationReader(object):
                     self.min_month, self.max_month) = fields[n:]
             country_code = name[-3:]
             uid = "%3s%09d" % (country_code, ident)
-            station = code.giss_data.StationRecord(uid)
+            station = code.giss_data.Series(uid=uid)
             # TODO: Rename min_month to first_month.
             # TODO: Handle magic 1880, should use meta info!
 
@@ -345,8 +345,7 @@ class SubboxReader(object):
               'stations', 'station_months', 'd'],
               fields[1:8]))
             attr['box'] = fields[1:5]
-            subbox = code.giss_data.SubboxRecord(series,
-               **attr)
+            subbox = code.giss_data.Series(series=series, **attr)
             yield subbox
 
     def __getattr__(self, name):
@@ -376,7 +375,7 @@ def StationTsReader(path):
             assert len(lines) == 1
             line = lines[0]
             id12 = line[10:22]
-            record = code.giss_data.StationRecord(id12)
+            record = code.giss_data.Series(uid=id12)
         else:
             # Lines consists of the temperature series. Year +
             # temperature values, as a set of contiguous years.
@@ -434,7 +433,7 @@ def V2MeanReader(path, year_min=-9999):
     for (id, lines) in itertools.groupby(f, id12):
         # lines is a set of lines which all begin with the same 12
         # character id
-        record = code.giss_data.StationRecord(id)
+        record = code.giss_data.Series(uid=id)
         prev_line = None
         for line in lines:
             if line != prev_line:
@@ -497,7 +496,7 @@ def DecimalReader(path, year_min=-9999):
     for (id, lines) in itertools.groupby(f, id12):
         # lines is a set of lines which all begin with the same 12
         # character id
-        record = code.giss_data.StationRecord(id)
+        record = code.giss_data.Series(uid=id)
         prev_line = None
         for line in lines:
             if line != prev_line:
@@ -560,7 +559,7 @@ def read_antarctic(path, station_path, discriminator):
             id12 = stations[station_name]
             if record is not None:
                 yield record
-            record = code.giss_data.StationRecord(id12)
+            record = code.giss_data.Series(uid=id12)
             continue
         line = line.strip()
         if line.find('.') >= 0 and line[0] in '12':
@@ -587,7 +586,7 @@ def read_australia(path, station_path, discriminator):
             id12 = stations[station_name]
             if record is not None:
                 yield record
-            record = code.giss_data.StationRecord(id12)
+            record = code.giss_data.Series(uid=id12)
             continue
         line = line.strip()
         if line.find('.') >= 0 and line[0] in '12':
@@ -659,7 +658,7 @@ def read_USHCN(path, stations):
         if record is None or id12[:11] != record.station_uid:
             if record is not None:
                 yield fill_record()
-            record = code.giss_data.StationRecord(id12)
+            record = code.giss_data.Series(uid=id12)
             years_data = {}
 
         temps = []
@@ -714,7 +713,7 @@ def read_hohenpeissenberg(path):
     We only want data from 1880 to 2002.
     """
 
-    record = code.giss_data.StationRecord('617109620002')
+    record = code.giss_data.Series(uid='617109620002')
     for line in open(path):
         if line[0] in '12':
             year = int(line[:4])

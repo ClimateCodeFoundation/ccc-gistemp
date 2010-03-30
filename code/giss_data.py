@@ -441,7 +441,7 @@ class MonthlyTemperatureRecord(object):
             monthly_valid[(self.first_month + i - 1) % 12] += valid(v)
         return monthly_valid
 
-    def _set_series(self, first_month, series):
+    def set_series(self, first_month, series):
         self._first_month = first_month
         self._good_start_idx = sys.maxint
         self._good_end_idx = 0
@@ -454,7 +454,6 @@ class MonthlyTemperatureRecord(object):
                         len(self._series))
                 self._series.append(v)
                 self._good_end_idx = max(self._good_end_idx, len(self._series))
-    _set_series = clear_cache(_set_series)
 
     def add_year(self, year, data):
         if self.first_month != sys.maxint:
@@ -579,9 +578,6 @@ class StationRecord(MonthlyTemperatureRecord):
         """The unique ID of the corresponding station."""
         return self.uid[:-1]
 
-    def set_series(self, first_month, series):
-        self._set_series(first_month, series)
-
 
 class SubboxMetaData(object):
     """The metadata for a set of sub-box records.
@@ -650,10 +646,7 @@ class SubboxRecord(MonthlyTemperatureRecord):
                 import eqarea
                 lat,lon = eqarea.centre(self.box)
                 self.uid = "%+05.1f%+06.1fC" % (lat,lon)
-        self.set_series(series)
-
-    def set_series(self, series):
-        self._set_series(BASE_YEAR*12+1, series)
+        self.set_series(BASE_YEAR*12+1, series)
 
     def __repr__(self):
         return ('Subbox(box=(%+06.2f,%+06.2f,%+07.2f,%+07.2f))' %

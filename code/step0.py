@@ -170,7 +170,7 @@ def step0(inputs):
     # can probably ensure it here by doing the above processing with
     # suitable care.
     for uid, record in sorted(records.iteritems()):
-        if record.n:
+        if len(record) > 0:
             yield record
 
 

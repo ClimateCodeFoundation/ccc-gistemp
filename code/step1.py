@@ -290,7 +290,7 @@ def fresh_arrays(record, begin, years):
     rec_years = record.last_year - record.first_year + 1
     # Number of months in record.
     rec_months = rec_years * 12
-    assert rec_months == record.n
+    assert rec_months == len(record)
     assert rec_months == len(rec_data)
     # The record may begin at a later year from the arrays we are
     # creating, so we need to offset it when we copy.

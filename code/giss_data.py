@@ -274,12 +274,12 @@ class MonthlyTemperatureRecord(object):
         self._good_count = None
         self._ann_anoms_good_count = None
 
-    def is_empty(self):
-        """Test whether the record contains data."""
-        return len(self._series) == 0
-
     @property
-    def n(self):
+    def series(self):
+        """The series of values (conventionally in degrees Celsius)."""
+        return self._series
+
+    def __len__(self):
         """The length of the series."""
         return len(self._series)
 
@@ -502,6 +502,45 @@ class MonthlyTemperatureRecord(object):
         return [self.get_a_month(m)
                 for m in range(start_month, start_month + 12)]
 
+    def get_set_of_years(self, first_year, last_year):
+        """Get a set of year records.
+
+        :Return:
+            A list of lists, where each sub-list contains 12 temperature values
+            for a given year. This works for any range of years, missing years
+            are filled with the MISSING value.
+
+        """
+        return [self.get_a_year(y) for y in range(first_year, last_year + 1)]
+
+    def set_ann_anoms(self, ann_anoms):
+        self.ann_anoms[:] = ann_anoms
+
+    @property
+    def ann_anoms_good_count(self):
+        """Number of good values in the annual anomalies"""
+        if self._ann_anoms_good_count is None:
+            bad = 0
+            for v in self.ann_anoms:
+                bad += invalid(v)
+            self._ann_anoms_good_count = len(self.ann_anoms) - bad
+        return self._ann_anoms_good_count
+
+    def pad_with_missing(self, n):
+        while len(self) < n:
+            self._series.append(MISSING)
+    pad_with_missing = clear_cache(pad_with_missing)
+
+    def set_value(self, idx, value):
+        while idx >= len(self.series):
+            self._series.append(MISSING)
+        self._series[idx] = value
+    set_value = clear_cache(set_value)
+
+    def trim(self):
+        self.station_months = len(self._series) - self._series.count(
+                MISSING)
+
 
 class StationRecord(MonthlyTemperatureRecord):
     """An average monthly temperature record associated with a `Station`.
@@ -528,11 +567,6 @@ class StationRecord(MonthlyTemperatureRecord):
         return "StationRecord(uid=%r)" % self.uid
 
     @property
-    def series(self):
-        """The series of values in celsius."""
-        return self._series
-
-    @property
     def station(self):
         """The corresponding `Station` instance."""
         st = stations().get(self.station_uid)
@@ -543,53 +577,10 @@ class StationRecord(MonthlyTemperatureRecord):
     @property
     def station_uid(self):
         """The unique ID of the corresponding station."""
-        try:
-            return self.uid[:-1]
-        except:
-            print ">>>", self, self.uid
-            raise
-
-    @property
-    def short_id(self):
-        """The shortened form of the record's uinique ID, as an integer.
-
-        This is the `uid` with the country code removed, converted to an
-        integer.
-
-        """
-        return int(self.uid[3:])
-
-    def get_set_of_years(self, first_year, last_year):
-        """Get a set of year records.
-
-        :Return:
-            A list of lists, where each sub-list contains 12 temperature values
-            for a given year. This works for any range of years, missing years
-            are filled with the MISSING value.
-
-        """
-        return [self.get_a_year(y) for y in range(first_year, last_year + 1)]
+        return self.uid[:-1]
 
     def set_series(self, first_month, series):
         self._set_series(first_month, series)
-
-    def set_ann_anoms(self, ann_anoms):
-        self.ann_anoms[:] = ann_anoms
-
-    @property
-    def ann_anoms_good_count(self):
-        """Number of good values in the annual anomalies"""
-        if self._ann_anoms_good_count is None:
-            bad = 0
-            for v in self.ann_anoms:
-                bad += invalid(v)
-            self._ann_anoms_good_count = len(self.ann_anoms) - bad
-        return self._ann_anoms_good_count
-
-    def copy(self):
-        r = StationRecord(self.uid)
-        r.set_series(self.first_month, self.series)
-        return r
 
 
 class SubboxMetaData(object):
@@ -629,11 +620,6 @@ class SubboxMetaData(object):
     def __repr__(self):
         return 'SubboxMetadata(%r)' % self.__dict__
 
-    def copy(self):
-        return SubboxMetaData(self.mo1, self.kq, self.mavg, self.monm,
-                self.monm4, self.yrbeg, self.missing_flag,
-                self.precipitation_flag, self.title)
-
 
 class SubboxRecord(MonthlyTemperatureRecord):
     """A sub-box record.
@@ -666,28 +652,8 @@ class SubboxRecord(MonthlyTemperatureRecord):
                 self.uid = "%+05.1f%+06.1fC" % (lat,lon)
         self.set_series(series)
 
-    @property
-    def series(self):
-        """The series of values in celsius."""
-        return self._series
-
     def set_series(self, series):
         self._set_series(BASE_YEAR*12+1, series)
-
-    def pad_with_missing(self, n):
-        while self.n < n:
-            self._series.append(MISSING)
-    pad_with_missing = clear_cache(pad_with_missing)
-
-    def set_value(self, idx, value):
-        while idx >= len(self.series):
-            self._series.append(MISSING)
-        self._series[idx] = value
-    set_value = clear_cache(set_value)
-
-    def trim(self):
-        self.station_months = len(self._series) - self._series.count(
-                MISSING)
 
     def __repr__(self):
         return ('Subbox(box=(%+06.2f,%+06.2f,%+07.2f,%+07.2f))' %

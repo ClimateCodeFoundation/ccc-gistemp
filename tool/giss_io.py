@@ -161,7 +161,7 @@ class SubboxWriter(object):
                                   box[3],
                                   b.stations, b.station_months, b.d, 9999.0)
             else:
-                fmt = "iiiiiiif%df" % b.n
+                fmt = "iiiiiiif%df" % len(b)
                 rec = struct.pack(self.bos + fmt, mo1,
                                   box[0],
                                   box[1],
@@ -179,7 +179,7 @@ class SubboxWriter(object):
             if self.trimmed and record.station_months == 0:
                 self._flush(1)
             else:
-                self._flush(record.n)
+                self._flush(len(record))
             self.buf_record = record
 
     def close(self):
@@ -231,11 +231,16 @@ class StationRecordWriter(object):
                       s.name, b, s.pop, s.GHCN_brightness,
                       s.uid[:3])
 
+            # The 11-digit station identifier with the 3-digit country
+            # code at the front removed.  Only used in this output
+            # format.
+            short_id = r.uid[3:]
+
             fmt = "%di" % len(r.series)
             data = struct.pack(self.bos + fmt, *convert_to_tenths(r.series))
             data += struct.pack(self.bos + "iiii36sii", as_tenths(s.lat),
-                    as_tenths(s.lon), r.short_id, s.elevation, compound_name,
-                    rel_first_month, rel_last_month)
+                    as_tenths(s.lon), int(short_id), s.elevation,
+                    compound_name, rel_first_month, rel_last_month)
 
         self.f.writeline(data)
 
@@ -397,7 +402,7 @@ class StationTsWriter(object):
                 record.uid, station.elevation, station.name))
 
         data = convert_to_tenths(record.series)
-        for y, offset in enumerate(range(0, record.n, 12)):
+        for y, offset in enumerate(range(0, len(record), 12)):
             months = ["%5d" % v for v in data[offset: offset + 12]]
             self.f.write('%4d%s\n' % (y + record.first_year, ''.join(months)))
 
@@ -442,7 +447,7 @@ def V2MeanReader(path, year_min=-9999):
                 print ("NOTE: repeated record found: Station %s year %s;"
                        " data are identical" % (line[:12],line[12:16]))
 
-        if not record.is_empty():
+        if len(record) != 0:
             yield record
 
     f.close()
@@ -505,7 +510,7 @@ def DecimalReader(path, year_min=-9999):
                 print ("NOTE: repeated record found: Station %s year %s;"
                        " data are identical" % (line[:12],line[12:16]))
 
-        if not record.is_empty():
+        if len(record) != 0:
             yield record
 
     f.close()

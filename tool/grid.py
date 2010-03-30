@@ -10,6 +10,9 @@ grid YYYY-MM [v2-file]
 Display gridded anomalies as SVG file.
 """
 
+# Regular expression used to match/validate the "when" argument.
+RE_WHEN = r'(\d{4})-(\d{2})'
+
 def map(when, inp, out):
     """Take a ccc-gistemp subbox file in V2 mean format as *inp* and
     produce an SVG file on *out*."""
@@ -22,7 +25,7 @@ def map(when, inp, out):
       xmlns:xlink="http://www.w3.org/1999/xlink"
       version="1.1">\n""")
 
-    m = re.match(r'(\d{4})-(\d{2})', when)
+    m = re.match(RE_WHEN, when)
     year, month = m.groups()
     # Convert to 0-based month.
     month = int(month) - 1
@@ -63,13 +66,23 @@ def filter_month(inp, year, month):
                 lat = float(line[:5])
                 lon = float(line[5:11])
                 yield ((lat,lon), v)
+def usage(out):
+    out.write("Usage:\n")
+    out.write(__doc__)
+    return 2
 
 def main(argv=None):
+    import re
     import sys
     if argv is None:
         argv = sys.argv
 
+    if len(argv) <= 1:
+        return usage(sys.stderr)
+
     when = argv[1]
+    if not re.match(RE_WHEN, when):
+        return usage(sys.stderr)
     if len(argv) > 2:
         f = open(argv[2])
     else:

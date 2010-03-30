@@ -433,7 +433,7 @@ class MonthlyTemperatureRecord(object):
 
         :Return:
             A list of 12 entries. Entry zero is the number of good entries
-            for January, entry 1 for february, etc.
+            for January, entry 1 for February, etc.
 
         """
         monthly_valid = [0] * 12

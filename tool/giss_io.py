@@ -634,7 +634,41 @@ def read_antarc_station_ids(path, discriminator):
     return dict
 
 
-def read_USHCN(path, stations):
+def convert_USHCN_id(record_stream, stations):
+    """Convert all the records in *record_stream* from having (6-digit)
+    USHCN identifiers to having 12-digit GHCN identifiers (using the
+    *stations* dictionary)."""
+
+    for record in record_stream:
+        id12 = stations[int(record.uid)]
+        record.uid = id12
+        yield record
+
+def convert_F_to_C(record_stream):
+    """Convert each of the series from degrees Fahrenheit to degrees
+    Celsius."""
+
+    def convert_datum(x):
+        if code.giss_data.invalid(x):
+            return x
+        # degrees F to degrees C
+        return (x - 32) * 5 / 9.0
+
+    for record in record_stream:
+        record.set_series(record.first_month,
+          map(convert_datum, record.series))
+        yield record
+
+def read_USHCN(path):
+    """Open the USHCN V2 file *path* and yield a series of temperature
+    records.  Each record is in degrees Fahrenheit (the unit used in the
+    USHCN files), and will have its `uid` attribute set to its USHCN
+    identifier.
+
+    Data marked as missing (-9999 in the USHCN file) or flagged with 'E'
+    or 'Q' will be replaced with MISSING.
+    """
+
     # TODO: This is reading data similar to other line based records,
     #       but the algorithm is somewhat different. See examples that
     #       use itertools.groupby.
@@ -650,15 +684,14 @@ def read_USHCN(path, stations):
     for line in open_or_uncompress(path):
         if line[6] != '3': # 3 indicates mean temperatures
             continue
-        USHCN_station = int(line[0:6])
-        id12 = stations[USHCN_station]
+        USHCN_id = line[0:6]
         year = int(line[7:11])
         if year < code.giss_data.BASE_YEAR: # discard data before 1880
             continue
-        if record is None or id12[:11] != record.station_uid:
+        if record is None or USHCN_id != record.uid:
             if record is not None:
                 yield fill_record()
-            record = code.giss_data.Series(uid=id12)
+            record = code.giss_data.Series(uid=USHCN_id)
             years_data = {}
 
         temps = []
@@ -670,8 +703,8 @@ def read_USHCN(path, stations):
                 (temp_fahrenheit == -9999)) :  # absent data
                 temp = code.giss_data.MISSING
             else:
-                # tenths of degrees F to degrees C
-                temp = (temp_fahrenheit - 320) * 5/90.0
+                # Convert to (fractional) degrees F
+                temp = temp_fahrenheit / 10.0
                 valid = True
             temps.append(temp)
         if valid: # some valid data found
@@ -683,6 +716,17 @@ def read_USHCN(path, stations):
 
     if record is not None:
         yield fill_record()
+
+def read_USHCN_converted(path, stations):
+    """Read the USHCN data in the file *path*, converting each record to
+    degrees Celsius, and converting their station identifiers to use the
+    12-digit GHCN identifiers specified in the *stations* dict.
+    """
+
+    ushcn = read_USHCN(path)
+    celsius = convert_F_to_C(ushcn)
+    ghcn_ids = convert_USHCN_id(celsius, stations)
+    return ghcn_ids
 
 
 def read_USHCN_stations(ushcn_v1_station_path, ushcn_v2_station_path):
@@ -736,8 +780,8 @@ def read_float(s):
     except:
         return code.giss_data.MISSING
 
-# Find the USHCN input file
 def ushcn_input_file():
+    """Find the USHCN input file."""
     files =  ["input/ushcnv2",
               "input/9641C_201003_F52.avg",
               "input/9641C_201002_F52.avg",
@@ -756,8 +800,10 @@ def step0_input():
     class Struct:
         pass
     input = Struct()
-    input.ushcn_stations = read_USHCN_stations('input/ushcn2.tbl', 'input/ushcnV2_cmb.tbl')
-    input.ushcn_source = read_USHCN(ushcn_input_file(), input.ushcn_stations)
+    input.ushcn_stations = read_USHCN_stations('input/ushcn2.tbl',
+      'input/ushcnV2_cmb.tbl')
+    input.ushcn_source = read_USHCN_converted(ushcn_input_file(),
+      input.ushcn_stations)
     input.ghcn_source = V2MeanReader("input/v2.mean", code.giss_data.BASE_YEAR)
     input.antarc_source = itertools.chain(
             read_antarctic("input/antarc1.txt", "input/antarc1.list", '8'),

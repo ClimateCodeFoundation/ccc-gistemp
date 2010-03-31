@@ -669,53 +669,35 @@ def read_USHCN(path):
     or 'Q' will be replaced with MISSING.
     """
 
-    # TODO: This is reading data similar to other line based records,
-    #       but the algorithm is somewhat different. See examples that
-    #       use itertools.groupby.
-    # NOTE: Sometimes, there are two sets of data for a station.
-    #       Where the same year appears in both data sets, the second year's
-    #       data is used. I do not know whether this is intentional or not.
-    def fill_record():
-        for year, temps in sorted(years_data.iteritems()):
-            record.add_year(year, temps)
-        return record
+    def id6(l):
+        """The 6 digit USHCN identifier."""
+        return l[0:6]
 
-    record = None
-    for line in open_or_uncompress(path):
-        if line[6] != '3': # 3 indicates mean temperatures
-            continue
-        USHCN_id = line[0:6]
-        year = int(line[7:11])
-        if year < code.giss_data.BASE_YEAR: # discard data before 1880
-            continue
-        if record is None or USHCN_id != record.uid:
-            if record is not None:
-                yield fill_record()
-            record = code.giss_data.Series(uid=USHCN_id)
-            years_data = {}
+    for id,lines in itertools.groupby(open_or_uncompress(path), id6):
+        record = code.giss_data.Series(uid=id)
+        for line in lines:
+            # '3' indicates mean temperatures.
+            assert line[6] == '3'
+            year = int(line[7:11])
+            if year < code.giss_data.BASE_YEAR: # discard data before 1880
+                continue
 
-        temps = []
-        valid = False
-        for m in range(0,12):
-            temp_fahrenheit = int(line[m*7+11:m*7+17])
-            flag = line[m*7+17]
-            if ((flag in 'EQ') or              # interpolated data
-                (temp_fahrenheit == -9999)) :  # absent data
-                temp = code.giss_data.MISSING
-            else:
-                # Convert to (fractional) degrees F
-                temp = temp_fahrenheit / 10.0
-                valid = True
-            temps.append(temp)
-        if valid: # some valid data found
-            # We cannot add using 'add_year' because that breaks
-            # things when years are duplicated in the data (see note
-            # above). The record is actually filled using ``fill_record``.
-            years_data.setdefault(year, [])
-            years_data[year] = temps
-
-    if record is not None:
-        yield fill_record()
+            temps = []
+            valid = False
+            for m in range(0,12):
+                temp_fahrenheit = int(line[m*7+11:m*7+17])
+                flag = line[m*7+17]
+                if ((flag in 'EQ') or              # interpolated data
+                    (temp_fahrenheit == -9999)):   # absent data
+                    temp = code.giss_data.MISSING
+                else:
+                    # Convert to (fractional) degrees F
+                    temp = temp_fahrenheit / 10.0
+                    valid = True
+                temps.append(temp)
+            if valid: # some valid data found
+                record.add_year(year, temps)
+        yield record
 
 def read_USHCN_converted(path, stations):
     """Read the USHCN data in the file *path*, converting each record to

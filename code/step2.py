@@ -43,10 +43,11 @@ def annual_anomaly(record):
     series = record.series
     monthly_means = []
     for m in range(12):
-        month_data = filter(valid, series[m::12])
-        # neglect December of final year, as we do not use its season.
-        if m == 11 and valid(series[-1]):
+        month_data = series[m::12]
+        # Neglect December of final year, as we do not use its season.
+        if m == 11:
             month_data = month_data[:-1]
+        month_data = filter(valid, month_data)
         monthly_means.append(float(sum(month_data)) / len(month_data))
     annual_anoms = []
     first = None
@@ -60,8 +61,9 @@ def annual_anomaly(record):
             if index >= 0: # no Dec value in year -1
                 datum = series[index]
                 if valid(datum):
-                    season = (m+1) // 3 # season number 0-3
-                    total[season] += datum - monthly_means[(m + 12) % 12]
+                    # season number 0-3
+                    season = (m+1) // 3
+                    total[season] += datum - monthly_means[m % 12]
                     count[season] += 1
         season_anomalies = [] # list of valid seasonal anomalies
         for s in range(4):
@@ -97,7 +99,7 @@ def is_rural(station):
 class Struct(object):
     pass
 
-def urban_adjustments(anomaly_stream):
+def urban_adjustments(record_stream):
     """Takes an iterator of station records and applies an adjustment
     to urban stations to compensate for urban temperature effects.
     Returns an iterator of station records.  Rural stations are passed
@@ -125,7 +127,7 @@ def urban_adjustments(anomaly_stream):
         record, try a second time for this urban station, with a
         larger radius.  If there is still not enough data, discard the
         urban station.
-     """
+    """
 
     last_year = giss_data.get_ghcn_last_year()
     first_year = 1880
@@ -139,14 +141,13 @@ def urban_adjustments(anomaly_stream):
     pi180 = math.pi / 180.0
 
     all = []
-    for record in anomaly_stream:
+    for record in record_stream:
         station = record.station
         all.append(record)
         record.urban_adjustment = None
         annual_anomaly(record)
         if record.anomalies is None:
             continue
-        length = len(record.anomalies)
         d = Struct()
         d.anomalies = record.anomalies
         d.cslat = math.cos(station.lat * pi180)
@@ -154,9 +155,9 @@ def urban_adjustments(anomaly_stream):
         d.cslon = math.cos(station.lon * pi180)
         d.snlon = math.sin(station.lon * pi180)
         d.id = record.uid
+        length = len(record.anomalies)
         d.first_year = record.first - iyoff
         d.last_year = d.first_year + length - 1
-        d.station = station
         d.record = record
         if is_rural(station):
             rural_stations.append(d)
@@ -174,6 +175,7 @@ def urban_adjustments(anomaly_stream):
     for record in all:
         us = urban_stations.get(record, None)
         if us is None:
+            # Not an urban station.  Pass through unchanged.
             yield record
             continue
 
@@ -311,13 +313,13 @@ def combine_neighbors(us, iyrm, iyoff, neighbors):
     # start with the neighbor with the longest time record
     rs = neighbors[0]
     combined[rs.first_year - 1:rs.last_year] = rs.anomalies
-    for m in range(len(rs.anomalies)):
-        if valid(rs.anomalies[m]):
+    for m,anom in enumerate(rs.anomalies):
+        if valid(anom):
             weights[m + rs.first_year - 1] = rs.weight
             counts[m + rs.first_year - 1] = 1
 
     # add in the remaining stations
-    for i, rs in enumerate(neighbors[1:]):
+    for rs in neighbors[1:]:
         dnew = [MISSING] * iyrm
         dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
         cmbine(combined, weights, counts, dnew,

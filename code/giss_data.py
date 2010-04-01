@@ -367,11 +367,11 @@ class Series(object):
 
     @property
     def first_month(self):
-        """The number of the last months in the data series.
+        """The number of the first month in the data series.
 
-        This number is counted from January in a non-existant year zero. The
-        property `last_month` provides the other end of the inclusive range of
-        months held in the `series`.
+        This number is counted from January (being 1) in a non-existant
+	year zero. The property `last_month` provides the other end
+	of the inclusive range of months held in the `series`.
 
         The `series` contains `last_month` - `first_month` + 1 entries.
 
@@ -380,7 +380,7 @@ class Series(object):
 
     @property
     def last_month(self):
-        """The number of the last months in the data series.
+        """The number of the last month in the data series.
 
         The `series` contains ``last_month`` - `first_month` + 1 entries.
         See `first_month` for details of how months are counted.
@@ -476,20 +476,6 @@ class Series(object):
             self._good_count = len(self._series) - bad_count
         return self._good_count
 
-    def strip_invalid(self):
-        """Strip leading and trailing invalid values.
-
-        Adjusts the record so that the series starts and ends with a good (not
-        `MISSING`) value. If there are no good values, the series will be
-        emptied.
-
-        """
-        self._first_month = self.first_good_month
-        self._series[:] = self._series[self._good_start_idx:self._good_end_idx]
-        self._good_start_idx = 0
-        self._good_end_idx = len(self._series)
-    strip_invalid = clear_cache(strip_invalid)
-
     def get_monthly_valid_counts(self):
         """Get number of good values for each month.
 
@@ -502,39 +488,6 @@ class Series(object):
         for i, v in enumerate(self._series):
             monthly_valid[(self.first_month + i - 1) % 12] += valid(v)
         return monthly_valid
-
-    def set_series(self, first_month, series):
-        self._first_month = first_month
-        self._good_start_idx = sys.maxint
-        self._good_end_idx = 0
-        self._series = []
-        for v in series:
-            if invalid(v):
-                self._series.append(MISSING)
-            else:
-                self._good_start_idx = min(self._good_start_idx,
-                        len(self._series))
-                self._series.append(v)
-                self._good_end_idx = max(self._good_end_idx, len(self._series))
-
-    def add_year(self, year, data):
-        if self.first_month != sys.maxint:
-            # We have data already, so we may need to pad with missing months
-            # Note: This assumes the series is a whole number of years.
-            gap = year - self.last_year - 1
-            if gap > 0:
-                self._series.extend([MISSING] * gap * 12)
-        start_month = year * 12 + 1
-        self._first_month = min(self.first_month, start_month)
-        for v in data:
-            if invalid(v):
-                self._series.append(MISSING)
-            else:
-                self._good_start_idx = min(self._good_start_idx,
-                        len(self._series))
-                self._series.append(v)
-                self._good_end_idx = max(self._good_end_idx, len(self._series))
-    add_year = clear_cache(add_year)
 
     # Year's worth of missing data
     missing_year = [MISSING]*12
@@ -592,12 +545,6 @@ class Series(object):
             self._series.append(MISSING)
     pad_with_missing = clear_cache(pad_with_missing)
 
-    def set_value(self, idx, value):
-        while idx >= len(self.series):
-            self._series.append(MISSING)
-        self._series[idx] = value
-    set_value = clear_cache(set_value)
-
     def trim(self):
         self.station_months = len(self._series) - self._series.count(
                 MISSING)
@@ -615,6 +562,61 @@ class Series(object):
     def station_uid(self):
         """The unique ID of the corresponding station."""
         return self.uid[:11]
+
+    # Mutators below here
+
+    def strip_invalid(self):
+        """Strip leading and trailing invalid values.
+
+        Adjusts the record so that the series starts and ends with a good (not
+        `MISSING`) value. If there are no good values, the series will be
+        emptied.
+
+        """
+        self._first_month = self.first_good_month
+        self._series[:] = self._series[self._good_start_idx:self._good_end_idx]
+        self._good_start_idx = 0
+        self._good_end_idx = len(self._series)
+    strip_invalid = clear_cache(strip_invalid)
+
+    def set_series(self, first_month, series):
+        self._first_month = first_month
+        self._good_start_idx = sys.maxint
+        self._good_end_idx = 0
+        self._series = []
+        for v in series:
+            if invalid(v):
+                self._series.append(MISSING)
+            else:
+                self._good_start_idx = min(self._good_start_idx,
+                        len(self._series))
+                self._series.append(v)
+                self._good_end_idx = max(self._good_end_idx, len(self._series))
+
+    def add_year(self, year, data):
+        if self.first_month != sys.maxint:
+            # We have data already, so we may need to pad with missing months
+            # Note: This assumes the series is a whole number of years.
+            gap = year - self.last_year - 1
+            if gap > 0:
+                self._series.extend([MISSING] * gap * 12)
+        start_month = year * 12 + 1
+        self._first_month = min(self.first_month, start_month)
+        for v in data:
+            if invalid(v):
+                self._series.append(MISSING)
+            else:
+                self._good_start_idx = min(self._good_start_idx,
+                        len(self._series))
+                self._series.append(v)
+                self._good_end_idx = max(self._good_end_idx, len(self._series))
+    add_year = clear_cache(add_year)
+
+    def set_value(self, idx, value):
+        while idx >= len(self.series):
+            self._series.append(MISSING)
+        self._series[idx] = value
+    set_value = clear_cache(set_value)
 
 
 class SubboxMetaData(object):

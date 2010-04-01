@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # $URL$
 # $Rev$
 #
@@ -30,12 +29,15 @@ def drop_short_records(record_source):
             yield record
 
 def annual_anomaly(record):
-    """Updates the station record *record* with attributes .first,
-    .last, and .anomalies.  The algorithm is as follows: compute
-    monthly averages, then monthly anomalies, then seasonal anomalies
-    (means of monthly anomalies for at least two months) then annual
-    anomalies (means of seasonal anomalies for at least three
-    seasons).
+    """Updates the station record *record* with its annual anomalies.  The
+    .anomalies attribute is assigned a list of annual anomalies.
+    The .first attribute is assigned the year to which to first item in
+    the .anomalies list applies.
+
+    The algorithm is as follows: compute monthly averages, then
+    monthly anomalies, then seasonal anomalies (means of monthly
+    anomalies for at least two months) then annual anomalies (means
+    of seasonal anomalies for at least three seasons).
     """
 
     series = record.series
@@ -79,7 +81,6 @@ def annual_anomaly(record):
         record.anomalies = None
     else:
         record.first = first + record.first_year
-        record.last = last + record.first_year
         record.anomalies = annual_anoms[first: last+1]
 
 
@@ -175,8 +176,6 @@ def urban_adjustments(anomaly_stream):
         if us is None:
             # Just remove leading/trailing invalid values for rural stations.
             record.strip_invalid()
-            record.begin = record.first
-            record.end = record.last
             yield record
             continue
 
@@ -264,10 +263,7 @@ def urban_adjustments(anomaly_stream):
         bb = b - a + 1
         record.set_series(a-1 + first_year * 12 + 1,
                           series[aa + offset:aa + offset + bb])
-        record.begin = ((a-1) / 12) + first_year
-        record.first = record.begin
-        record.end = ((b-1) / 12) + first_year
-        record.last = record.last_year
+        del record.first
         yield record
 
 

@@ -117,11 +117,14 @@ def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg):
     dataset with the priv. comm. data."""
     print "Correct the GHCN Hohenpeissenberg record."
 
+    cut = hohenpeissenberg.last_year + 1
+
     for record in ghcn_records.itervalues():
         if record.station_uid == hohenpeissenberg.station_uid:
-            # Extract the data for the years 2003 to present.
+            # Extract the data for the years more recent than the priv.
+            # comm. data.
             new_data = []
-            for year in range(2003, record.last_year + 1):
+            for year in range(cut, record.last_year + 1):
                 new_data.extend(record.get_a_year(year))
 
             if record.uid == hohenpeissenberg.uid:
@@ -131,13 +134,13 @@ def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg):
                 last_year = record.last_year
                 record.set_series(hohenpeissenberg.first_month,
                                   hohenpeissenberg.series)
-                for i, year in enumerate(range(2003, last_year + 1)):
+                for i, year in enumerate(range(cut, last_year + 1)):
                     record.add_year(year, new_data[i * 12:(i + 1) * 12])
 
             else:
                 # For other records, just replace the data with the later
                 # years.
-                record.set_series(2002 * 12 + 1, new_data)
+                record.set_series(cut * 12 + 1, new_data)
 
 
 # TODO: Should the antarc_source really appear at this stage?

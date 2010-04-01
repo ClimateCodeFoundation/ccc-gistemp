@@ -565,20 +565,6 @@ class Series(object):
 
     # Mutators below here
 
-    def strip_invalid(self):
-        """Strip leading and trailing invalid values.
-
-        Adjusts the record so that the series starts and ends with a good (not
-        `MISSING`) value. If there are no good values, the series will be
-        emptied.
-
-        """
-        self._first_month = self.first_good_month
-        self._series[:] = self._series[self._good_start_idx:self._good_end_idx]
-        self._good_start_idx = 0
-        self._good_end_idx = len(self._series)
-    strip_invalid = clear_cache(strip_invalid)
-
     def set_series(self, first_month, series):
         self._first_month = first_month
         self._good_start_idx = sys.maxint

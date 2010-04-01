@@ -174,8 +174,6 @@ def urban_adjustments(anomaly_stream):
     for record in all:
         us = urban_stations.get(record, None)
         if us is None:
-            # Just remove leading/trailing invalid values for rural stations.
-            record.strip_invalid()
             yield record
             continue
 

@@ -6,11 +6,19 @@
 # Clear Climate Code, 2010-01-22
 
 """Python replacement for code/STEP2/*
+
+This step performs a trend adjustment to those stations identified as
+urban.  An urban station must meet various criteria to have its trend
+adjusted (there must be sufficient nearby rural stations and their
+combined record must have enough overlap with the urban station); if an
+urban station does not meet the criteria, it is discarded.
+
+Additionally in this step, all stations with short records are discarded
+(prior to any other processing).
 """
 __docformat__ = "restructuredtext"
 
 
-import sys
 import math
 import itertools
 
@@ -38,6 +46,8 @@ def annual_anomaly(record):
     monthly anomalies, then seasonal anomalies (means of monthly
     anomalies for at least two months) then annual anomalies (means
     of seasonal anomalies for at least three seasons).
+
+    This function assumes that the series starts in January.
     """
 
     series = record.series
@@ -68,7 +78,7 @@ def annual_anomaly(record):
         season_anomalies = [] # list of valid seasonal anomalies
         for s in range(4):
             # valid seasonal anomaly requires at least 2 valid months
-            if count[s] > 1:
+            if count[s] >= 2:
                 season_anomalies.append(total[s]/count[s])
         # valid annual anomaly requires at least 3 valid seasons
         if len(season_anomalies) > 2:
@@ -130,7 +140,6 @@ def urban_adjustments(record_stream):
     """
 
     last_year = giss_data.get_ghcn_last_year()
-    first_year = 1880
 
     iyoff = giss_data.BASE_YEAR - 1
     iyrm = last_year - iyoff
@@ -144,7 +153,6 @@ def urban_adjustments(record_stream):
     for record in record_stream:
         station = record.station
         all.append(record)
-        record.urban_adjustment = None
         annual_anomaly(record)
         if record.anomalies is None:
             continue
@@ -168,6 +176,9 @@ def urban_adjustments(record_stream):
     # (ignoring gaps).
     for st in rural_stations:
         st.recLen = len([v for v in st.anomalies if valid(v)])
+    # Note: Changing the following to use `reverse=True` will change the
+    # results (a little bit), because the list will end up in a
+    # different order.
     rural_stations.sort(key=lambda s:s.recLen)
     rural_stations.reverse()
 
@@ -191,8 +202,8 @@ def urban_adjustments(record_stream):
                     radius = parameters.urban_adjustment_full_radius
                 else:
                     radius = parameters.urban_adjustment_full_radius / 2
-                neighbors = get_neighbours(us, rural_stations, radius)
-                if not neighbors:
+                neighbours = get_neighbours(us, rural_stations, radius)
+                if not neighbours:
                     if usingFullRadius:
                         dropStation = True
                         break
@@ -200,8 +211,8 @@ def urban_adjustments(record_stream):
                     needNewNeighbours = True
                     continue
 
-                counts, urban_series, combined = combine_neighbors(
-                        us, iyrm, iyoff, neighbors)
+                counts, urban_series, combined = combine_neighbours(
+                        us, iyrm, neighbours)
                 iy1 = 1
                 needNewNeighbours = False
 
@@ -240,7 +251,7 @@ def urban_adjustments(record_stream):
         n1x = first + iyoff
         n2x = last + iyoff
         if iyxtnd < 0:
-            sys.exit('impossible')
+            raise ValueError('iyxtnd < 0: impossible')
         if iyxtnd > 0:
             lxend = iyu2 - (last + iyoff)
             if iyxtnd <= lxend:
@@ -256,12 +267,12 @@ def urban_adjustments(record_stream):
         m1 = record.rel_first_month + record.good_start_idx
         m2 = record.rel_first_month + record.good_end_idx - 1
         offset = record.good_start_idx # index of first valid month
-        a, b = adjust(first_year, record, series, fit, n1x, n2x,
+        a, b = adjust(giss_data.BASE_YEAR, series, fit, n1x, n2x,
                       first + iyoff, last + iyoff, m1, m2, offset)
         # a and b are numbers of new first and last valid months
         aa = a - m1
         bb = b - a + 1
-        record.set_series(a-1 + first_year * 12 + 1,
+        record.set_series(a-1 + giss_data.BASE_YEAR * 12 + 1,
                           series[aa + offset:aa + offset + bb])
         del record.first
         yield record
@@ -273,7 +284,7 @@ def get_neighbours(us, rural_stations, radius):
     station returned is given a 'weight' slot representing its
     distance fromn the urban station.
     """
-    neighbors = []
+    neighbours = []
 
     cos_crit = math.cos(radius / earth.radius)
     rbyrc = earth.radius / radius
@@ -288,19 +299,20 @@ def get_neighbours(us, rural_stations, radius):
         if csdbyr < 1.0:
             dbyrc = rbyrc * math.sqrt(2.0 * (1.0 - csdbyr))
         rs.weight = 1.0 - dbyrc
-        neighbors.append(rs)
+        neighbours.append(rs)
 
-    return neighbors
+    return neighbours
 
 
-def combine_neighbors(us, iyrm, iyoff, neighbors):
-    """Combines the neighbor stations *neighbors*, weighted according
+def combine_neighbours(us, iyrm, neighbours):
+    """Combines the neighbour stations *neighbours*, weighted according
     to their distances from the urban station *us*, to give a combined
-    annual anomaly series.  Returns a tuple: (*counts*,
-    *urban_series*, *combined*), where *counts* is a per-year list of
-    the number of stations combined, *urban_series* is the series from
-    the urban station, re-based at *iyoff*, and *combined* is the
-    combined neighbor series, based at *iyoff*.
+    annual anomaly series.  *iyrm* is the length of the combined series.
+    
+    Returns a tuple: (*counts*, *urban_series*, *combined*), where
+    *counts* is a per-year list of the number of stations combined,
+    *urban_series* is the series from the urban station, re-based.
+    *combined* is the combined neighbour series, re-based.
     """
 
     weights = [0.0] * iyrm
@@ -308,10 +320,10 @@ def combine_neighbors(us, iyrm, iyoff, neighbors):
     urban_series = [MISSING] * iyrm
     combined = [MISSING] * iyrm
 
-    urban_series[us.first_year - 1:us.last_year] = us.anomalies
+    urban_series[us.first_year - 1: us.last_year] = us.anomalies
 
-    # start with the neighbor with the longest time record
-    rs = neighbors[0]
+    # start with the neighbour with the longest time record
+    rs = neighbours[0]
     combined[rs.first_year - 1:rs.last_year] = rs.anomalies
     for m,anom in enumerate(rs.anomalies):
         if valid(anom):
@@ -319,7 +331,7 @@ def combine_neighbors(us, iyrm, iyoff, neighbors):
             counts[m + rs.first_year - 1] = 1
 
     # add in the remaining stations
-    for rs in neighbors[1:]:
+    for rs in neighbours[1:]:
         dnew = [MISSING] * iyrm
         dnew[rs.first_year - 1: rs.last_year] = rs.anomalies
         cmbine(combined, weights, counts, dnew,
@@ -490,8 +502,12 @@ def trend2(points, xmid, min):
     return sl1, sl2, rms, sl
 
 
-def adjust(first_year, station, series, fit, iy1, iy2,
+def adjust(first_year, series, fit, iy1, iy2,
            iy1a, iy2a, m1, m2, offset):
+    """Adjust the series according to the previously computed
+    parameters.  *series* is mutated, but its length is not changed.
+    """
+
     (sl1, sl2, knee, sl0) = fit
     if not good_two_part_fit(fit, iy1a, iy2a):
         # Use linear approximation
@@ -519,7 +535,7 @@ def adjust(first_year, station, series, fit, iy1, iy2,
             if m >= m1o and m <= m2o and valid(series[mIdx + offset]):
                 if m1 < 0:
                     m1 = m
-                series[mIdx+offset] = series[mIdx+offset] + adj
+                series[mIdx+offset] += adj
                 m2 = m
 
         m0 = m0 + 12

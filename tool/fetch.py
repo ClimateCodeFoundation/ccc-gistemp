@@ -26,6 +26,8 @@ import sys
 # http://www.python.org/doc/2.4.4/lib/module-urllib.html
 import urllib
 
+import re
+
 # http://www.python.org/doc/2.4.4/lib/module-tarfile.html
 # Conditionally import our modified tarfile for Python2.4.
 if sys.version_info[:2] == (2, 4):
@@ -130,13 +132,13 @@ def fetch(files, prefix='input/', output=sys.stdout):
 
     for n in step0inputs:
         place[n] = ['tar', gistemp_source_tar,
-          'GISTEMP_sources/STEP0/input_files/' + n]
+          'GISTEMP_sources[^/]*/STEP0/input_files/' + n + '$']
     for n in step1inputs:
         place[n] = ['tar', gistemp_source_tar,
-          'GISTEMP_sources/STEP1/input_files/' + n]
+          'GISTEMP_sources[^/]*/STEP1/input_files/' + n + '$']
     for n in step45inputs:
         place[n] = ['tar', gistemp_source_tar,
-          'GISTEMP_sources/STEP4_5/input_files/' + n]
+          'GISTEMP_sources[^/]*/STEP4_5/input_files/' + n + '$']
 
     place['v2.mean'] = ['zip',
       'ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/zipd/v2.mean.zip',
@@ -345,7 +347,8 @@ def fetch_from_tar(inp, want, prefix='input', log=sys.stdout,
     # http://code.google.com/p/ccc-gistemp/issues/detail?id=26
     tar = tarfile.open('', mode='r|%s' % compression_type, fileobj=inp)
     for info in tar:
-        if info.name in want:
+        # would like to use 'any', but that requires Python 2.5
+        if [r for r in want if re.match(r, info.name)]:
             short = info.name.split('/')[-1]
             local = os.path.join(prefix, short)
             out = open(local, 'wb')

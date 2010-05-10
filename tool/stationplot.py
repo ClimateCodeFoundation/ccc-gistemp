@@ -108,11 +108,14 @@ gray
 #a6cee3
 """.split()
 
-def aplot(series):
+def aplot(series, K):
     """`series` is a (data,begin) pair.  Each datum is enumerated with
     its fractional year coordinate, and the entire series is split into
     contiguous chunks.  The results are intended to be suitable for
     plotting.
+
+    *K* is the number of data items per year.  This is 12 for monthly
+    data; 1 for annual data.
 
     A sequence of lists is returned, each list being a list of
     (year, datum) pairs.  year will be a fractional year.
@@ -125,7 +128,7 @@ def aplot(series):
         year coordinate."""
 
         for m,datum in enumerate(data):
-            yield (first + (m+0.5)/12.0, datum)
+            yield (first + (m+0.5)/K, datum)
 
     data,first = series
 
@@ -164,16 +167,23 @@ def plot(arg, mode, inp, out, meta, timewindow=None):
               (id11, d['lat'], d['lon'], d['name']))
     title = '\n'.join(title)
 
+    # Assign number of data items per year.
+    if 'annual' in mode:
+        K = 1
+    else:
+        K = 12
+
     # Calculate first and last year, and highest and lowest temperature.
     minyear = 9999
     limyear = -9999
     highest = -9999
     lowest = 9999
     if timewindow:
+        # :todo: make work with mode=annual
         datadict = window(datadict, timewindow)
     for _,(data,begin) in datadict.items():
         minyear = min(minyear, begin)
-        limyear = max(limyear, begin+len(data)//12)
+        limyear = max(limyear, begin + (len(data)//K))
         valid_data = filter(valid, data)
         ahigh = max(valid_data)
         alow = min(valid_data)
@@ -296,7 +306,7 @@ def plot(arg, mode, inp, out, meta, timewindow=None):
 
     for id12,series in datadict.items():
         out.write("<g id='record%s'>\n" % id12)
-        for segment in aplot(series):
+        for segment in aplot(series, K):
             out.write(aspath(segment)+'\n')
         out.write("</g>\n")
     out.write("</g>\n" * 6)
@@ -496,6 +506,10 @@ def asdict(arg, inp, mode):
                 # Clear Climate Code, code directory
                 from code.series import anomalize
                 anomalize(data, None)
+            if mode == 'annual':
+                # Clear Climate code, code directory
+                from code.step1 import monthly_annual
+                _, data = monthly_annual(data)
             table[id12] = (data,begin)
 
     return table
@@ -543,7 +557,7 @@ def main(argv=None):
         metafile = 'input/v2.inv'
         mode = 'temp'
         timewindow = None
-        opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:t:')
+        opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:t:y')
         if not arg:
             raise Usage('At least one identifier must be supplied.')
         for k,v in opt:
@@ -559,6 +573,8 @@ def main(argv=None):
                 metafile = v
             if k == '-t':
                 timewindow = parse_topt(v)
+            if k == '-y':
+                mode = 'annual'
         if outfile == '-':
             outfile = sys.stdout
         else:

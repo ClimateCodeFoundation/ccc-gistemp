@@ -23,7 +23,9 @@ http://google-maps-icons.googlecode.com/files/factory.png
 def xmlquote(x):
     import re
 
-    def it(s):
+    def it(m):
+        """Takes match object, returns replacement string."""
+        s = m.group()
         if s == '&':
             return '&amp;'
         if s == '<':
@@ -54,7 +56,7 @@ def kml(inp, out):
   <IconStyle><Icon>
     <href>%(url)s</href>
   </Icon></IconStyle>
-</Style>""" % locals()
+</Style>""" % dict(code=code, url=xmlquote(url))
 
     for l in inp:
         # See ftp.ncdc.noaa.gov/v2.read.inv.f

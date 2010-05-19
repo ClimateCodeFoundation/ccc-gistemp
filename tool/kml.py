@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 # $URL$
 # $Rev$
-#
-# Convert v2.inv file to a KML file for browsing in Google Earth.
-#
-# Usage:
-# default to using input/v2.inv:
-# python tool/kml.py > ghcn.kml
-# or specify a file:
-# python tool/kml.py v2.temperature.inv > ghcn.kml
+
+"""
+Convert v2.inv file to a KML file for browsing in Google Earth.
+
+Usage:
+python tool/kml.py [v2.temperature.inv] [> ghcn.kml]
+
+If no input file is specified, it defaults to using input/v2.inv.
+"""
 
 
 # Images for the icons that denote the "urban flag" in the v2.mean file;

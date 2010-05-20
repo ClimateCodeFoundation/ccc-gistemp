@@ -580,6 +580,12 @@ class Series(object):
                 self._good_end_idx = max(self._good_end_idx, len(self._series))
 
     def add_year(self, year, data):
+        """Add a year's worth of data.  *data* should be a sequence of
+        length 12.  Years must be added in increasing order (though the
+        sequence is permitted to have gaps in, and these will be filled
+        with MISSING).
+        """
+
         if self.first_month == sys.maxint:
             self._first_month = year * 12 + 1
         else:

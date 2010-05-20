@@ -415,9 +415,9 @@ def V2MeanReader(path, year_min=-9999):
     If `year_min` is specified, then only years >= year_min are kept
     (the default, -9999, effectively keeps all years).
     
-    Traditionally this file was the output of Step 0 (and of course the
-    GHCN source), but modern ccc-gistemp produces this format for the
-    outputs of Steps 0, 1, and 2."""
+    Traditionally a file in this format was the output of Step 0 (and
+    of course the format used by the GHCN source), but modern ccc-gistemp
+    produces this format for the outputs of Steps 0, 1, and 2."""
 
     f = open(path)
     def id12(l):
@@ -430,9 +430,12 @@ def V2MeanReader(path, year_min=-9999):
             return MISSING
         return v
 
+    # The Series.add_year protocol assumes that the years are in
+    # increasing sequence.  This is so in the v2.mean file but does not
+    # seem to be documented (it seems unlikely to change either).
     for (id, lines) in itertools.groupby(f, id12):
         # lines is a set of lines which all begin with the same 12
-        # character id
+        # character id.
         record = code.giss_data.Series(uid=id)
         prev_line = None
         for line in lines:

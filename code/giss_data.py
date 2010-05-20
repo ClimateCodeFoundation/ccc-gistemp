@@ -580,14 +580,22 @@ class Series(object):
                 self._good_end_idx = max(self._good_end_idx, len(self._series))
 
     def add_year(self, year, data):
-        if self.first_month != sys.maxint:
+        if self.first_month == sys.maxint:
+            self._first_month = year * 12 + 1
+        else:
             # We have data already, so we may need to pad with missing months
             # Note: This assumes the series is a whole number of years.
             gap = year - self.last_year - 1
             if gap > 0:
                 self._series.extend([MISSING] * gap * 12)
-        start_month = year * 12 + 1
-        self._first_month = min(self.first_month, start_month)
+        assert self.first_month % 12 == 1
+        if year < self.first_year:
+            # Ignore years before the first year.  Previously this case
+            # was extremely buggy.
+            print self.uid, year, self.first_year
+            return
+        assert year == self.last_year + 1
+         
         for v in data:
             if invalid(v):
                 self._series.append(MISSING)

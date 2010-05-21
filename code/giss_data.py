@@ -287,6 +287,15 @@ class Series(object):
 	The last digit distinguishes this series from other series
 	from the same station.
 
+    A first year can be supplied to the constructor which will base the
+    series at that year:
+
+    :Ivar first_year:
+        Set the first year of the series.  Data that are
+        subsequently added using add_year will be ignored if they
+        precede first_year (a typical use is to set first_year to 1880
+        for all records, ensuring that they all start at the same year).
+
     When used to hold a series for a subbox, for example a record of data
     as stored in the ``input/SBBX.HadR2`` file, then the following
     keyword arguments are traditionally supplied to the constructor:
@@ -310,6 +319,11 @@ class Series(object):
         self._ann_anoms_good_count = None
         self.ann_anoms = []
         series = None
+        if 'first_year' in k:
+            first_year = k['first_year']
+            if first_year:
+                self._first_month = first_year*12 + 1
+            del k['first_year']
         if 'series' in k:
             series = k['series']
             del k['series']
@@ -598,7 +612,6 @@ class Series(object):
         if year < self.first_year:
             # Ignore years before the first year.  Previously this case
             # was extremely buggy.
-            print self.uid, year, self.first_year
             return
         assert year == self.last_year + 1
          

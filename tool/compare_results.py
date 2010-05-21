@@ -425,6 +425,7 @@ def main(argv = None):
     except Fatal, err:
         sys.stderr.write(err.msg)
         sys.stderr.write('\n')
+        print __doc__
         return 2
 
 if __name__ == '__main__':

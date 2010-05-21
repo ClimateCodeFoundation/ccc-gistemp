@@ -523,6 +523,10 @@ class Series(object):
         """Get the time series data for a year."""
         start_month = year * 12 + 1
         start_index = start_month - self.first_month
+        if start_index < 0:
+            # Have to trap this, otherwise the following code works but
+            # returns the wrong data.
+            return self.missing_year
         data = self.series[start_index:start_index+12]
         if len(data) == 12:
             return data

@@ -409,11 +409,11 @@ class StationTsWriter(object):
         self.f.close()
 
 
-def V2MeanReader(path, year_min=-9999):
+def V2MeanReader(path, year_min=None):
     """Reads a file in GHCN v2.mean format and yields each station.
     
     If `year_min` is specified, then only years >= year_min are kept
-    (the default, -9999, effectively keeps all years).
+    (the default, None, keeps all years).
     
     Traditionally a file in this format was the output of Step 0 (and
     of course the format used by the GHCN source), but modern ccc-gistemp
@@ -436,14 +436,13 @@ def V2MeanReader(path, year_min=-9999):
     for (id, lines) in itertools.groupby(f, id12):
         # lines is a set of lines which all begin with the same 12
         # character id.
-        record = code.giss_data.Series(uid=id)
+        record = code.giss_data.Series(uid=id, first_year=year_min)
         prev_line = None
         for line in lines:
             if line != prev_line:
                 year = int(line[12:16])
                 tenths = [v2_int(line[a:a+5]) for a in range(16, 16+12*5, 5)]
-                if year >= year_min:
-                    record.add_year(year, convert_tenths_to_float(tenths))
+                record.add_year(year, convert_tenths_to_float(tenths))
                 prev_line = line
             else:
                 print ("NOTE: repeated record found: Station %s year %s;"

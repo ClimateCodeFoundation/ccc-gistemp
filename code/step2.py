@@ -111,52 +111,43 @@ def urban_adjustments(record_stream):
             yield record
             continue
 
-        usingFullRadius = False
-        dropStation = False
-        needNewNeighbours = True
-        while True:
-            if needNewNeighbours:
-                if usingFullRadius:
-                    radius = parameters.urban_adjustment_full_radius
-                else:
-                    radius = parameters.urban_adjustment_full_radius / 2
-                neighbours = get_neighbours(us, rural_stations, radius)
-                if not neighbours:
-                    if usingFullRadius:
-                        dropStation = True
-                        break
-                    usingFullRadius = True
-                    needNewNeighbours = True
-                    continue
-
-                counts, urban_series, combined = combine_neighbours(
-                        us, iyrm, neighbours)
-                iy1 = 1
-                needNewNeighbours = False
-
-            points, quorate_count, first, last = prepare_series(
-                iy1, iyrm, combined, urban_series, counts, iyoff)
-
-            if quorate_count < parameters.urban_adjustment_min_years:
-                if usingFullRadius:
-                    dropStation = True
-                    break
-                usingFullRadius = True
-                needNewNeighbours = True
+        dropStation = True
+        R = parameters.urban_adjustment_full_radius
+        for radius in [R/2, R]:
+            neighbours = get_neighbours(us, rural_stations, radius)
+            if not neighbours:
                 continue
+            counts, urban_series, combined = combine_neighbours(
+                    us, iyrm, neighbours)
+            iy1 = 1
 
-            if quorate_count >= (parameters.urban_adjustment_proportion_good
-                                 * (last - first + 0.9)):
-                break
+            while True:
+                points, quorate_count, first, last = prepare_series(
+                    iy1, iyrm, combined, urban_series, counts, iyoff)
 
-            # Not enough good years for the given range.  Try to save
-            # cases in which the gaps are in the early part, by
-            # dropping that part and going around to prepare_series
-            # again.
-            iy1 = int(last - (quorate_count - 1) /
-                      parameters.urban_adjustment_proportion_good)
-            if iy1 < first + 1:
-                iy1 = first + 1                  # avoid infinite loop
+                if quorate_count < parameters.urban_adjustment_min_years:
+                    break
+
+                if quorate_count >= (parameters.urban_adjustment_proportion_good
+                                     * (last - first + 0.9)):
+                    break
+
+                # Not enough good years for the given range.  Try to save
+                # cases in which the gaps are in the early part, by
+                # dropping that part and going around to prepare_series
+                # again.
+                iy1 = int(last - (quorate_count - 1) /
+                          parameters.urban_adjustment_proportion_good)
+                iy1 = max(iy1, first + 1)
+
+            # Now work out why we exited previous loop.
+            if quorate_count < parameters.urban_adjustment_min_years:
+                continue
+            # We have a good adjustment.
+            assert quorate_count >= (parameters.urban_adjustment_proportion_good
+                                 * (last - first + 0.9))
+            dropStation = False
+            break
 
         if dropStation:
             continue

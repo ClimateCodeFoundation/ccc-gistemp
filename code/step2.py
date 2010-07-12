@@ -19,95 +19,16 @@ Additionally in this step, all stations with short records are discarded
 __docformat__ = "restructuredtext"
 
 
+# Standard Python
 import math
 import itertools
 
+# Clear Climate Code
 import earth
 import giss_data
 import parameters
 from giss_data import valid, invalid, MISSING
 
-def drop_short_records(record_source):
-    """Drop records which don't have at least one month index
-    with at least *parameters.station_drop_minimum_months* valid data.
-    """
-    for record in record_source:
-        mmax = max(record.get_monthly_valid_counts())
-        if mmax >= parameters.station_drop_minimum_months:
-            yield record
-
-def annual_anomaly(record):
-    """Updates the station record *record* with its annual anomalies.  The
-    .anomalies attribute is assigned a list of annual anomalies.
-    The .first attribute is assigned the year to which to first item in
-    the .anomalies list applies.
-
-    The algorithm is as follows: compute monthly averages, then
-    monthly anomalies, then seasonal anomalies (means of monthly
-    anomalies for at least two months) then annual anomalies (means
-    of seasonal anomalies for at least three seasons).
-
-    This function assumes that the series starts in January.
-    """
-
-    series = record.series
-    monthly_means = []
-    for m in range(12):
-        month_data = series[m::12]
-        # Neglect December of final year, as we do not use its season.
-        if m == 11:
-            month_data = month_data[:-1]
-        month_data = filter(valid, month_data)
-        monthly_means.append(float(sum(month_data)) / len(month_data))
-    annual_anoms = []
-    first = None
-    for y in range(len(series)/12):
-        # Seasons are Dec-Feb, Mar-May, Jun-Aug, Sep-Nov.
-        # (Dec from previous year).
-        total = [0.0] * 4 # total monthly anomaly for each season
-        count = [0] * 4   # number of valid months in each season
-        for m in range(-1, 11):
-            index = y * 12 + m
-            if index >= 0: # no Dec value in year -1
-                datum = series[index]
-                if valid(datum):
-                    # season number 0-3
-                    season = (m+1) // 3
-                    total[season] += datum - monthly_means[m % 12]
-                    count[season] += 1
-        season_anomalies = [] # list of valid seasonal anomalies
-        for s in range(4):
-            # valid seasonal anomaly requires at least 2 valid months
-            if count[s] >= 2:
-                season_anomalies.append(total[s]/count[s])
-        # valid annual anomaly requires at least 3 valid seasons
-        if len(season_anomalies) > 2:
-            annual_anoms.append(sum(season_anomalies) / len(season_anomalies))
-            if first is None:
-                first = y
-            last = y
-        else:
-            annual_anoms.append(MISSING)
-
-    if first is None:
-        record.anomalies = None
-    else:
-        record.first = first + record.first_year
-        record.anomalies = annual_anoms[first: last+1]
-
-
-def is_rural(station):
-    """Test whether the station described by *station* is rural.
-    """
-    if parameters.use_global_brightness:
-        return station.global_brightness <= 10
-    else:
-        return (station.US_brightness == '1' or
-                (station.US_brightness == ' ' and
-                 station.pop == 'R'))
-
-class Struct(object):
-    pass
 
 def urban_adjustments(record_stream):
     """Takes an iterator of station records and applies an adjustment
@@ -190,9 +111,6 @@ def urban_adjustments(record_stream):
             yield record
             continue
 
-        iyu1 = us.first_year + iyoff - 1 # subtract 1 for a possible partial yr
-        iyu2 = us.last_year + iyoff + 1  # add 1 for partial year
-
         usingFullRadius = False
         dropStation = False
         needNewNeighbours = True
@@ -248,34 +166,118 @@ def urban_adjustments(record_stream):
         iyxtnd = int(round(quorate_count /
                            parameters.urban_adjustment_proportion_good)
                      - (last - first + 1))
+        assert iyxtnd >= 0
         n1x = first + iyoff
         n2x = last + iyoff
-        if iyxtnd < 0:
-            raise ValueError('iyxtnd < 0: impossible')
+
+        iyu1 = us.first_year + iyoff - 1 # subtract 1 for a possible partial yr
+        iyu2 = us.last_year + iyoff + 1  # add 1 for partial year
+
         if iyxtnd > 0:
-            lxend = iyu2 - (last + iyoff)
-            if iyxtnd <= lxend:
-                 n2x = n2x + lxend
-            else:
-                 n1x = n1x - (iyxtnd - lxend)
-                 if n1x < iyu1:
-                     n1x = iyu1
-                 n2x = iyu2
+            # When extending, extend to include all of the recent part
+            # of the urban record...
+            lxend = iyu2 - n2x
+            if iyxtnd > lxend:
+                # ... and if we have enough "spare years" extend some or
+                # all of the earlier part of the urban record.
+                n1x = n1x - (iyxtnd - lxend)
+                n1x = max(n1x, iyu1)
+            n2x = iyu2
 
         series = record.series
         # adjust
         m1 = record.rel_first_month + record.good_start_idx
         m2 = record.rel_first_month + record.good_end_idx - 1
         offset = record.good_start_idx # index of first valid month
-        a, b = adjust(giss_data.BASE_YEAR, series, fit, n1x, n2x,
+        a, b = adjust(series, fit, n1x, n2x,
                       first + iyoff, last + iyoff, m1, m2, offset)
-        # a and b are numbers of new first and last valid months
-        aa = a - m1
-        bb = b - a + 1
+        # *a* and *b* are numbers of new first and last valid months
+
+        # *lpad* is the number of months to remove starting with the
+        # first valid month of the series.
+        lpad = a - m1
+        # *nretain* is the number of months (valid or invalid) to
+        # retain.
+        nretain = b - a + 1
+        # Truncate the series.
         record.set_series(a-1 + giss_data.BASE_YEAR * 12 + 1,
-                          series[aa + offset:aa + offset + bb])
+                          series[lpad + offset:lpad + offset + nretain])
         del record.first
         yield record
+
+
+def annual_anomaly(record):
+    """Updates the station record *record* with its annual anomalies.  The
+    .anomalies attribute is assigned a list of annual anomalies.
+    The .first attribute is assigned the year to which to first item in
+    the .anomalies list applies.
+
+    The algorithm is as follows: compute monthly averages, then
+    monthly anomalies, then seasonal anomalies (means of monthly
+    anomalies for at least two months) then annual anomalies (means
+    of seasonal anomalies for at least three seasons).
+
+    This function assumes that the series starts in January.
+    """
+
+    series = record.series
+    monthly_means = []
+    for m in range(12):
+        month_data = series[m::12]
+        # Neglect December of final year, as we do not use its season.
+        if m == 11:
+            month_data = month_data[:-1]
+        month_data = filter(valid, month_data)
+        monthly_means.append(float(sum(month_data)) / len(month_data))
+    annual_anoms = []
+    first = None
+    for y in range(len(series)/12):
+        # Seasons are Dec-Feb, Mar-May, Jun-Aug, Sep-Nov.
+        # (Dec from previous year).
+        total = [0.0] * 4 # total monthly anomaly for each season
+        count = [0] * 4   # number of valid months in each season
+        for m in range(-1, 11):
+            index = y * 12 + m
+            if index >= 0: # no Dec value in year -1
+                datum = series[index]
+                if valid(datum):
+                    # season number 0-3
+                    season = (m+1) // 3
+                    total[season] += datum - monthly_means[m % 12]
+                    count[season] += 1
+        season_anomalies = [] # list of valid seasonal anomalies
+        for s in range(4):
+            # valid seasonal anomaly requires at least 2 valid months
+            if count[s] >= 2:
+                season_anomalies.append(total[s]/count[s])
+        # valid annual anomaly requires at least 3 valid seasons
+        if len(season_anomalies) > 2:
+            annual_anoms.append(sum(season_anomalies) / len(season_anomalies))
+            if first is None:
+                first = y
+            last = y
+        else:
+            annual_anoms.append(MISSING)
+
+    if first is None:
+        record.anomalies = None
+    else:
+        record.first = first + record.first_year
+        record.anomalies = annual_anoms[first: last+1]
+
+
+def is_rural(station):
+    """Test whether the station described by *station* is rural.
+    """
+    if parameters.use_global_brightness:
+        return station.global_brightness <= 10
+    else:
+        return (station.US_brightness == '1' or
+                (station.US_brightness == ' ' and
+                 station.pop == 'R'))
+
+class Struct(object):
+    pass
 
 
 def get_neighbours(us, rural_stations, radius):
@@ -340,43 +342,6 @@ def combine_neighbours(us, iyrm, neighbours):
     return counts, urban_series, combined
 
 
-def prepare_series(iy1, iyrm, combined, urban_series, counts, iyoff):
-    """Prepares for the linearity fitting by returning a series of
-    data points *(x,f)*, where *x* is a year number and *f* is the
-    difference between the combined rural station anomaly series
-    *combined* and the urban station series *urban_series*.  The
-    points only include valid years, from the first quorate year to
-    the last.  A valid year is one in which both the urban station and
-    the combined rural series have valid data.  A quorate year is a
-    valid year in which there are at least
-    *parameters.urban_adjustment_min_rural_stations* contributing
-    (obtained from the *counts* series).
-
-    Returns a 4-tuple: (*p*, *c*, *f*, *l*). *p* is the series of
-    points, *c* is a count of the valid quorate years.  *f* is the
-    first such year.  *l* is the last such year.
-    """
-    first = last = i = quorate_count = length = 0
-    points = []
-
-    for iy in xrange(iy1 - 1, iyrm):
-        if valid(combined[iy]) and valid(urban_series[iy]):
-            if counts[iy] >= parameters.urban_adjustment_min_rural_stations:
-                last = iy + 1
-                quorate_count += 1
-                if first == 0:
-                    first = iy + 1
-            if quorate_count <= 0:
-                continue
-
-            points.append((iy + iyoff + 1, combined[iy] - urban_series[iy]))
-            i += 1
-            if counts[iy] >= parameters.urban_adjustment_min_rural_stations:
-                 length = i
-
-    return points[:length], quorate_count, first, last
-
-
 def cmbine(combined, weights, counts, data, first, last, weight):
     """Adds the array *data* with weight *weight* into the array of
     weighted averages *combined*, with total weights *weights* and
@@ -417,6 +382,47 @@ def cmbine(combined, weights, counts, data, first, last, weight):
         old_wt, weights[n] = weights[n], wtnew
         combined[n] = (old_wt * combined[n] + weight * (v_new + bias)) / wtnew
         counts[n] += 1
+
+
+def prepare_series(iy1, iyrm, combined, urban_series, counts, iyoff):
+    """Prepares for the linearity fitting by returning a series of
+    data points *(x,f)*, where *x* is a year number and *f* is the
+    difference between the combined rural station anomaly series
+    *combined* and the urban station series *urban_series*.  The
+    points only include valid years, from the first quorate year to
+    the last.  A valid year is one in which both the urban station and
+    the combined rural series have valid data.  A quorate year is a
+    valid year in which there are at least
+    *parameters.urban_adjustment_min_rural_stations* contributing.
+
+    The *counts* argument is a sequence that contains the number of
+    stations contributing to each datum in *combined*.
+
+    Returns a 4-tuple: (*p*, *c*, *f*, *l*). *p* is the series of
+    points, *c* is a count of the valid quorate years.  *f* is the
+    first such year.  *l* is the last such year.
+
+    For historical reasons *f* and *l* are returned as 1-based indexes.
+    """
+    first = last = i = quorate_count = length = 0
+    points = []
+
+    for iy in xrange(iy1 - 1, iyrm):
+        if valid(combined[iy]) and valid(urban_series[iy]):
+            if counts[iy] >= parameters.urban_adjustment_min_rural_stations:
+                last = iy + 1
+                quorate_count += 1
+                if first == 0:
+                    first = iy + 1
+            if quorate_count == 0:
+                continue
+
+            points.append((iy + iyoff + 1, combined[iy] - urban_series[iy]))
+            i += 1
+            if counts[iy] >= parameters.urban_adjustment_min_rural_stations:
+                 length = i
+
+    return points[:length], quorate_count, first, last
 
 
 def getfit(points):
@@ -502,12 +508,31 @@ def trend2(points, xmid, min):
     return sl1, sl2, rms, sl
 
 
-def adjust(first_year, series, fit, iy1, iy2,
+def adjust(series, fit, iy1, iy2,
            iy1a, iy2a, m1, m2, offset):
     """Adjust the series according to the previously computed
-    parameters.  *series* is mutated, but its length is not changed.
-    """
+    parameters.
+    
+    *series* is a monthly data series;  it is mutated, but its
+    length is not changed.
+    
+    *iy1*, *iy2* are calendar years: the first and last years that are
+    subject to adjustment.
 
+    *iy1a*, *iy2a* are calendar years: the first and last years for the
+    2-part fit.
+
+    *m1*, *m2* are month numbers for the first and last month with good
+    data (where 0 is 1880-01).
+
+    *offset* is the index of the first valid month.
+
+    """
+    first_year = giss_data.BASE_YEAR
+
+    # *sl1* and *sl2* are the slopes, in Kelvin per year, of the first
+    # and second parts of the fit.  *knee* is the calendar year at which
+    # the two slopes meet.
     (sl1, sl2, knee, sl0) = fit
     if not good_two_part_fit(fit, iy1a, iy2a):
         # Use linear approximation
@@ -569,6 +594,15 @@ def good_two_part_fit(fit, iy1, iy2):
              (abs(sl1) <= parameters.urban_adjustment_reverse_gradient) or
              (abs(sl2) <= parameters.urban_adjustment_reverse_gradient)))
 
+
+def drop_short_records(record_source):
+    """Drop records which don't have at least one month index
+    with at least *parameters.station_drop_minimum_months* valid data.
+    """
+    for record in record_source:
+        mmax = max(record.get_monthly_valid_counts())
+        if mmax >= parameters.station_drop_minimum_months:
+            yield record
 
 def step2(record_source):
     data = drop_short_records(record_source)

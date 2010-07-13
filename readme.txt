@@ -106,6 +106,13 @@ input data, but subsequently only write to the work/ log/ and result/
 directories.  Before running tool/run.py, these directories can all be
 deleted (if you wish, for example, to have a clean run).
 
+In 2010 on the sorts of not-very-impressive machines that the developers
+use, a complete run takes about 40 minutes.  If you want this to go much
+faster we recommend that you run using PyPy (an alternate implementation
+of Python http://codespeak.net/pypy/dist/pypy/doc/ ).  See this note
+from Paul Ollis:
+http://groups.google.com/group/ccc-gistemp-discuss/browse_thread/thread/cb0409e770820680
+
 
 6. RESULTS
 
@@ -162,6 +169,7 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
+2010-07-13 DRJ Added note about PyPy.
 2010-03-11 DRJ Updated to prepare for 0.4.1.
 2010-03-09 DRJ Updated to prepare for 0.4.0.
 2010-01-26 NB  Updated to prepare for 0.3.0.

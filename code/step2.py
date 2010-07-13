@@ -162,6 +162,8 @@ def urban_adjustments(record_stream):
             continue
 
         log.write('%s step2-action "adjusted"\n' % record.uid)
+        log.write("%s neighbours %r\n" %
+          (record.uid, map(lambda r: r.record.uid, neighbours)))
         log.write("%s adjustment %r\n" %
           (record.uid, dict(series=combined, year=giss_data.BASE_YEAR,
             difference=points)))

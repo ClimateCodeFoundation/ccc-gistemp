@@ -22,12 +22,16 @@ __docformat__ = "restructuredtext"
 # Standard Python
 import math
 import itertools
+# http://docs.python.org/release/2.4.4/lib/module-os.path.html
+import os.path
 
 # Clear Climate Code
 import earth
 import giss_data
 import parameters
 from giss_data import valid, invalid, MISSING
+
+log = open(os.path.join('log', 'step2.log'), 'w')
 
 
 def urban_adjustments(record_stream):
@@ -79,11 +83,12 @@ def urban_adjustments(record_stream):
             continue
         d = Struct()
         d.anomalies = anomalies
+        log.write("%s annual-anomaly %r\n" %
+          (record.uid, dict(year=first, series=anomalies)))
         d.cslat = math.cos(station.lat * pi180)
         d.snlat = math.sin(station.lat * pi180)
         d.cslon = math.cos(station.lon * pi180)
         d.snlon = math.sin(station.lon * pi180)
-        d.id = record.uid
         length = len(d.anomalies)
         # first_year and last_year are the time bounds of the anomaly
         # series, where 1 is 1880 (BASE_YEAR really).
@@ -110,6 +115,7 @@ def urban_adjustments(record_stream):
         us = urban_stations.get(record, None)
         if us is None:
             # Not an urban station.  Pass through unchanged.
+            log.write('%s step2-action "rural"\n' % record.uid)
             yield record
             continue
 
@@ -152,7 +158,10 @@ def urban_adjustments(record_stream):
             break
 
         if dropStation:
+            log.write('%s step2-action "dropped"\n' % record.uid)
             continue
+
+        log.write('%s step2-action "adjusted"\n' % record.uid)
 
         fit = getfit(points)
         # find extended range
@@ -616,6 +625,8 @@ def drop_short_records(record_source):
         mmax = max(record.get_monthly_valid_counts())
         if mmax >= parameters.station_drop_minimum_months:
             yield record
+        else:
+            log.write('%s step2-action "short"\n' % record.uid)
 
 def step2(record_source):
     data = drop_short_records(record_source)

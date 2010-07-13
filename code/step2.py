@@ -97,12 +97,12 @@ def urban_adjustments(record_stream):
 
     # Sort the rural stations according to the length of the time record
     # (ignoring gaps).
-    for st in rural_stations:
-        st.recLen = len([v for v in st.anomalies if valid(v)])
+    def reclen(s):
+        return len([v for v in s.anomalies if valid(v)])
     # Note: Changing the following to use `reverse=True` will change the
     # results (a little bit), because the list will end up in a
     # different order.
-    rural_stations.sort(key=lambda s:s.recLen)
+    rural_stations.sort(key=reclen)
     rural_stations.reverse()
 
     # Combine time series for rural stations around each urban station
@@ -123,14 +123,18 @@ def urban_adjustments(record_stream):
             if not neighbours:
                 continue
             counts, combined = combine_neighbours(iyrm, neighbours)
-            start_year = 1
+            start_year = giss_data.BASE_YEAR
 
             while True:
-                points, quorate_count, first, last = prepare_series(
+                points, quorate_count = prepare_series(
                     start_year, combined, urban_series, counts)
 
                 if quorate_count < parameters.urban_adjustment_min_years:
                     break
+
+                # first and last years that are quorate.
+                first = min(points)[0]
+                last = max(points)[0]
 
                 if quorate_count >= (parameters.urban_adjustment_proportion_good
                                      * (last - first + 0.9)):
@@ -142,6 +146,7 @@ def urban_adjustments(record_stream):
                 # again.
                 start_year = int(last - (quorate_count - 1) /
                           parameters.urban_adjustment_proportion_good)
+                # Avoid infinite loop.
                 start_year = max(start_year, first + 1)
 
             # Now work out why we exited previous loop.
@@ -171,8 +176,8 @@ def urban_adjustments(record_stream):
                      - (last - first + 1))
         assert iyxtnd >= 0
         # *n1x* and *n2x* are calendar years.
-        n1x = first + iyoff
-        n2x = last + iyoff
+        n1x = first
+        n2x = last
 
         # The first and last years for which the urban station has a
         # valid annual anomaly.
@@ -201,7 +206,7 @@ def urban_adjustments(record_stream):
         m2 = record.rel_first_month + record.good_end_idx - 1
         offset = record.good_start_idx # index of first valid month
         a, b = adjust(series, fit, n1x, n2x,
-                      first + iyoff, last + iyoff, m1, m2, offset)
+                      first, last, m1, m2, offset)
         # *a* and *b* are numbers of new first and last valid months
 
         # *lpad* is the number of months to remove starting with the
@@ -401,7 +406,7 @@ def cmbine(combined, weights, counts, data, weight):
         counts[n] += 1
 
 
-def prepare_series(iy1, combined, urban_series, counts):
+def prepare_series(from_year, combined, urban_series, counts):
     """Prepares for the linearity fitting by returning a series of
     data points *(x,d)*, where *x* is a calendar year number and *d*
     is the difference between the combined rural station anomaly series
@@ -416,22 +421,23 @@ def prepare_series(iy1, combined, urban_series, counts):
     contributing.
 
     The algorithm is restricted to only considering years starting at
-    *iy1* (and ending at the end of the series); *iy1* is a
-    1-based index (for historical reasons).
+    *from_year* (and ending at the end of the series); it is a
+    calendar year.
 
     The *counts* argument is a sequence that contains the number of
     stations contributing to each datum in *combined*.
 
-    Returns a 4-tuple: (*p*, *c*, *f*, *l*). *p* is the series of
-    points, *c* is a count of the valid quorate years.  *f* is the
-    first such year.  *l* is the last such year.
-
-    For historical reasons *f* and *l* are returned as 1-based indexes.
+    Returns a tuple: (*points*, *count*). *points* is the series of
+    points, *count* is a count of the valid quorate years.
     """
 
     # Calendar year corresponding to first datum in series.
     year_offset = giss_data.BASE_YEAR
-    first = last = quorate_count = length = 0
+    # Number of valid quorate years
+    quorate_count = 0
+    # Used to truncate the series to the last quorate year, immediately
+    # before returning it.
+    length = 0
     points = []
 
     assert len(combined) >= len(urban_series)
@@ -441,13 +447,10 @@ def prepare_series(iy1, combined, urban_series, counts):
         loop, below."""
         return counts[iy] >= parameters.urban_adjustment_min_rural_stations
 
-    for iy in xrange(iy1 - 1, len(urban_series)):
+    for iy in xrange(from_year - year_offset, len(urban_series)):
         if valid(combined[iy]) and valid(urban_series[iy]):
             if quorate():
-                last = iy + 1
                 quorate_count += 1
-                if first == 0:
-                    first = iy + 1
             if quorate_count == 0:
                 continue
 
@@ -455,7 +458,7 @@ def prepare_series(iy1, combined, urban_series, counts):
             if quorate():
                  length = len(points)
 
-    return points[:length], quorate_count, first, last
+    return points[:length], quorate_count
 
 
 def getfit(points):

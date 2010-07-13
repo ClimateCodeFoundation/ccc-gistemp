@@ -377,14 +377,19 @@ def cmbine(combined, weights, counts, data, first, last, weight):
 
 def prepare_series(iy1, iyrm, combined, urban_series, counts, iyoff):
     """Prepares for the linearity fitting by returning a series of
-    data points *(x,f)*, where *x* is a year number and *f* is the
-    difference between the combined rural station anomaly series
+    data points *(x,f)*, where *x* is a calendar year number and *f*
+    is the difference between the combined rural station anomaly series
     *combined* and the urban station series *urban_series*.  The
     points only include valid years, from the first quorate year to
-    the last.  A valid year is one in which both the urban station and
-    the combined rural series have valid data.  A quorate year is a
-    valid year in which there are at least
+    the last quorate year.  A valid year is one in which both the
+    urban station and the combined rural series have valid data.
+    A quorate year is a valid year in which there are at least
     *parameters.urban_adjustment_min_rural_stations* contributing.
+
+    The algorithm is restricted to only considering years between *iy1*
+    and *iyrm* (inclusive), both of which are 1-based indexes.  *iyoff*
+    should be added to *iy1* and *iyrm* to convert to calendar year (in
+    other words it is typically 1879).
 
     The *counts* argument is a sequence that contains the number of
     stations contributing to each datum in *combined*.
@@ -395,7 +400,7 @@ def prepare_series(iy1, iyrm, combined, urban_series, counts, iyoff):
 
     For historical reasons *f* and *l* are returned as 1-based indexes.
     """
-    first = last = i = quorate_count = length = 0
+    first = last = quorate_count = length = 0
     points = []
 
     for iy in xrange(iy1 - 1, iyrm):
@@ -409,9 +414,8 @@ def prepare_series(iy1, iyrm, combined, urban_series, counts, iyoff):
                 continue
 
             points.append((iy + iyoff + 1, combined[iy] - urban_series[iy]))
-            i += 1
             if counts[iy] >= parameters.urban_adjustment_min_rural_stations:
-                 length = i
+                 length = len(points)
 
     return points[:length], quorate_count, first, last
 

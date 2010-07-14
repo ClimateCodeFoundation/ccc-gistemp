@@ -175,37 +175,40 @@ def urban_adjustments(record_stream):
                            parameters.urban_adjustment_proportion_good)
                      - (last - first + 1))
         assert iyxtnd >= 0
-        # *n1x* and *n2x* are calendar years.
-        n1x = first
-        n2x = last
+        # The first and last years, in the urban series, that will be
+        # adjusted.  We start with the quorate range, then possibly
+        # extend it (below).
+        adjust_first = first
+        adjust_last = last
 
         # The first and last years for which the urban station has a
         # valid annual anomaly.
         valid_years = [i for i,x in enumerate(urban_series) if valid(x)]
-        first_year = min(valid_years)
-        last_year = max(valid_years)
+        urban_first = min(valid_years)
+        urban_last = max(valid_years)
         # Convert to calendar years, and extend by 1 year in each
         # direction to include possible partial years.
-        iyu1 = first_year + giss_data.BASE_YEAR - 1
-        iyu2 = last_year + giss_data.BASE_YEAR + 1
+        urban_first += giss_data.BASE_YEAR - 1
+        urban_last += giss_data.BASE_YEAR + 1
+        del valid_years
 
         if iyxtnd > 0:
             # When extending, extend to include all of the recent part
             # of the urban record...
-            lxend = iyu2 - n2x
+            lxend = urban_last - adjust_last
             if iyxtnd > lxend:
                 # ... and if we have enough "spare years" extend some or
                 # all of the earlier part of the urban record.
-                n1x = n1x - (iyxtnd - lxend)
-                n1x = max(n1x, iyu1)
-            n2x = iyu2
+                adjust_first -= (iyxtnd - lxend)
+                adjust_first = max(adjust_first, urban_first)
+            adjust_last = urban_last
 
         series = record.series
         # adjust
         m1 = record.rel_first_month + record.good_start_idx
         m2 = record.rel_first_month + record.good_end_idx - 1
         offset = record.good_start_idx # index of first valid month
-        a, b = adjust(series, fit, n1x, n2x,
+        a, b = adjust(series, fit, adjust_first, adjust_last,
                       first, last, m1, m2, offset)
         # *a* and *b* are numbers of new first and last valid months
 

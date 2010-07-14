@@ -544,24 +544,33 @@ def trend2(points, xmid, min):
     return sl1, sl2, rms, sl
 
 
-def adjust(series, fit, iy1, iy2,
-           iy1a, iy2a, m1, m2, offset):
+def adjust(series, fit, adjust_first, adjust_last,
+           fit_first, fit_last, m1, m2, offset):
     """Adjust the series according to the previously computed
     parameters.
     
     *series* is a monthly data series;  it is mutated, but its
     length is not changed.
     
-    *iy1*, *iy2* are calendar years: the first and last years that are
-    subject to adjustment.
+    *adjust_first*, *adjust_last* are calendar years: the first and
+    last years that are subject to adjustment.
 
-    *iy1a*, *iy2a* are calendar years: the first and last years for the
+    *fit_first*, *fit_last* are calendar years: the first and last years for the
     2-part fit.
 
     *m1*, *m2* are month numbers for the first and last month with good
     data (where 0 is 1880-01).
 
     *offset* is the index of the first valid month.
+
+    The fit is used to make an adjustment consisting of two sloped
+    parts, of slope *sl1* between year *fit_first* and *knee*, and of
+    slope *sl2* between year *knee* and *fit_last*.  Any adjustment can
+    be biased up or down without affecting the trend; the adjustment is
+    chosen so that it is zero in the year *fit_last*.  Outside the range
+    *fit_first* to *fit_last* the adjustment is constant (zero for
+    the recent part, and the same adjustment as for year *fit_first* for
+    the earlier part).
 
     """
     first_year = giss_data.BASE_YEAR
@@ -570,7 +579,7 @@ def adjust(series, fit, iy1, iy2,
     # and second parts of the fit.  *knee* is the calendar year at which
     # the two slopes meet.
     (sl1, sl2, knee, sl0) = fit
-    if not good_two_part_fit(fit, iy1a, iy2a):
+    if not good_two_part_fit(fit, fit_first, fit_last):
         # Use linear approximation
         sl1, sl2 = sl0, sl0
 
@@ -578,17 +587,15 @@ def adjust(series, fit, iy1, iy2,
 
     m1o, m2o = m1, m2
     m1 = -100
-    m0 = 12 * (iy1 - first_year)   # Dec of year iy1
-    for iy in range(iy1, iy2 + 1):
+    m0 = 12 * (adjust_first - first_year)   # Dec of year adjust_first
+    for iy in range(adjust_first, adjust_last + 1):
         sl = sl1
         if iy > knee:
             sl = sl2
-        iya = iy
-        if iy < iy1a:
-            iya = iy1a
-        if iy > iy2a:
-            iya = iy2a
-        adj = (iya - knee) * sl - (iy2a - knee) * sl2
+        # For the purposes of calculating the adjustment for the year,
+        # clamp to the range [fit_first, fit_last].
+        iya = max(fit_first, min(iy, fit_last))
+        adj = (iya - knee) * sl - (fit_last - knee) * sl2
         for m in range(m0, m0 + 12):
             mIdx = m - base
             if mIdx < 0:

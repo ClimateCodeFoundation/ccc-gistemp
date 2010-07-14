@@ -82,16 +82,13 @@ def urban_adjustments(record_stream):
             continue
 
         fit = getfit(points)
-        # first and last years that are quorate.
-        first = min(points)[0]
-        last = max(points)[0]
 
         # The first and last years, in the urban series, that will be
         # adjusted.
         adjust_first, adjust_last = extend_range(
-          us.anomalies, quorate_count, first, last)
+          us.anomalies, quorate_count, fit.first, fit.last)
 
-        adjust_record(record, fit, adjust_first, adjust_last, first, last)
+        adjust_record(record, fit, adjust_first, adjust_last)
         yield record
 
 def annotate_records(stream):
@@ -450,21 +447,32 @@ def rural_difference(urban, rural_stations):
     return None, None
 
 def getfit(points):
-    """ Finds the best two-part linear fit for *points*, and
-    returns the fit parameters.
+    """Finds the best two-part linear fit for *points*, and
+    returns the fit parameters as an object with members: slope1, slope2,
+    slope, knee, first (calendar year of first point), last (calendar
+    year of last point).
     """
+
+    fit = Struct()
+
+    # first and last years that are quorate.
+    fit.first = min(points)[0]
+    fit.last = max(points)[0]
 
     # Todo: incorporate trend2 into this.
     rmsmin = 1.e20
 
     for n in xrange(parameters.urban_adjustment_min_leg,
                     len(points) - parameters.urban_adjustment_min_leg):
-        xknee = points[n][0]
-        sl1, sl2, rms, sl = trend2(points, xknee, 2)
+        knee = points[n][0]
+        sl1, sl2, rms, sl = trend2(points, knee, 2)
 
         if rms < rmsmin:
              rmsmin = rms
-             fit = (sl1, sl2, xknee, sl)
+             fit.slope1 = sl1
+             fit.slope2 = sl2
+             fit.slope = sl
+             fit.knee = knee
 
     return fit
 
@@ -573,15 +581,16 @@ def extend_range(series, count, first, last):
     return first, last
 
 
-def adjust_record(record, fit, adjust_first, adjust_last,
-                  fit_first, fit_last):
+def adjust_record(record, fit, adjust_first, adjust_last):
+    """As adjust (see below), but takes a record object."""
+
     series = record.series
     # adjust
     m1 = record.rel_first_month + record.good_start_idx
     m2 = record.rel_first_month + record.good_end_idx - 1
     offset = record.good_start_idx # index of first valid month
     a, b = adjust(series, fit, adjust_first, adjust_last,
-                  fit_first, fit_last, m1, m2, offset)
+                  m1, m2, offset)
     # *a* and *b* are numbers of new first and last valid months
 
     # *lpad* is the number of months to remove starting with the
@@ -595,7 +604,7 @@ def adjust_record(record, fit, adjust_first, adjust_last,
                       series[lpad + offset:lpad + offset + nretain])
 
 def adjust(series, fit, adjust_first, adjust_last,
-           fit_first, fit_last, m1, m2, offset):
+           m1, m2, offset):
     """Adjust the series according to the previously computed
     parameters.
     
@@ -605,47 +614,42 @@ def adjust(series, fit, adjust_first, adjust_last,
     *adjust_first*, *adjust_last* are calendar years: the first and
     last years that are subject to adjustment.
 
-    *fit_first*, *fit_last* are calendar years: the first and last years for the
-    2-part fit.
-
     *m1*, *m2* are month numbers for the first and last month with good
     data (where 0 is 1880-01).
 
     *offset* is the index of the first valid month.
 
-    The fit is used to make an adjustment consisting of two sloped
-    parts, of slope *sl1* between year *fit_first* and *knee*, and of
-    slope *sl2* between year *knee* and *fit_last*.  Any adjustment can
-    be biased up or down without affecting the trend; the adjustment is
-    chosen so that it is zero in the year *fit_last*.  Outside the range
-    *fit_first* to *fit_last* the adjustment is constant (zero for
-    the recent part, and the same adjustment as for year *fit_first* for
-    the earlier part).
-
+    *fit* contains the parameters for two slopes that are used to
+    make the adjustment: of slope *fit.slope1* between year *fit.first*
+    and *fit.knee*, and of slope *fit.slope2* between year *fit.knee*
+    and *fit.last*.  Any adjustment can be biased up or down without
+    affecting the trend; the adjustment is chosen so that it is
+    zero in the year *fit_last*.  Outside the range *fit.first* to
+    *fit.last* the adjustment is constant (zero for the recent part,
+    and the same adjustment as for year *fit.first* for the earlier
+    part).
     """
-    first_year = giss_data.BASE_YEAR
 
-    # *sl1* and *sl2* are the slopes, in Kelvin per year, of the first
-    # and second parts of the fit.  *knee* is the calendar year at which
-    # the two slopes meet.
-    (sl1, sl2, knee, sl0) = fit
-    if not good_two_part_fit(fit, fit_first, fit_last):
+    sl1 = fit.slope1
+    sl2 = fit.slope2
+    if not good_two_part_fit(fit):
         # Use linear approximation
-        sl1, sl2 = sl0, sl0
+        sl1 = sl2 = fit.slope
 
     base = m1
 
     m1o, m2o = m1, m2
     m1 = -100
-    m0 = 12 * (adjust_first - first_year)   # Dec of year adjust_first
+    # :todo: suspect following comment is wrong.
+    m0 = 12 * (adjust_first - giss_data.BASE_YEAR)   # Dec of year adjust_first
     for iy in range(adjust_first, adjust_last + 1):
         sl = sl1
-        if iy > knee:
+        if iy > fit.knee:
             sl = sl2
         # For the purposes of calculating the adjustment for the year,
-        # clamp to the range [fit_first, fit_last].
-        iya = max(fit_first, min(iy, fit_last))
-        adj = (iya - knee) * sl - (fit_last - knee) * sl2
+        # clamp to the range [fit.first, fit.last].
+        iya = max(fit.first, min(iy, fit.last))
+        adj = (iya - fit.knee) * sl - (fit.last - fit.knee) * sl2
         for m in range(m0, m0 + 12):
             mIdx = m - base
             if mIdx < 0:
@@ -661,7 +665,7 @@ def adjust(series, fit, adjust_first, adjust_last,
     return m1, m2
 
 
-def good_two_part_fit(fit, iy1, iy2):
+def good_two_part_fit(fit):
     """Decide whether to apply a two-part fit.
 
     If the two-part fit is not good, the linear fit is used instead.
@@ -677,9 +681,12 @@ def good_two_part_fit(fit, iy1, iy2):
              urban_adjustment_reverse_gradient
     """
 
-    (sl1, sl2, knee, sl) = fit
-    return ((knee >= iy1 + parameters.urban_adjustment_short_leg) and
-            (knee <= iy2 - parameters.urban_adjustment_short_leg) and
+    sl1 = fit.slope1
+    sl2 = fit.slope2
+    knee = fit.knee
+
+    return ((knee - fit.first >= parameters.urban_adjustment_short_leg) and
+            (fit.last - knee >= parameters.urban_adjustment_short_leg) and
             (abs(sl1) <= parameters.urban_adjustment_steep_leg) and
             (abs(sl2) <= parameters.urban_adjustment_steep_leg) and
             (abs(sl2 - sl1) <= parameters.urban_adjustment_steep_leg) and

@@ -64,10 +64,51 @@ def urban_adjustments(record_stream):
         urban station.
     """
 
-    last_year = giss_data.get_ghcn_last_year()
+    rural_stations, urban_stations, all = annotate_records(record_stream)
 
-    iyoff = giss_data.BASE_YEAR - 1
-    iyrm = last_year - iyoff
+    # Combine time series for rural stations around each urban station
+    for record in all:
+        us = urban_stations.get(record, None)
+        if us is None:
+            # Not an urban station.  Pass through unchanged.
+            log.write('%s step2-action "rural"\n' % record.uid)
+            yield record
+            continue
+
+        points, quorate_count = rural_difference(us, rural_stations)
+
+        if not points:
+            log.write('%s step2-action "dropped"\n' % record.uid)
+            continue
+
+        fit = getfit(points)
+        # first and last years that are quorate.
+        first = min(points)[0]
+        last = max(points)[0]
+
+        # The first and last years, in the urban series, that will be
+        # adjusted.
+        adjust_first, adjust_last = extend_range(
+          us.anomalies, quorate_count, first, last)
+
+        adjust_record(record, fit, adjust_first, adjust_last, first, last)
+        yield record
+
+def annotate_records(stream):
+    """Take each of the records in *stream* and annotate them with
+    computed data (critically, its annual anomaly series).  For each
+    record an annotation object is created that refers to the original
+    record.
+    
+    Returns a tuple of (*rural*, *urban*, *all*).  *rural* is a
+    list of annotation objects for rural stations (sorted); *urban* is a
+    dict that maps from an urban record to its annotation object; *all*
+    is a list that is a copy of the original stream of records.
+
+    Note that *rural* and *urban* are disjoint, but not complete.  A
+    station which has insufficient data to compute an annual anomaly
+    will not appear in either collection.
+    """
 
     rural_stations = []
     urban_stations = {}
@@ -75,7 +116,7 @@ def urban_adjustments(record_stream):
     pi180 = math.pi / 180.0
 
     all = []
-    for record in record_stream:
+    for record in stream:
         all.append(record)
         anomalies = annual_anomaly(record)
         if anomalies is None:
@@ -105,78 +146,8 @@ def urban_adjustments(record_stream):
     rural_stations.sort(key=reclen)
     rural_stations.reverse()
 
-    # Combine time series for rural stations around each urban station
-    for record in all:
-        us = urban_stations.get(record, None)
-        if us is None:
-            # Not an urban station.  Pass through unchanged.
-            log.write('%s step2-action "rural"\n' % record.uid)
-            yield record
-            continue
+    return rural_stations, urban_stations, all
 
-        urban_series = us.anomalies
-
-        dropStation = True
-        R = parameters.urban_adjustment_full_radius
-        for radius in [R/2, R]:
-            neighbours = get_neighbours(us, rural_stations, radius)
-            if not neighbours:
-                continue
-            counts, combined = combine_neighbours(iyrm, neighbours)
-            start_year = giss_data.BASE_YEAR
-
-            while True:
-                points, quorate_count = prepare_series(
-                    start_year, combined, urban_series, counts)
-
-                if quorate_count < parameters.urban_adjustment_min_years:
-                    break
-
-                # first and last years that are quorate.
-                first = min(points)[0]
-                last = max(points)[0]
-
-                if quorate_count >= (parameters.urban_adjustment_proportion_good
-                                     * (last - first + 0.9)):
-                    break
-
-                # Not enough good years for the given range.  Try to save
-                # cases in which the gaps are in the early part, by
-                # dropping that part and going around to prepare_series
-                # again.
-                start_year = int(last - (quorate_count - 1) /
-                          parameters.urban_adjustment_proportion_good)
-                # Avoid infinite loop.
-                start_year = max(start_year, first + 1)
-
-            # Now work out why we exited previous loop.
-            if quorate_count < parameters.urban_adjustment_min_years:
-                continue
-            # We have a good adjustment.
-            assert quorate_count >= (parameters.urban_adjustment_proportion_good
-                                 * (last - first + 0.9))
-            dropStation = False
-            break
-
-        if dropStation:
-            log.write('%s step2-action "dropped"\n' % record.uid)
-            continue
-
-        log.write('%s step2-action "adjusted"\n' % record.uid)
-        log.write("%s neighbours %r\n" %
-          (record.uid, map(lambda r: r.record.uid, neighbours)))
-        log.write("%s adjustment %r\n" %
-          (record.uid, dict(series=combined, year=giss_data.BASE_YEAR,
-            difference=points)))
-
-        fit = getfit(points)
-        # The first and last years, in the urban series, that will be
-        # adjusted.
-        adjust_first, adjust_last = extend_range(
-          urban_series, quorate_count, first, last)
-
-        adjust_record(record, fit, adjust_first, adjust_last, first, last)
-        yield record
 
 def annual_anomaly(record):
     """Computes annual anomalies for the station record *record*.
@@ -417,6 +388,66 @@ def prepare_series(from_year, combined, urban_series, counts):
 
     return points[:length], quorate_count
 
+
+# Maximum length of any yearly series.  Used to correctly size the
+# combined rural series for each urban station.
+# (only used in rural_differences function)
+MAX_YEARS = giss_data.get_ghcn_last_year() - giss_data.BASE_YEAR + 1
+
+def rural_difference(urban, rural_stations):
+    """For the urban station *urban*, generate a combined rural record
+    from neighbouring stations and compute a set of differences.
+
+    Returns a pair (*points*, *quorate_count*) or (None, None) if a
+    suitable combined rural record cannot be found.
+    """
+
+    dropStation = True
+    R = parameters.urban_adjustment_full_radius
+    for radius in [R/2, R]:
+        neighbours = get_neighbours(urban, rural_stations, radius)
+        if not neighbours:
+            continue
+        counts, combined = combine_neighbours(MAX_YEARS, neighbours)
+        start_year = giss_data.BASE_YEAR
+
+        while True:
+            points, quorate_count = prepare_series(
+                start_year, combined, urban.anomalies, counts)
+
+            if quorate_count < parameters.urban_adjustment_min_years:
+                break
+
+            # first and last years that are quorate.
+            first = min(points)[0]
+            last = max(points)[0]
+
+            if quorate_count >= (parameters.urban_adjustment_proportion_good
+                                 * (last - first + 0.9)):
+                # Found a suitable combined record.
+
+                uid = urban.record.uid
+                log.write('%s step2-action "adjusted"\n' % uid)
+                log.write("%s neighbours %r\n" %
+                  (uid, map(lambda r: r.record.uid, neighbours)))
+                log.write("%s adjustment %r\n" %
+                  (uid, dict(series=combined, year=giss_data.BASE_YEAR,
+                    difference=points)))
+                return points, quorate_count
+
+            # Not enough good years for the given range.  Try to save
+            # cases in which the gaps are in the early part, by
+            # dropping that part and going around to prepare_series
+            # again.
+            start_year = int(last - (quorate_count - 1) /
+                      parameters.urban_adjustment_proportion_good)
+            # Avoid infinite loop.
+            start_year = max(start_year, first + 1)
+
+        # Failed to find suitable series with those neighbours, go
+        # around again, looking for more neighbours.
+
+    return None, None
 
 def getfit(points):
     """ Finds the best two-part linear fit for *points*, and

@@ -170,59 +170,13 @@ def urban_adjustments(record_stream):
             difference=points)))
 
         fit = getfit(points)
-        # find extended range
-        iyxtnd = int(round(quorate_count /
-                           parameters.urban_adjustment_proportion_good)
-                     - (last - first + 1))
-        assert iyxtnd >= 0
         # The first and last years, in the urban series, that will be
-        # adjusted.  We start with the quorate range, then possibly
-        # extend it (below).
-        adjust_first = first
-        adjust_last = last
+        # adjusted.
+        adjust_first, adjust_last = extend_range(
+          urban_series, quorate_count, first, last)
 
-        # The first and last years for which the urban station has a
-        # valid annual anomaly.
-        valid_years = [i for i,x in enumerate(urban_series) if valid(x)]
-        urban_first = min(valid_years)
-        urban_last = max(valid_years)
-        # Convert to calendar years, and extend by 1 year in each
-        # direction to include possible partial years.
-        urban_first += giss_data.BASE_YEAR - 1
-        urban_last += giss_data.BASE_YEAR + 1
-        del valid_years
-
-        if iyxtnd > 0:
-            # When extending, extend to include all of the recent part
-            # of the urban record...
-            lxend = urban_last - adjust_last
-            if iyxtnd > lxend:
-                # ... and if we have enough "spare years" extend some or
-                # all of the earlier part of the urban record.
-                adjust_first -= (iyxtnd - lxend)
-                adjust_first = max(adjust_first, urban_first)
-            adjust_last = urban_last
-
-        series = record.series
-        # adjust
-        m1 = record.rel_first_month + record.good_start_idx
-        m2 = record.rel_first_month + record.good_end_idx - 1
-        offset = record.good_start_idx # index of first valid month
-        a, b = adjust(series, fit, adjust_first, adjust_last,
-                      first, last, m1, m2, offset)
-        # *a* and *b* are numbers of new first and last valid months
-
-        # *lpad* is the number of months to remove starting with the
-        # first valid month of the series.
-        lpad = a - m1
-        # *nretain* is the number of months (valid or invalid) to
-        # retain.
-        nretain = b - a + 1
-        # Truncate the series.
-        record.set_series(a-1 + giss_data.BASE_YEAR * 12 + 1,
-                          series[lpad + offset:lpad + offset + nretain])
+        adjust_record(record, fit, adjust_first, adjust_last, first, last)
         yield record
-
 
 def annual_anomaly(record):
     """Computes annual anomalies for the station record *record*.
@@ -546,6 +500,68 @@ def trend2(points, xmid, min):
 
     return sl1, sl2, rms, sl
 
+
+def extend_range(series, count, first, last):
+    """Extend the range for adjusting, if possible.  *first* and *last*
+    are the calendar years that define the range of quorate years.
+    *count* gives the total number of quorate years in that range (these
+    are computed in `prepare_series`).  *series* is the annual anomalies
+    (based at BASE_YEAR) for the urban station.
+
+    Returns a pair of calendar years for the extended range.  If no
+    extension is possible, the quorate range *first* to *last* is
+    returned.
+    """
+
+    iyxtnd = int(round(count / parameters.urban_adjustment_proportion_good)
+                 - (last - first + 1))
+    if iyxtnd == 0:
+        # No extension possible.
+        return first, last
+    assert iyxtnd > 0
+
+    # The first and last years for which the urban station has a
+    # valid annual anomaly.
+    valid_years = [i for i,x in enumerate(series) if valid(x)]
+    urban_first = min(valid_years)
+    urban_last = max(valid_years)
+    # Convert to calendar years, and extend by 1 year in each
+    # direction to include possible partial years.
+    urban_first += giss_data.BASE_YEAR - 1
+    urban_last += giss_data.BASE_YEAR + 1
+
+    # When extending, extend to include all of the recent part
+    # of the urban record...
+    lxend = urban_last - last
+    if iyxtnd > lxend:
+        # ... and if we have enough "spare years" extend some or
+        # all of the earlier part of the urban record.
+        first -= (iyxtnd - lxend)
+        first = max(first, urban_first)
+    last = urban_last
+    return first, last
+
+
+def adjust_record(record, fit, adjust_first, adjust_last,
+                  fit_first, fit_last):
+    series = record.series
+    # adjust
+    m1 = record.rel_first_month + record.good_start_idx
+    m2 = record.rel_first_month + record.good_end_idx - 1
+    offset = record.good_start_idx # index of first valid month
+    a, b = adjust(series, fit, adjust_first, adjust_last,
+                  fit_first, fit_last, m1, m2, offset)
+    # *a* and *b* are numbers of new first and last valid months
+
+    # *lpad* is the number of months to remove starting with the
+    # first valid month of the series.
+    lpad = a - m1
+    # *nretain* is the number of months (valid or invalid) to
+    # retain.
+    nretain = b - a + 1
+    # Truncate the series.
+    record.set_series(a-1 + giss_data.BASE_YEAR * 12 + 1,
+                      series[lpad + offset:lpad + offset + nretain])
 
 def adjust(series, fit, adjust_first, adjust_last,
            fit_first, fit_last, m1, m2, offset):

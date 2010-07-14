@@ -54,10 +54,15 @@ immediately prior to the peri-urban adjustment step."""
 
 use_global_brightness = True
 """If this is true, the global brightness field from station metadata
-is used to identify rural stations (global brightness less than 11).
+is used to identify rural stations (global brightness at most
+max_rural_brightness).
 If this is false, the US brightness field is used if it is present (US
 brightness equal to 1), and the population index is used otherwise
 ('R' for rural)."""
+
+max_rural_brightness = 10
+"""(when use_global_brightness is true) the maximum brightness value for
+a station to be considered rural."""
 
 urban_adjustment_min_years = 20
 """When trying to calculate an urban station adjustment, at least this

@@ -94,8 +94,7 @@ def urban_adjustments(record_stream):
 def annotate_records(stream):
     """Take each of the records in *stream* and annotate them with
     computed data (critically, its annual anomaly series).  For each
-    record an annotation object is created that refers to the original
-    record.
+    record an annotation object is created.
     
     Returns a tuple of (*rural*, *urban*, *all*).  *rural* is a
     list of annotation objects for rural stations (sorted); *urban* is a
@@ -127,7 +126,7 @@ def annotate_records(stream):
         d.snlat = math.sin(station.lat * pi180)
         d.cslon = math.cos(station.lon * pi180)
         d.snlon = math.sin(station.lon * pi180)
-        d.record = record
+        d.uid = record.uid
         if is_rural(station):
             rural_stations.append(d)
         else:
@@ -216,7 +215,7 @@ def is_rural(station):
     """Test whether the station described by *station* is rural.
     """
     if parameters.use_global_brightness:
-        return station.global_brightness <= 10
+        return station.global_brightness <= parameters.max_rural_brightness
     else:
         return (station.US_brightness == '1' or
                 (station.US_brightness == ' ' and
@@ -423,12 +422,11 @@ def rural_difference(urban, rural_stations):
                                  * (last - first + 0.9)):
                 # Found a suitable combined record.
 
-                uid = urban.record.uid
-                log.write('%s step2-action "adjusted"\n' % uid)
+                log.write('%s step2-action "adjusted"\n' % urban.uid)
                 log.write("%s neighbours %r\n" %
-                  (uid, map(lambda r: r.record.uid, neighbours)))
+                  (urban.uid, map(lambda r: r.uid, neighbours)))
                 log.write("%s adjustment %r\n" %
-                  (uid, dict(series=combined, year=giss_data.BASE_YEAR,
+                  (urban.uid, dict(series=combined, year=giss_data.BASE_YEAR,
                     difference=points)))
                 return points, quorate_count
 

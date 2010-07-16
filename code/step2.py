@@ -580,66 +580,42 @@ def extend_range(series, count, first, last):
 
 
 def adjust_record(record, fit, adjust_first, adjust_last):
-    """As adjust (see below), but takes a record object."""
-
-    series = record.series
-    # adjust
-    m1 = record.rel_first_month + record.good_start_idx
-    m2 = record.rel_first_month + record.good_end_idx - 1
-    offset = record.good_start_idx # index of first valid month
-    a, b = adjust(series, fit, adjust_first, adjust_last,
-                  m1, m2, offset)
-    # *a* and *b* are numbers of new first and last valid months
-
-    # *lpad* is the number of months to remove starting with the
-    # first valid month of the series.
-    lpad = a - m1
-    # *nretain* is the number of months (valid or invalid) to
-    # retain.
-    nretain = b - a + 1
-    # Truncate the series.
-    record.set_series(a-1 + giss_data.BASE_YEAR * 12 + 1,
-                      series[lpad + offset:lpad + offset + nretain])
-
-def adjust(series, fit, adjust_first, adjust_last,
-           m1, m2, offset):
     """Adjust the series according to the previously computed
     parameters.
     
-    *series* is a monthly data series;  it is mutated, but its
-    length is not changed.
+    *record* is a (monthly) station record.  Its data series is replaced,
+    but its length is not changed.  Data outside the adjustment range
+    (see below) will become MISSING.
     
     *adjust_first*, *adjust_last* are calendar years: the first and
-    last years that are subject to adjustment.
-
-    *m1*, *m2* are month numbers for the first and last month with good
-    data (where 0 is 1880-01).
-
-    *offset* is the index of the first valid month.
+    last years that are subject to adjustment.  Adjustment years run
+    from December prior to the year in question through to November
+    (because the anomaly years do too).
 
     *fit* contains the parameters for two slopes that are used to
     make the adjustment: of slope *fit.slope1* between year *fit.first*
     and *fit.knee*, and of slope *fit.slope2* between year *fit.knee*
     and *fit.last*.  Any adjustment can be biased up or down without
     affecting the trend; the adjustment is chosen so that it is
-    zero in the year *fit_last*.  Outside the range *fit.first* to
+    zero in the year *fit.last*.  Outside the range *fit.first* to
     *fit.last* the adjustment is constant (zero for the recent part,
     and the same adjustment as for year *fit.first* for the earlier
     part).
     """
 
+    # A fresh array for the new (adjusted) series.
+    nseries = [MISSING] * len(record.series)
+
     sl1 = fit.slope1
     sl2 = fit.slope2
     if not good_two_part_fit(fit):
-        # Use linear approximation
+        # Use linear approximation.
         sl1 = sl2 = fit.slope
 
-    base = m1
-
-    m1o, m2o = m1, m2
-    m1 = -100
-    # :todo: suspect following comment is wrong.
-    m0 = 12 * (adjust_first - giss_data.BASE_YEAR)   # Dec of year adjust_first
+    # (because the adjustment range is extended by 1 on either
+    # end) the adjustment range can be outside the range of data for the
+    # series.  There are checks inside the loop to ignore those indexes.
+    # *iy* is a calendar year.
     for iy in range(adjust_first, adjust_last + 1):
         sl = sl1
         if iy > fit.knee:
@@ -648,20 +624,19 @@ def adjust(series, fit, adjust_first, adjust_last,
         # clamp to the range [fit.first, fit.last].
         iya = max(fit.first, min(iy, fit.last))
         adj = (iya - fit.knee) * sl - (fit.last - fit.knee) * sl2
-        for m in range(m0, m0 + 12):
-            mIdx = m - base
-            if mIdx < 0:
-                continue
-            if m >= m1o and m <= m2o and valid(series[mIdx + offset]):
-                if m1 < 0:
-                    m1 = m
-                series[mIdx+offset] += adj
-                m2 = m
-
-        m0 = m0 + 12
-
-    return m1, m2
-
+        # The anomaly years run from Dec to Nov.  So the adjustment
+        # years do too.
+        # The index into *series* that corresponds to December
+        # immediately before the beginning of year *iy*.
+        dec = 12 * (iy - record.first_year) - 1
+        # *m* is an index into the *series* array.
+        for m in range(dec, dec+12):
+            try:
+                if m >= 0 and valid(record.series[m]):
+                    nseries[m] = record.series[m] + adj
+            except IndexError:
+                break
+    record.set_series(record.first_month, nseries)
 
 def good_two_part_fit(fit):
     """Decide whether to apply a two-part fit.

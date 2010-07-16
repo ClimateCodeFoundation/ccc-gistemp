@@ -509,7 +509,7 @@ class Series(object):
     def has_data_for_year(self, year):
         return self.get_a_year(year) != self.missing_year
 
-    def get_a_month(self, month):
+    def _get_a_month(self, month):
         """Get the value for a single month."""
         idx = month - self.first_month
         if idx < 0:
@@ -519,19 +519,14 @@ class Series(object):
         except IndexError:
             return MISSING
 
+    # If you are tempted to optimise the following, like drj was, note
+    # that it is a little tricky to cope with: years that entirely
+    # precede the first year; and, an initial partial year when the
+    # series does not begin in January.
     def get_a_year(self, year):
         """Get the time series data for a year."""
         start_month = year * 12 + 1
-        start_index = start_month - self.first_month
-        if start_index < 0:
-            # Have to trap this, otherwise the following code works but
-            # returns the wrong data.
-            return self.missing_year
-        data = self.series[start_index:start_index+12]
-        if len(data) == 12:
-            return data
-        # Do it the slow way:
-        return [self.get_a_month(m)
+        return [self._get_a_month(m)
                 for m in range(start_month, start_month + 12)]
 
     def get_set_of_years(self, first_year, last_year):

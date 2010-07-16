@@ -413,34 +413,6 @@ class Series(object):
         return (self.last_month - 1) // 12
 
     @property
-    def first_good_year(self):
-        """The year of the first good value in the series."""
-        return (self.first_good_month - 1) // 12
-
-    @property
-    def last_good_year(self):
-        """The year of the last good value in the series."""
-        return (self.last_good_month - 1) // 12
-
-    @property
-    def first_good_month(self):
-        """The number of the first good month in the series.
-
-        See `first_month` for details of how months are counted.
-
-        """
-        return self.first_month + self.good_start_idx
-
-    @property
-    def last_good_month(self):
-        """The number of the last good month in the series.
-
-        See `first_month` for details of how months are counted.
-
-        """
-        return self.first_month + self.good_end_idx - 1
-
-    @property
     def rel_first_year(self):
         """The `first_year` relative to `BASE_YEAR`."""
         return self.first_year - BASE_YEAR
@@ -451,16 +423,6 @@ class Series(object):
         return self.last_year - BASE_YEAR
 
     @property
-    def rel_first_good_year(self):
-        """The `first_good_year` relative to `BASE_YEAR`."""
-        return self.first_good_year - BASE_YEAR
-
-    @property
-    def rel_last_good_year(self):
-        """The `last_good_year` relative to `BASE_YEAR`."""
-        return self.last_good_year - BASE_YEAR
-
-    @property
     def rel_first_month(self):
         """The `first_month` relative to `BASE_YEAR`."""
         return self.first_month - BASE_YEAR * 12
@@ -469,16 +431,6 @@ class Series(object):
     def rel_last_month(self):
         """The `last_month` relative to `BASE_YEAR`."""
         return self.last_month - BASE_YEAR * 12
-
-    @property
-    def rel_first_good_month(self):
-        """The `first_good_month` relative to `BASE_YEAR`."""
-        return self.first_good_month - BASE_YEAR * 12
-
-    @property
-    def rel_last_good_month(self):
-        """The `last_good_month` relative to `BASE_YEAR`."""
-        return self.last_good_month - BASE_YEAR * 12
 
     @property
     def good_count(self):

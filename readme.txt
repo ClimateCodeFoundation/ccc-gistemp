@@ -1,6 +1,7 @@
-CLEAR CLIMATE CODE GISTEMP README FOR RELEASE 0.4.1
+CLEAR CLIMATE CODE GISTEMP README FOR RELEASE 0.5.0
 
 Nick Barnes, Clear Climate Code
+David Jones, Clear Climate Code
 
 $Date$
 
@@ -20,19 +21,17 @@ CONTENTS
 
 1. INTRODUCTION
 
-This is release 0.4.1 of the Clear Climate Code GISTEMP project
+This is release 0.5.0 of the Clear Climate Code GISTEMP project
 (ccc-gistemp).
 
 Clear Climate Code have reimplemented GISTEMP (the GISS surface
 temperature analysis system), to make it clearer.  Work continues
 towards making it more clear and more accessible.
 
-ccc-gistemp release 0.4.1 is a release of ccc-gistemp version 0.4.
-The purpose of version 0.4 is to increase clarity by:
-  - removing rounding;
-  - removing intermediate I/O;
-  - gathering and documenting parameters in parameters.py;
-  - general code clarification.
+ccc-gistemp release 0.5.0 is a release of ccc-gistemp version 0.5.
+The purpose of version 0.5 is to increase clarity by:
+  - clarifying and documenting Step 2;
+  - consolidating general code clarification.
 
 Changes since earlier releases are described in more detail in
 release-notes.txt.
@@ -45,8 +44,9 @@ http://ccc-gistemp.googlecode.com/ ccc-gistemp code repository.
 
 2. DEPENDENCIES
 
-The only dependency is Python 2.5 (or a more recent Python version).
-Python 2.4 was supported for previous releases but has now been dropped.
+The only dependency is Python 2.4 (or a more recent Python version).
+Support for Python 2.4 (and to some extent 2.5) remains fragile, and it
+has caused some problems in the past.  We recommend Python 2.6
 The code should run on OS X, FreeBSD, Windows, and probably a variety of
 other Unix-like operating systems.  A network connection is required to
 download the input files (which need only be done once), and to display
@@ -62,20 +62,20 @@ not work).
 
 3. INSTALLATION
 
-Unpack ccc-gistemp-0.4.1.tar.gz.
+Unpack ccc-gistemp-0.5.0.tar.gz.
 
 
 4. INPUT DATA
 
-ccc-gistemp-0.4.1 uses input data in the subdirectory input/.  This
-input data includes large files of temperature records from GHCN,
-USHCN, and sea surface data, and small files of additional temperature
-records and station tables from GISS.  ccc-gistemp-0.4.1 includes code
-(tool/preflight.py) to fetch this data from the originating
-organisations over the internet.  It will not download a file if it is
-already present in the input/ directory, so if you wish to run
-ccc-gistemp with updated input data, you can delete the input/
-directory before you start.
+ccc-gistemp uses input data in the subdirectory input/.  This
+input data includes large files (a few megabytes to a few dozen
+megabytes) of temperature records from GHCN, USHCN, and sea surface
+data, and small files of additional temperature records and station
+tables from GISS.  ccc-gistemp includes code (tool/preflight.py)
+to fetch this data from the originating organisations over the
+internet.  It will not download a file if it is already present in
+the input/ directory, so if you wish to run ccc-gistemp with updated
+input data, you can delete the input/ directory before you start.
 
 
 5. RUNNING
@@ -151,13 +151,14 @@ unpacked, the local ccc-gistemp code will be run on it and the results
 compared, generating a report in index.html.
 
 Note that there are indeed some changes between the results of the
-reference run and 0.4.1, mainly caused by a change to the GISTEMP
-algorithm, for rural/urban station distinction, made at GISS since the
-reference run.  We have replicated that change in ccc-gistemp (see
+reference run and 0.4.1 (and subsequent versions), mainly caused
+by a change to the GISTEMP algorithm, for rural/urban station
+distinction, made at GISS since the reference run.  We have replicated
+that change in ccc-gistemp (see
 http://ccc-gistemp.googlecode.com/issues/detail?id=54).  To test
-ccc-gistemp running the same algorithm as the reference GISTEMP run,
-edit code/parameters.py to set use_global_brightness = False before
-running tool/regression.py.
+ccc-gistemp running the same algorithm as the reference GISTEMP
+run, edit code/parameters.py to set use_global_brightness = False
+before running tool/regression.py.
 
 
 A. REFERENCES
@@ -169,6 +170,7 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
+2010-07-19 DRJ Updated to prepare for 0.5.0.
 2010-07-13 DRJ Added note about PyPy.
 2010-03-11 DRJ Updated to prepare for 0.4.1.
 2010-03-09 DRJ Updated to prepare for 0.4.0.
@@ -184,6 +186,7 @@ Most recent changes first:
 2008-09-12 NB  Updated for CCC 0.0.2.
 2008-09-11 NB  Updated for CCC 0.0.1.
 2008-09-08 NB  Created.
+
 
 C. COPYRIGHT AND LICENSE
 

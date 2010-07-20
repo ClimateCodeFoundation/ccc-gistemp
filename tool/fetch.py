@@ -29,8 +29,9 @@ import urllib
 import re
 
 # http://www.python.org/doc/2.4.4/lib/module-tarfile.html
-# Conditionally import our modified tarfile for Python2.4.
-if sys.version_info[:2] == (2, 4):
+# Conditionally import our modified tarfile for Python 2.4.x, 2.5, and
+# 2.5.1
+if sys.version_info[:3] <= (2, 5, 1):
     import ccc_tarfile as tarfile
 else:
     import tarfile
@@ -255,10 +256,12 @@ def fetch_tar(l, prefix, output):
             tar_compression_type = ""
         else:
             tar_compression_type = ext[1:]
-        u = urllib.urlopen(url)
+        name = url.split('/')[-1]
+        fetch_url([[['url', url], name]], prefix, output)
+        tar = open(os.path.join(prefix, name), 'rb')
         members = map(lambda x: x[0][2], group)
         print >>output, 'Extracting members from', url, '...'
-        fetch_from_tar(u, members, prefix, output,
+        fetch_from_tar(tar, members, prefix, output,
             compression_type=tar_compression_type)
         print >>output, "  ... finished extracting"
 

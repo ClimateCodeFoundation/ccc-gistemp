@@ -1,4 +1,4 @@
-CLEAR CLIMATE CODE GISTEMP README FOR RELEASE 0.5.0
+CLEAR CLIMATE CODE GISTEMP README FOR RELEASE 0.5.1
 
 Nick Barnes, Clear Climate Code
 David Jones, Clear Climate Code
@@ -21,14 +21,14 @@ CONTENTS
 
 1. INTRODUCTION
 
-This is release 0.5.0 of the Clear Climate Code GISTEMP project
+This is release 0.5.1 of the Clear Climate Code GISTEMP project
 (ccc-gistemp).
 
 Clear Climate Code have reimplemented GISTEMP (the GISS surface
 temperature analysis system), to make it clearer.  Work continues
 towards making it more clear and more accessible.
 
-ccc-gistemp release 0.5.0 is a release of ccc-gistemp version 0.5.
+ccc-gistemp release 0.5.1 is a release of ccc-gistemp version 0.5.
 The purpose of version 0.5 is to increase clarity by:
   - clarifying and documenting Step 2;
   - consolidating general code clarification.
@@ -44,13 +44,23 @@ http://ccc-gistemp.googlecode.com/ ccc-gistemp code repository.
 
 2. DEPENDENCIES
 
-The only dependency is Python 2.4 (or a more recent Python version).
-Support for Python 2.4 (and to some extent 2.5) remains fragile, and it
-has caused some problems in the past.  We recommend Python 2.6
+You need a machine that runs Python, and a network connection; there are
+no explicit operating system or CPU architecture dependencies so "any"
+operating system or CPU should be okay.
+
+We recommend Python 2.6, but ccc-gistemp should work on Python 2.4
+or anything more recent.  Support for Python 2.4 (and to some extent
+2.5) remains fragile, and it has caused some problems in the past.
+
 The code should run on OS X, FreeBSD, Windows, and probably a variety of
-other Unix-like operating systems.  A network connection is required to
-download the input files (which need only be done once), and to display
-an optional graph from the results.
+other Unix-like operating systems.
+
+A network connection is required to download the input files (which
+need only be done once), and to display an optional graph from the
+results.  If you use a proxy to access the internet then Python requires
+that the "http_proxy" environment variable it set.  The proxy will need
+to handle both HTTP and FTP requests (this seems to cause some trouble,
+see "INPUT DATA" below for downloading data by hand).
 
 Python may already be installed on your machine (for example, it comes
 pre-installed on OS X), it may be possible to install it using your
@@ -62,7 +72,7 @@ not work).
 
 3. INSTALLATION
 
-Unpack ccc-gistemp-0.5.0.tar.gz.
+Unpack ccc-gistemp-0.5.1.tar.gz.
 
 
 4. INPUT DATA
@@ -76,6 +86,13 @@ to fetch this data from the originating organisations over the
 internet.  It will not download a file if it is already present in
 the input/ directory, so if you wish to run ccc-gistemp with updated
 input data, you can delete the input/ directory before you start.
+
+Downloading the input data is a common causes of problems.  Maintaining
+the part of the code that does this (which has nothing to do with the
+core GISTEMP algorithm) is a significant cost.  If the tools
+we provide do not seem to download the input data correctly, you can
+download the data "by hand" and install it in the input/ directory.  See
+doc/input.txt for more details.
 
 
 5. RUNNING
@@ -170,6 +187,7 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
+2010-07-21 DRJ Updated to prepare for 0.5.1.
 2010-07-19 DRJ Updated to prepare for 0.5.0.
 2010-07-13 DRJ Added note about PyPy.
 2010-03-11 DRJ Updated to prepare for 0.4.1.

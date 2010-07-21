@@ -1,0 +1,50 @@
+$URL$
+$Rev$
+
+David Jones, Clear Climate Code, 2010-07-20
+
+INPUT FILES
+
+In the direcory input/ ccc-gistemp expects to find its various input
+data.  If any of these data are not present a tool, tool/preflight.py,
+will attempt to download them from the internet.  Instead, the data can
+be downloaded by hand and placed in input/.
+
+input/
+  The "big" files...
+
+  SBBX.HadR2    - Sea surface temperatures from
+      ftp://data.giss.nasa.gov/pub/gistemp/SBBX.HadR2
+  ushcnv2.gz    - Temperature data from USHCN.  The location of this file
+      varies (usually every month, as a new release is made).  Open
+      ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly and choose the
+      most recent file with the name 9641C_YYYYMM_F52.avg.gz (YYYY and
+      MM are numbers for year and month).  Rename it ushcnv2.gz.
+  v2.mean       - Uncompressed version of v2.mean.zip; normally created
+      by ccc-gistemp automatically, download v2.mean.zip instead.
+  v2.mean.zip   - Temperature data from GHCN.  Download from
+      ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/zipd/v2.mean.zip
+
+  And the "little" files:
+
+  antarc1.list
+  antarc1.txt
+  antarc2.list
+  antarc2.txt
+  antarc3.list
+  antarc3.txt
+  mcdw.tbl
+  oisstv2_mod4.clim.gz
+  sumofday.tbl
+  t_hohenpeissenberg_200306.txt_as_received_July17_2003
+  ushcn2.tbl
+  ushcnV2_cmb.tbl
+  v2.inv
+
+  The "little" files all come from
+  http://data.giss.nasa.gov/gistemp/sources/GISTEMP_sources.tar.gz .  If
+  you are downloading by hand then you will need to download that file
+  and unpack it.  The required input files are found in
+  GISTEMP_sources/STEP0/input_files GISTEMP_sources/STEP1/input_files
+  GISTEMP_sources/STEP4_5/input_files .  It is okay, but messy, to copy
+  the entire contents of these subdirectories into input/.

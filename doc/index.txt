@@ -1,0 +1,18 @@
+$URL$
+$Rev$
+
+David Jones, Clear Climate Code, 2010-07-20
+
+DOCUMENTATION
+
+Document for ccc-gistemp.  There is not much to see yet:
+
+lab/            lab notes written by developers as they were working on
+                the code.  Unorganised, not likely to be of general interest.
+
+input.txt       What ccc-gistemp expects to find in its input directory,
+                and how to get it there.
+
+HISTORY
+
+2010-07-20 DRJ  Created.

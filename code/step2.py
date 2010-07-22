@@ -603,6 +603,9 @@ def adjust_record(record, fit, adjust_first, adjust_last):
     part).
     """
 
+    # We assume the series starts in January.
+    assert record.first_month % 12 == 1
+
     # A fresh array for the new (adjusted) series.
     nseries = [MISSING] * len(record.series)
 

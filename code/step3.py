@@ -10,7 +10,6 @@
 Python code reproducing the STEP3 part of the GISTEMP algorithm.
 """
 
-import earth # required for radius.
 import eqarea
 import giss_data
 import parameters
@@ -18,8 +17,12 @@ import series
 from giss_data import MISSING, valid, invalid
 
 import math
+# http://docs.python.org/release/2.4.4/lib/module-os.path.html
+import os.path
 import sys
 import itertools
+
+log = open(os.path.join('log', 'step3.log'), 'w')
 
 
 def inbox(station_records, lats, latn, longw, longe):
@@ -63,22 +66,24 @@ def inbox(station_records, lats, latn, longw, longe):
             yield record
 
 
+# :todo: Return (station, weight) pair
 def incircle(iterable, arc, lat, lon):
     """An iterator that filters iterable (the argument) and yields every
     station with a certain distance of the point of interest given by
-    lat and lon (in degrees).
+    lat and lon (in degrees).  Each station returned has an associated
+    weight (normalized distance from centre).  A series of (*station*,
+    *weight*) pairs is yielded.
 
     This is essentially a filter; the stations that are returned are in
     the same order in which they appear in iterable.
 
     A station record is returned if the great circle arc between it
-    and the point of interest is less than arc radians (using angles
-    is slightly odd, but makes it independent of sphere size).
+    and the point of interest is less than *arc* radians (using angles
+    makes it independent of sphere size).
 
-    The records returned are given weights (attribute .weight) based
-    on its distance from the point.  The weight is 1-(d/arc).  d is
-    not the angle from the station to the point of interest but is the
-    chord length on a unit circle.
+    The weight is 1-(d/arc).  where *d* is the
+    chord length on a unit circle (from the point lat,lon to the
+    station).
     """
 
     # Warning: lat,lon in degrees; arc in radians!
@@ -110,9 +115,8 @@ def incircle(iterable, arc, lat, lon):
             coslats*coslat*(coslons*coslon + sinlons*sinlon))
         if cosd > cosarc:
             d = math.sqrt(2*(1-cosd)) # chord length on unit sphere
-            d /= arc
-            record.weight = 1 - d
-            yield record
+            weight = 1.0 - (d / arc)
+            yield record, weight
 
 
 def sort(l, cmp):
@@ -152,9 +156,13 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
     is the combining radius in kilometres.
     """
 
+    # Clear Climate Code
+    import earth # required for radius.
+
     station_records = list(station_records)
 
-    log = sys.stdout
+    # A dribble of progress messages.
+    dribble = sys.stdout
 
     # Critical radius as an angle of arc
     arc = radius / earth.radius
@@ -183,23 +191,19 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
 
         # Count how many cells are empty
         n_empty_cells = 0
-        # Used to generate the "subbox at" rows in the log.
-        lastcentre = (None, None)
         for subbox in subboxes:
             # Select and weight stations
             centre = eqarea.centre(subbox)
-            log.write("\rsubbox at %+05.1f%+06.1f (%d empty)" % (
+            dribble.write("\rsubbox at %+05.1f%+06.1f (%d empty)" % (
               centre + (n_empty_cells,)))
-            log.flush()
-            lastcentre = centre
-            # Of possible station records for this region, filter for those
-            # from stations within radius of subbox centre.
-            incircle_records = list(incircle(region_records, arc, *centre))
+            dribble.flush()
+            # Determine the contributing stations to this grid cell.
+            contributors = list(incircle(region_records, arc, *centre))
 
             # Combine data.
             subbox_series = [MISSING] * max_months
 
-            if len(incircle_records) == 0:
+            if not contributors:
                 box_obj = giss_data.Series(series=subbox_series,
                     box=list(subbox), stations=0, station_months=0,
                     d=MISSING)
@@ -207,39 +211,39 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                 yield box_obj
                 continue
 
-            # Initialise data with first station
-            record = incircle_records[0]
+            # Initialise series and weight arrays with first station.
+            record,wt = contributors[0]
             total_good_months = record.good_count
             total_stations = 1
 
-            max_weight = record.weight
             offset = record.rel_first_month - 1
             a = record.series # just a temporary
             subbox_series[offset:offset + len(a)] = a
-            weight = [0.0] * max_months
-            for i in range(len(a)):
-                if valid(a[i]):
-                    weight[i + offset] = record.weight
+            max_weight = wt
+            weight = [wt*valid(v) for v in subbox_series]
+
+            # For logging, keep a list of stations that contributed
+            contributed = [(record.uid,wt)]
 
             # Add in the remaining stations
-            for record in incircle_records[1:]:
-                # TODO: A StationMethod method to produce a padded data series
+            for record,wt in contributors[1:]:
+                # TODO: A method to produce a padded data series
                 #       would be good here. Hence we could just do:
                 #           new = record.padded_series(max_months)
                 new = [MISSING] * max_months
                 aa, bb = record.rel_first_month, record.rel_last_month
                 new[aa - 1:bb] = record.series
                 station_months = series.combine(
-                    subbox_series, weight, new, record.weight,
+                    subbox_series, weight, new, wt,
                     record.rel_first_year, record.rel_last_year + 1,
                     parameters.gridding_min_overlap)
                 total_good_months += station_months
                 if station_months == 0:
                     continue
                 total_stations += 1
+                contributed.append((record.uid,wt))
 
-                if max_weight < record.weight:
-                    max_weight = record.weight
+                max_weight = max(max_weight, wt)
 
             series.anomalize(subbox_series,
                              parameters.gridding_reference_period, first_year)
@@ -247,14 +251,15 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                     box=list(subbox), stations=total_stations,
                     station_months=total_good_months,
                     d=radius*(1-max_weight))
+            log.write("%s stations %r\n" % (box_obj.uid, contributed))
             yield box_obj
         plural_suffix = 's'
         if n_empty_cells == 1:
             plural_suffix = ''
-        log.write(
+        dribble.write(
           '\rRegion (%+03.0f/%+03.0f S/N %+04.0f/%+04.0f W/E): %d empty cell%s.\n' %
             (tuple(box) + (n_empty_cells,plural_suffix)))
-    log.write("\n")
+    dribble.write("\n")
 
 
 def step3(records, radius=parameters.gridding_radius, year_begin=1880):

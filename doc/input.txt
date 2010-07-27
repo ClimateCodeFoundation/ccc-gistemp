@@ -5,7 +5,7 @@ David Jones, Clear Climate Code, 2010-07-20
 
 INPUT FILES
 
-In the direcory input/ ccc-gistemp expects to find its various input
+In the directory input/ ccc-gistemp expects to find its various input
 data.  If any of these data are not present a tool, tool/preflight.py,
 will attempt to download them from the internet.  Instead, the data can
 be downloaded by hand and placed in input/.
@@ -42,9 +42,14 @@ input/
   v2.inv
 
   The "little" files all come from
-  http://data.giss.nasa.gov/gistemp/sources/GISTEMP_sources.tar.gz .  If
-  you are downloading by hand then you will need to download that file
-  and unpack it.  The required input files are found in
-  GISTEMP_sources/STEP0/input_files GISTEMP_sources/STEP1/input_files
-  GISTEMP_sources/STEP4_5/input_files .  It is okay, but messy, to copy
-  the entire contents of these subdirectories into input/.
+  http://data.giss.nasa.gov/gistemp/sources/GISTEMP_sources.tar.gz .
+  If you are downloading by hand then you will need to download that
+  file and unpack it.  The required input files are found in several
+  directories:
+
+    GISTEMP_sources/STEP0/input_files
+    GISTEMP_sources/STEP1/input_files
+    GISTEMP_sources/STEP4_5/input_files
+
+  It is okay, but messy, to copy the entire contents of these
+  subdirectories into input/.

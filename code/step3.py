@@ -239,6 +239,7 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                     parameters.gridding_min_overlap)
                 total_good_months += station_months
                 if station_months == 0:
+                    contributed.append((record.uid, 0.0))
                     continue
                 total_stations += 1
                 contributed.append((record.uid,wt))

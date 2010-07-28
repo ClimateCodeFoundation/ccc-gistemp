@@ -3,14 +3,18 @@
 # $Rev$
 
 """
-Convert v2.inv file to a KML file for browsing in Google Earth.
+Convert GHCN style data and metadata file to a KML file for browsing
+in Google Earth.
 
 Usage:
-python tool/kml.py [v2.mean [v2.temperature.inv]] [> ghcn.kml]
+python tool/kml.py [--longitude west,east] [--latitude south,north]
+  [data [inv]] [> ghcn.kml]
 
-The v2.mean, data, input defaults to input/v2.mean; the
-v2.temperature.inv, metadata, input defaults
-to input/v2.inv.
+The data file is usually v2.mean, it defaults to input/v2.mean; the
+inv file, metadata, defaults to input/v2.inv.
+
+Using --longitude or --latitude restricts the output to stations within
+those bounds.
 """
 
 # Clear Climate Code

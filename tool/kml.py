@@ -51,6 +51,10 @@ def meta_iter(meta):
     for line in meta:
         yield line[:11], line
 
+# Regular expression for a record identifer for a cell.  These are ISO
+# 6709 lat/lon value in degrees with a precision of .1.
+CELL_RE = r'([-+]\d\d\.\d)([-+]\d\d\d\.\d)'
+
 
 def kml(data, meta, out, lat=(-90,91), lon=(-180,181)):
     """Convert the input *meta*, which is assumed to be (an open file
@@ -79,6 +83,23 @@ def kml(data, meta, out, lat=(-90,91), lon=(-180,181)):
         # Bit hacky, just use first record when multiple records.
         id11 = id[:11]
         if id11 not in styled:
+            m = re.match(CELL_RE, id11)
+            if m:
+                # Grid cell.
+                clat,clon = m.groups()
+                # Create a fake metadata string
+                # Calculate first year with data (with yearly anomaly
+                # really).
+                first = [i for i,v in enumerate(anom) if v != MISSING]
+                if first:
+                    first = str(first[0]+1880)
+                else:
+                    first = ''
+                name = first
+                fake = "%(id11)s %(name)-30s %(clat)-6s %(clon)-7s" % locals()
+                fake = "%-80s" % fake
+                meta[id11] = fake
+            # Assume normal 11-digit GHCN station.
             # todo, use metadata here, for urban/airport etc.
             url = chart_anom(anom)
             print """
@@ -87,7 +108,7 @@ def kml(data, meta, out, lat=(-90,91), lon=(-180,181)):
     <href>%(url)s</href>
   </Icon></IconStyle>
 </Style>""" % dict(id=id11, url=xmlquote(url))
-        styled.add(id11)
+            styled.add(id11)
 
     for stationid,l in meta.items():
         # See ftp.ncdc.noaa.gov/v2.read.inv.f

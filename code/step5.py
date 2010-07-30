@@ -7,9 +7,9 @@
 # David Jones, Ravenbrook Limited, 2009-10-27
 
 """
-STEP5 of the GISTEMP algorithm.
+Step 5 of the GISTEMP algorithm.
 
-In STEP5: 8000 subboxes are combined into 80 boxes, and ocean data is
+In Step 5: 8000 subboxes are combined into 80 boxes, and ocean data is
 combined with land data; boxes are combined into latitudinal zones
 (including hemispheric and global zones); annual and seasonal anomalies
 are computed from monthly anomalies.
@@ -31,7 +31,6 @@ import math
 import struct
 # http://www.python.org/doc/2.4.4/lib/module-os.html
 import os
-import sys
 
 def blank_ocean_data(data):
     """Augment a land-only data series with blank ocean data."""
@@ -49,7 +48,7 @@ def SBBXtoBX(data):
     (land, ocean) subbox series pairs. Returns an iterator of box data.
     """
 
-    # First item from iterator is normally a pair of metadataobjects,
+    # First item from iterator is normally a pair of metadata objects,
     # one for land, one for ocean.  If we are piping step3 straight into
     # step5 then it is not a pair.  In that case we synthesize missing
     # ocean data.
@@ -67,7 +66,6 @@ def SBBXtoBX(data):
 
     # TODO: Formalise use of only monthlies, see step 3.
     assert land_meta.mavg == 6
-    NYRSIN = land_meta.monm/12
     combined_year_beg = min(land_meta.yrbeg, ocean_meta.yrbeg)
     # Index into the combined array of the first year of the land data.
     land_offset = 12*(land_meta.yrbeg-combined_year_beg)
@@ -106,11 +104,9 @@ def SBBXtoBX(data):
 
         # GISTEMP sort.
         # We want to end up with IORDR, the permutation array that
-        # represents the sorter order.  IORDR[0] is the index (into the
+        # represents the sorted order.  IORDR[0] is the index (into the
         # *wgtc* array) of the longest record, IORDR[1] the index of the
-        # next longest record, and so on.  We do that by decorating the
-        # *wgtc* array with indexes 0 to 99, and then extracting the
-        # (permuted) indexes into IORDR.
+        # next longest record, and so on.
         # :todo: should probably import from a purpose built module.
         from step3 import sort
         IORDR = range(nsubbox)
@@ -147,8 +143,7 @@ def SBBXtoBX(data):
 
 
 def zonav(boxed_data):
-    """
-    Perform Zonal Averaging.
+    """Zonal Averaging.
 
     The input *boxed_data* is an iterator of boxed time series.
     The data in the boxes are combined to produce averages over
@@ -248,13 +243,13 @@ def zonav(boxed_data):
     for zone in range(len(band_in_zone)):
         if lenz[0] == 0:
             raise Error('**** NO DATA FOR ZONE %d' % bands+zone)
-        # Find the longest band that is in the special zone.
+        # Find the longest band that is in the compound zone.
         for j1 in range(bands):
             if iord[j1] in band_in_zone[zone]:
                 break
         else:
             # Should be an assertion really.
-            raise Error('No band in special zone %d.' % zone)
+            raise Error('No band in compound zone %d.' % zone)
         band = iord[j1]
         wtg = list(wt[band])
         avgg = list(avg[band])
@@ -283,12 +278,19 @@ def sort_perm(a):
 
 def zones():
     """Return the parameters of the 14 zones (8 basic bands and 6
-    additional).  A pair of (*boxes_in_band*,*band_in_zone*) is
-    returned.  `boxes_in_band[b]` gives the number of boxes in band
+    additional compound zones).
+    
+    A pair of (*boxes_in_band*,*band_in_zone*) is returned.
+    `boxes_in_band[b]` gives the number of boxes in band
     *b* for `b in range(8)`.  *band_in_zone* defines how the 6
     combined zones are made from the basic bands.  `b in
-    band_in_zone[k]` is true when basic band *b* is in special zone
+    band_in_zone[k]` is true when basic band *b* is in compound zone
     *z* (*b* is in range(8), *z* is in range(6)).
+
+    Implicit (in this function and its callers) is that 8 basic bands
+    form a decomposition of the 80 boxes.  All you need to know is the
+    number of boxes in each band; simply take the next N boxes to make
+    the next band.
     """
 
     # Number of boxes (regions) in each band.

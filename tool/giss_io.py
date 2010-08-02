@@ -715,18 +715,20 @@ def read_USHCN_converted(path, stations):
 
 def read_USHCN_stations(ushcn_v1_station_path, ushcn_v2_station_path):
     """Reads the USHCN station list and returns a dictionary
-    mapping USHCN station ID to 12-digit station ID.
+    mapping USHCN station ID (integer) to 12-digit GHCN record ID
+    (string).
     """
 
     stations = {}
     for line in open(ushcn_v1_station_path):
-        (USHCN_id, WMO_id, duplicate) = line.split()
+        (USHCN_id, id11, duplicate) = line.split()
         USHCN_id = int(USHCN_id)
-        if WMO_id[0:3] != '425': # non-US country_code
+        if not id11.startswith('425'):
+            # non-US country_code
             raise ValueError, "non-425 station found in ushcn.tbl: '%s'" % line
         if duplicate != '0':
             raise ValueError, "station in ushcn.tbl with non-zero duplicate: '%s'" % line
-        stations[USHCN_id] = WMO_id + '0'
+        stations[USHCN_id] = id11 + '0'
     # some USHCNv2 station IDs convert to USHCNv1 station IDs:
     for line in open(ushcn_v2_station_path):
         (v2_station,_,v1_station,_) = line.split()

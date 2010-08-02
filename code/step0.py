@@ -40,8 +40,11 @@ USHCN data:
   ushcnv2.gz
 """
 
+# http://docs.python.org/release/2.4.4/lib/module-itertools.html
 import itertools
-from giss_data import MISSING, valid, invalid
+
+# Clear Climate Code
+from giss_data import valid
 import parameters
 
 def calc_monthly_USHCN_offsets(u_record, g_record):
@@ -68,14 +71,21 @@ def calc_monthly_USHCN_offsets(u_record, g_record):
 
 
 def adjust_USHCN(ushcn_records, ghcn_records, us_stations):
-    """Where the GHCN dataset contains data for stations in the USHCN
-    set, adjust the USHCN data, for differences in
-    monthly temperature means.
+    """Where the GHCN dataset, *ghcn_records*, contains data for
+    stations in the USHCN dataset, *ushcn_records*, replace the
+    GHCN data with USHCN data, adjusted for differences in monthly
+    temperature means.  The GHCN data is updated; the corresponding
+    USHCN station is removed from *ushcn_records*.  *us_stations*
+    should be a collection of 12-digit GHCN record identifiers,
+    normally these are the records that are replaced by USHCN data,
+    but if they are not replaced by USHCN data, they are removed
+    (from *ghcn_records*).
     """
+
     print "Adjust USHCN records"
 
     us_only = {}
-    for id12 in us_stations.itervalues():
+    for id12 in us_stations:
         us_only[id12] = None
 
     def adj(t, d):
@@ -143,28 +153,36 @@ def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg):
                 record.set_series(cut * 12 + 1, new_data)
 
 
-# TODO: Should the antarc_source really appear at this stage?
-def asdict(ghcn_source, antarc_source):
-    print "Load GHCN records"
-    return dict((record.uid, record) for record in
-      itertools.chain(ghcn_source, antarc_source))
+def asdict(records):
+    """Convert simple series of stations records into a dictionary
+    (mapping from uid to record)."""
+
+    return dict((record.uid, record) for record in records)
 
 
 def step0(inputs):
-    """An iterator for step 1.  Produces a stream of
+    """An iterator for step 0.  Produces a stream of
     `giss_data.Series` instances.
 
     """
-    ushcn_records = dict((record.uid, record)
-                         for record in inputs.ushcn_source)
-    ghcn_records = asdict(inputs.ghcn_source,
-                          inputs.antarc_source)
-    correct_Hohenpeissenberg(ghcn_records, inputs.hohenpeissenberg)
-    adjust_USHCN(ushcn_records, ghcn_records, inputs.ushcn_stations)
+    ushcn_records = asdict(inputs.ushcn_source)
+    print "Load GHCN records"
+    ghcn_records = asdict(inputs.ghcn_source)
+    scar_records = asdict(inputs.antarc_source)
+    if 'hohenpeissenberg' in parameters.data_sources:
+        correct_Hohenpeissenberg(ghcn_records, inputs.hohenpeissenberg)
+    if ('ushcn' in parameters.data_sources and
+        'ghcn' in parameters.data_sources):
+        adjust_USHCN(ushcn_records, ghcn_records,
+          inputs.ushcn_stations.itervalues())
 
     records = {}
-    records.update(ghcn_records)
-    records.update(ushcn_records)
+    if 'ghcn' in parameters.data_sources:
+        records.update(ghcn_records)
+    if 'ushcn' in parameters.data_sources:
+        records.update(ushcn_records)
+    if 'scar' in parameters.data_sources:
+        records.update(scar_records)
 
     # We sort here - as does GISTEMP - so that all the records for a
     # given 11-digit station ID are grouped together, ready for
@@ -173,7 +191,7 @@ def step0(inputs):
     # can probably ensure it here by doing the above processing with
     # suitable care.
     for uid, record in sorted(records.iteritems()):
-        if len(record) > 0:
+        if record:
             yield record
 
 

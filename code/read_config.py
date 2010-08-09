@@ -21,8 +21,8 @@ def v2_get_sources():
     sources = {}
     for source in ['MCDW', 'USHCN2', 'SUMOFDAY']:
         for line in open('input/%s.tbl' % source.lower()):
-            _, id, rec_no = line.split()
-            sources[id + rec_no] = source
+            _, id11, duplicate = line.split()
+            sources[id11 + duplicate] = source
     return sources
 
 

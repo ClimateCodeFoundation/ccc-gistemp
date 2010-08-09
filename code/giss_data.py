@@ -25,6 +25,8 @@ the `StationMetaData` and `SubboxMetaData` classes.
 __docformat__ = "restructuredtext"
 
 import sys
+# http://docs.python.org/release/2.4.4/lib/warning-functions.html
+import warnings
 
 import read_config
 
@@ -134,10 +136,13 @@ def stations():
         )
 
         _stations = {}
-        for line in open("input/v2.inv"):
-            dd = dict((name, conv(line[a:b]))
-                      for a, b, name, conv in fields)
-            _stations[dd['uid']] = Station(**dd)
+        try:
+            for line in open("input/v2.inv"):
+                dd = dict((field, convert(line[a:b]))
+                          for a, b, field, convert in fields)
+                _stations[dd['uid']] = Station(**dd)
+        except IOError:
+            warnings.warn("Could not load GHCN metadata (v2.inv) file.")
 
     return _stations
 
@@ -167,18 +172,29 @@ def get_ghcn_last_year():
 
 
 def v2_sources():
+    """Return (and cache) a sources dictionary that maps from 12-digit
+    GHCN record ID to source.
+
+    If the source files cannot be found (or read) then an empty
+    dictionary is returned.
+    """
     global _v2_sources
     if _v2_sources is None:
-        _v2_sources = read_config.v2_get_sources()
+        try:
+            _v2_sources = read_config.v2_get_sources()
+        except IOError:
+            _v2_sources = {}
+            warnings.warn(
+              "Could not load GHCN source metadata (mcdw.tbl) files.")
     return _v2_sources
 
 
 def clear_cache(func):
-    """A decorator, for `TemperatureRecord` methods that change the data.
+    """A decorator, for `Series` methods that change the data.
 
-    Any method that changes the underlying data series in a `TemperatureRecord`
-    must clear the cached values used for some properties. This decorator
-    takes care of this chore.
+    Any method that changes the underlying data series in a `Series`
+    instance must clear the cached values used for some properties.
+    This decorator takes care of this chore.
 
     """
     def f(self, *args, **kwargs):

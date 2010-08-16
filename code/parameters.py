@@ -14,12 +14,12 @@ order in which they are used in the algorithm.
 """
 __docformat__ = "restructuredtext"
 
-data_sources = ['ghcn', 'ushcn', 'hohenpeissenberg', 'scar']
-"""The list of data sources that are used. 'ghcn' is the Global
-Historical Climate Network (NOAA); 'ushcn' is the US Historical
-Climate Network (NOAA); 'hohenpeissenberg' is Wiljens data for
-Hohenpeissenberg; 'scar' is the READER data from Scientific Committee
-on Antarctic Research.
+data_sources = "ghcn ushcn hohenpeissenberg scar"
+"""Data sources that are used for the analysis (space separated string).
+'ghcn' is the Global Historical Climate Network (NOAA); 'ushcn' is
+the US Historical Climate Network (NOAA); 'hohenpeissenberg' is
+Wiljens data for Hohenpeissenberg; 'scar' is the READER data from
+Scientific Committee on Antarctic Research.
 """
 
 USHCN_offset_start_year = 1980

@@ -1,0 +1,30 @@
+$URL$
+$Rev$
+
+DRJ 2010-08-13
+
+What US GHCN records remain after Step 0?
+
+(assume only_USHCN is false; it's a new flag introduced in 2010)
+- lines following "cont_US=.false."
+  all non-US GHCN stations are written.  As are US stations whose ID
+  precedes the first USHCN (converted) ID.
+
+  copy GHCN until GHCN ID >= USHCN ID
+  if GHCN ID > USHCN ID:
+      copy USHCN until either USHCN ID > GHCN ID (goto beginning) or IDs
+      are same and all USHCN years up to GHCN year have been copied
+
+  when GHCN ID and USHCN ID match, GHCN data is discarded unless there
+  is a matching USHCN year; USHCN data is copied when there is no
+  matching GHCN data.  when a year has both GHCN and USHCN, the adjusted
+  USHCN data is written.
+
+so, for a station in USHCN (meaning, has records in the USHCN stream),
+all the corresponding GHCN data is eliminated.
+
+So what GHCN station data is in the GHCN stream?  All the GHCN records.
+
+Thus (contiguous) US GHCN stations for which there are no corresponding
+USHCN records are retained.
+

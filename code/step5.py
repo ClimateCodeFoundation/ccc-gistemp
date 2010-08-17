@@ -42,10 +42,12 @@ def blank_ocean_data(data):
             d=MISSING)
         yield land_box, ocean_box
 
-def SBBXtoBX(data):
-    """Simultaneously combine the land series and the ocean series and
-    combine subboxes into boxes.  *data* should be an iterator of
-    (land, ocean) subbox series pairs. Returns an iterator of box data.
+
+def select(data):
+    """Taking a stream of (land,ocean) record pairs, decide how to
+    weight the two series in subsequent combination and yield a stream
+    of (weight,land,ocean) triples.  *weight* will be 1 when the land
+    record is to be used, and 0 if the ocean record is to be used.
     """
 
     # First item from iterator is normally a pair of metadata objects,
@@ -61,8 +63,31 @@ def SBBXtoBX(data):
         print "No ocean data; using land data only"
         data = blank_ocean_data(data)
 
-    # number of subboxes within each box
-    nsubbox = 100
+    yield land_meta, ocean_meta
+
+    for land,ocean in data:
+        if (ocean.good_count < parameters.subbox_min_valid
+            or land.d < parameters.subbox_land_range):
+            landmask = 1.0
+        else:
+            landmask = 0.0
+
+        yield landmask, land, ocean
+
+
+def SBBXtoBX(data):
+    """Simultaneously combine the land series and the ocean series and
+    combine subboxes into boxes.  *data* should be an iterator of
+    (weight, land, ocean) triples (a land and ocean series for each
+    subbox).  When *weight* is 1 the land series is selected; when
+    *weight* is 0 the ocean series is selected.  Currently no
+    intermediate weights are supported.
+
+    Returns an iterator of box data.
+    """
+
+    meta = data.next()
+    land_meta, ocean_meta = meta
 
     # TODO: Formalise use of only monthlies, see step 3.
     assert land_meta.mavg == 6
@@ -81,18 +106,22 @@ def SBBXtoBX(data):
     info[4] = 2 * land_meta.monm + 5
     yield(info, land_meta.title)
 
+    # Number of subboxes within each box.
+    nsubbox = 100
+
     for box_number,box in enumerate(eqarea.grid()):
         # Averages for the land and ocean (one series per subbox)...
         avg = []
         wgtc = []
         # Eat the records from land and ocean 100 (nsubbox) at a time.
         # In other words, all 100 subboxes for the box.
-        landsub,oceansub = zip(*itertools.islice(data, nsubbox))
+        landweight,landsub,oceansub = zip(*itertools.islice(data, nsubbox))
         # :todo: combine below zip with above zip?
-        for i, l, o in zip(range(nsubbox), landsub, oceansub):
+        for i, t, l, o in zip(range(nsubbox), landweight, landsub, oceansub):
+            # Simple version only selects either land or ocean
+            assert t in (0,1)
             a = [MISSING]*combined_n_months
-            if (o.good_count < parameters.subbox_min_valid
-                or l.d < parameters.subbox_land_range):
+            if t:
                 # use land series for this subbox
                 a[land_offset:land_offset+len(l.series)] = l.series
                 wgtc.append(l.good_count)
@@ -420,7 +449,7 @@ def step5(data):
         `code.giss_data.SubboxSetProtocol`.
 
     """
-    boxed = SBBXtoBX(data)
+    boxed = SBBXtoBX(select(data))
     boxed = giss_io.step5_bx_output(boxed)
     zoned_averages = zonav(boxed)
     return annzon(zoned_averages)

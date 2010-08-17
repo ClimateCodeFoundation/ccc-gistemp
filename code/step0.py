@@ -70,23 +70,15 @@ def calc_monthly_USHCN_offsets(u_record, g_record):
     return diffs
 
 
-def adjust_USHCN(ushcn_records, ghcn_records, us_stations):
+def adjust_USHCN(ushcn_records, ghcn_records):
     """Where the GHCN dataset, *ghcn_records*, contains data for
     stations in the USHCN dataset, *ushcn_records*, replace the
     GHCN data with USHCN data, adjusted for differences in monthly
     temperature means.  The GHCN data is updated; the corresponding
-    USHCN station is removed from *ushcn_records*.  *us_stations*
-    should be a collection of 12-digit GHCN record identifiers,
-    normally these are the records that are replaced by USHCN data,
-    but if they are not replaced by USHCN data, they are removed
-    (from *ghcn_records*).
+    USHCN station is removed from *ushcn_records*.
     """
 
     print "Adjust USHCN records"
-
-    us_only = {}
-    for id12 in us_stations:
-        us_only[id12] = None
 
     def adj(t, d):
         if valid(t):
@@ -115,12 +107,9 @@ def adjust_USHCN(ushcn_records, ghcn_records, us_stations):
                 new_data.extend(temps)
         g_record.set_series(u_record.first_year * 12 + 1, new_data)
         to_remove.append(key)
-        us_only.pop(key, None)
 
     for k in to_remove:
         del ushcn_records[k]
-    for k in us_only:
-        ghcn_records.pop(k, None)
 
 def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg):
     """Replace Hohenpeissenberg data from 1880 to 2002 in the GHCN
@@ -173,8 +162,7 @@ def step0(inputs):
         correct_Hohenpeissenberg(ghcn_records, inputs.hohenpeissenberg)
     if ('ushcn' in parameters.data_sources and
         'ghcn' in parameters.data_sources):
-        adjust_USHCN(ushcn_records, ghcn_records,
-          inputs.ushcn_stations.itervalues())
+        adjust_USHCN(ushcn_records, ghcn_records)
 
     records = {}
     if 'ghcn' in parameters.data_sources:

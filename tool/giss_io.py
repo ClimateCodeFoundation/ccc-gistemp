@@ -969,15 +969,17 @@ def step5_input():
     return itertools.izip(land, ocean)
 
 def step5_bx_output(data):
+    """Write box (BX) output file."""
+
     bos = '>'
     box = open('result/BX.Ts.ho2.GHCN.CL.PA.1200', 'wb')
     boxf = fort.File(box, bos=bos)
-    (info, title) = data.next()
+    info, title = data.next()
     boxf.writeline(struct.pack('%s8i' % bos, *info) + title)
     yield (info, title)
 
     for record in data:
-        (avgr, wtr, ngood, box) = record
+        avgr, wtr, ngood, box = record
         n = len(avgr)
         fmt = '%s%df' % (bos, n)
         boxf.writeline(struct.pack(fmt, *avgr) +
@@ -1004,6 +1006,8 @@ def step5_mask_output(data):
     out.close()
 
 def step5_zone_titles():
+    """Return the titles used for the 14 zones."""
+
     # Boundaries (degrees latitude, +ve North) of the 8 basic belts.
     band = ['90.0 N',
             '64.2 N',
@@ -1015,7 +1019,8 @@ def step5_zone_titles():
             '64.2 S',
             '90.0 S']
     # Accumulate the titles here.
-    titles = ['  LATITUDE BELT FROM %7s TO %7s' % (band[j+1], band[j]) for j in range(8)]
+    titles = ['  LATITUDE BELT FROM %7s TO %7s' % (band[j+1], band[j])
+      for j in range(8)]
 
     titles += [
         '  NORTHERN LATITUDES: 23.6 N TO  90.0 N',
@@ -1031,6 +1036,8 @@ def step5_zone_titles():
 
 
 def step5_output(data):
+    """Generate final Step 5 output files."""
+
     (info, data, wt, ann, monmin, title) = data
     XBAD = 9999
     iy1tab = 1880
@@ -1046,11 +1053,8 @@ def step5_output(data):
     out = ['ZonAnn', 'GLB', 'NH', 'SH']
     out = [open('result/'+bit+'.Ts.ho2.GHCN.CL.PA.txt', 'w')
             for bit in out]
-    zono = open('result/ZON.Ts.ho2.GHCN.CL.PA.1200', 'wb')
 
     bos = '>'
-
-    zono = fort.File(zono, bos)
 
     # Create and write out the header record of the output files.
     print >> out[0], ' Annual Temperature Anomalies (.01 C) - ' + title[28:80]
@@ -1119,45 +1123,45 @@ Year  Glob  NHem  SHem    -90N  -24N  -24S    -90N  -64N  -44N  -24N  -EQU  -24S
         print >> outf, (tit[j] + ' Temperature Anomalies' + 
           ' in .01 C     base period: 1951-1980')
         for iy in range(iy1tab-iyrbeg, iyrs):
-            iout = [100*XBAD]*18
+            # Each year is formatted as a row of 18 numbers (12 months,
+            # 2 different annual anomalies, and 4 seasonal).
+            row = [100*XBAD]*18
             if (iy+iyrbeg >= iy1tab+5 and ((iy+iyrbeg) % 20 == 1) or
               iy == iy1tab - iyrbeg):
                 print >> outf
                 print >> outf, banner
             # *data* for this zone, avoids some duplication of code.
             zdata = data[iord[j]]
-            # :todo: Would probably be better to have a little 4-long
-            # seasonal array to do the computation in.
-            awin = 9999
+            # 4 seasons.
+            season = [9999]*4
             if iy > 0:
-                awin = zdata[iy-1][11] + zdata[iy][0] + zdata[iy][1]
-            aspr = sum(zdata[iy][2:5])
-            asmr = sum(zdata[iy][5:8])
-            afl  = sum(zdata[iy][8:11])
-            if awin < 8000:
-                iout[14] = int(round(100.0*awin/3))
-            if aspr < 8000:
-                iout[15] = int(round(100.0*aspr/3))
-            if asmr < 8000:
-                iout[16] = int(round(100.0*asmr/3))
-            if afl < 8000:
-                iout[17] = int(round(100.0*afl/3))
-            ann2=awin+aspr+asmr+afl
-            if ann2 < 8000:
-                iout[13] = int(round(100.0*ann2/12))
-            ann1=ann[iord[j]][iy]
+                season[0] = zdata[iy-1][11] + zdata[iy][0] + zdata[iy][1]
+            for s in range(1, 4):
+                season[s] = sum(zdata[iy][s*3-1:s*3+2])
+            # Each season slots into slots 14 to 17 of *row*.
+            for s,x in enumerate(season):
+                if x < 8000:
+                    row[14+s] = int(round(100.0*x/3))
+            # Meteorological Year is average of 4 seasons.
+            metann = sum(season)
+            if metann < 8000:
+                row[13] = int(round(100.0*metann/12))
+            # Calendar year as previously computed.
+            calann = ann[iord[j]][iy]
+            # For final year of data, suppress annual anomaly value unless
+            # December is present (assuming a full year of data?).
             if iy == iyrs-1 and zdata[iy][-1] > 8000:
-                ann1 = 9999
-            if ann1 < 8000:
-                iout[12] = int(round(100.0*ann[iord[j]][iy]))
+                calann = 9999
+            if calann < 8000:
+                row[12] = int(round(100.0*ann[iord[j]][iy]))
+            # Fill in the months.
             for m in range(12):
-                iout[m] = int(round(100.0*zdata[iy][m]))
-            iyr = iyrbeg+iy
-            # Convert each of *iout* to a string, storing the results in
+                row[m] = int(round(100.0*zdata[iy][m]))
+            # Convert each of *row* to a string, storing the results in
             # *sout*.
-            sout = [None]*len(iout)
-            for i,x in enumerate(iout):
-                # All the elements of iout are formatted to width 5,
+            formatted_row = [None]*len(row)
+            for i,x in enumerate(row):
+                # All the elements of *row* are formatted to width 5,
                 # except for element 13 (14 in the Fortran code), which
                 # is length 4.
                 if i == 13:
@@ -1168,13 +1172,16 @@ Year  Glob  NHem  SHem    -90N  -24N  -24S    -90N  -64N  -44N  -24N  -EQU  -24S
                     x = '%5d' % x
                     if len(x) > 5:
                         x = '*****'
-                sout[i] = x
+                formatted_row[i] = x
+            year = iyrbeg+iy
             print >> outf, (
               '%4d ' + '%s'*12 + '  %s%s  ' + '%s'*4 + '%6d') % tuple(
-              [iyr] + sout + [iyr])
+              [year] + formatted_row + [year])
         print >> outf, banner
 
     # Save monthly means on disk.
+    zono = open('result/ZON.Ts.ho2.GHCN.CL.PA.1200', 'wb')
+    zono = fort.File(zono, bos)
     zono.writeline(struct.pack(bos + '8i', *info) +
                    title + titl2)
 
@@ -1183,4 +1190,5 @@ Year  Glob  NHem  SHem    -90N  -24N  -24S    -90N  -64N  -44N  -24N  -EQU  -24S
         zono.writeline(struct.pack(fmt_mon, *itertools.chain(*data[jz])) +
                        struct.pack(fmt_mon, *itertools.chain(*wt[jz])) +
                        zone_titles[jz])
+    zono.close()
     return "Step 5 Completed"

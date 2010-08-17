@@ -988,6 +988,21 @@ def step5_bx_output(data):
     print "Step5: Closing box file"
     boxf.close()
 
+def step5_mask_output(data):
+    """Output the landmask used by Step 5."""
+
+    # metadata
+    yield data.next()
+
+    out = open(os.path.join('work', 'step5mask'), 'w')
+
+    for datum in data:
+        mask,land,ocean = datum
+        assert land.uid == ocean.uid
+        out.write("%sMASK%.3f\n" % (land.uid, mask))
+        yield datum
+    out.close()
+
 def step5_zone_titles():
     # Boundaries (degrees latitude, +ve North) of the 8 basic belts.
     band = ['90.0 N',

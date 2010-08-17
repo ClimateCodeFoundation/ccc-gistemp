@@ -455,6 +455,7 @@ def step5(data):
     """
     landocean = ensure_landocean(data)
     subboxes = select(landocean)
+    subboxes = giss_io.step5_mask_output(subboxes)
     boxed = SBBXtoBX(subboxes)
     boxed = giss_io.step5_bx_output(boxed)
     zoned_averages = zonav(boxed)

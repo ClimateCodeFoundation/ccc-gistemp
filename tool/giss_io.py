@@ -928,6 +928,8 @@ def step4_load_clim():
     return clim
 
 def step4_dummy_input():
+    # Dummy metadata first.  step5.py recognises this value.
+    yield None
     while True:
         yield 'Step 4 dummy value'
 

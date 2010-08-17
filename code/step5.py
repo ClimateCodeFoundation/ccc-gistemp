@@ -426,21 +426,40 @@ def ensure_landocean(data):
         # Use the land meta object for both land and ocean data
         land_meta,ocean_meta = meta, meta
         print "No ocean data; using land data only"
-        data = blank_ocean_data(data)
+        data = add_blank(data, 'ocean')
+
+    if land_meta is None:
+        # Synthesize land data
+        land_meta = ocean_meta
+        print "No land data; using ocean data only"
+        data = add_blank(extract_ocean(data), 'land')
 
     yield land_meta, ocean_meta
     for series in data:
         yield series
 
-def blank_ocean_data(data):
-    """Augment a land-only data series with blank ocean data."""
-    for land_box in data:
-        ocean_series = [MISSING] * len(land_box.series)
-        ocean_box = giss_data.Series(series=ocean_series,
-            box=land_box.box,
+def extract_ocean(data):
+    for land,ocean in data:
+        yield ocean
+
+def add_blank(data, required):
+    """Augment a single data series with blank data to make a data
+    series pair.  *required* should be 'land' to synthesize the first of
+    the pair; or 'ocean' to synthesize the second of the pair.
+    """
+
+    assert required in ('land', 'ocean')
+
+    for this_box in data:
+        other_series = [MISSING] * len(this_box.series)
+        other_box = giss_data.Series(series=other_series,
+            box=this_box.box,
             stations=0, station_months=0,
             d=MISSING)
-        yield land_box, ocean_box
+        if required == 'land':
+            yield other_box, this_box
+        else:
+            yield this_box, other_box
 
 
 def step5(data):

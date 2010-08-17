@@ -25,55 +25,6 @@ from giss_data import valid, invalid, MISSING
 
 # http://www.python.org/doc/2.3.5/lib/itertools-functions.html
 import itertools
-# http://www.python.org/doc/2.3.5/lib/module-math.html
-import math
-# http://www.python.org/doc/2.3.5/lib/module-struct.html
-import struct
-# http://www.python.org/doc/2.4.4/lib/module-os.html
-import os
-
-def blank_ocean_data(data):
-    """Augment a land-only data series with blank ocean data."""
-    for land_box in data:
-        ocean_series = [MISSING] * len(land_box.series)
-        ocean_box = giss_data.Series(series=ocean_series,
-            box=land_box.box,
-            stations=0, station_months=0,
-            d=MISSING)
-        yield land_box, ocean_box
-
-
-def select(data):
-    """Taking a stream of (land,ocean) record pairs, decide how to
-    weight the two series in subsequent combination and yield a stream
-    of (weight,land,ocean) triples.  *weight* will be 1 when the land
-    record is to be used, and 0 if the ocean record is to be used.
-    """
-
-    # First item from iterator is normally a pair of metadata objects,
-    # one for land, one for ocean.  If we are piping step3 straight into
-    # step5 then it is not a pair.  In that case we synthesize missing
-    # ocean data.
-    meta = data.next()
-    try:
-        land_meta, ocean_meta = meta
-    except (TypeError, ValueError):
-        # Use the land meta object for both land and ocean data
-        land_meta,ocean_meta = meta, meta
-        print "No ocean data; using land data only"
-        data = blank_ocean_data(data)
-
-    yield land_meta, ocean_meta
-
-    for land,ocean in data:
-        if (ocean.good_count < parameters.subbox_min_valid
-            or land.d < parameters.subbox_land_range):
-            landmask = 1.0
-        else:
-            landmask = 0.0
-
-        yield landmask, land, ocean
-
 
 def SBBXtoBX(data):
     """Simultaneously combine the land series and the ocean series and
@@ -438,18 +389,73 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
                           0.6*data[2*ihem+8][iy][m])
     return (info, data, wt, ann, parameters.zone_annual_min_months, title)
 
+
+def select(data):
+    """Taking a stream of (land,ocean) record pairs, decide how to
+    weight the two series in subsequent combination and yield a stream
+    of (weight,land,ocean) triples.  *weight* will be 1 when the land
+    record is to be used, and 0 if the ocean record is to be used.
+    """
+
+    meta = data.next()
+    yield meta
+
+    for land,ocean in data:
+        if (ocean.good_count < parameters.subbox_min_valid
+            or land.d < parameters.subbox_land_range):
+            landmask = 1.0
+        else:
+            landmask = 0.0
+
+        yield landmask, land, ocean
+
+def ensure_landocean(data):
+    """Ensure that the data stream has a land and an ocean series.  If
+    we are piping Step 3 straight into Step 5 then we only have a land
+    series.  In that case we synthesize missing ocean data.
+    """
+
+    # First item from iterator is normally a pair of metadata objects,
+    # one for land, one for ocean.  If we are piping step3 straight into
+    # step5 then it is not a pair.
+
+    meta = data.next()
+    try:
+        land_meta, ocean_meta = meta
+    except (TypeError, ValueError):
+        # Use the land meta object for both land and ocean data
+        land_meta,ocean_meta = meta, meta
+        print "No ocean data; using land data only"
+        data = blank_ocean_data(data)
+
+    yield land_meta, ocean_meta
+    for series in data:
+        yield series
+
+def blank_ocean_data(data):
+    """Augment a land-only data series with blank ocean data."""
+    for land_box in data:
+        ocean_series = [MISSING] * len(land_box.series)
+        ocean_box = giss_data.Series(series=ocean_series,
+            box=land_box.box,
+            stations=0, station_months=0,
+            d=MISSING)
+        yield land_box, ocean_box
+
+
 def step5(data):
     """Step 5 of GISTEMP.
 
     This step takes input provided by steps 3 and 4 (zipped together).
+    Alternatively just Step 3's output can be used.
 
     :Param data:
         These are the land and ocean sub-box data, zipped together.
-        They need to support the protocol defined by
-        `code.giss_data.SubboxSetProtocol`.
 
     """
-    boxed = SBBXtoBX(select(data))
+    landocean = ensure_landocean(data)
+    subboxes = select(landocean)
+    boxed = SBBXtoBX(subboxes)
     boxed = giss_io.step5_bx_output(boxed)
     zoned_averages = zonav(boxed)
     return annzon(zoned_averages)

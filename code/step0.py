@@ -40,9 +40,6 @@ USHCN data:
   ushcnv2.gz
 """
 
-# http://docs.python.org/release/2.4.4/lib/module-itertools.html
-import itertools
-
 # Clear Climate Code
 from giss_data import valid
 import parameters
@@ -143,42 +140,45 @@ def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg):
 
 
 def asdict(records):
-    """Convert simple series of stations records into a dictionary
+    """Convert simple series of station records into a dictionary
     (mapping from uid to record)."""
 
     return dict((record.uid, record) for record in records)
 
 
-def step0(inputs):
-    """An iterator for step 0.  Produces a stream of
-    `giss_data.Series` instances.
+def step0(input):
+    """An iterator for Step 0.  Produces a stream of
+    `giss_data.Series` instances.  *input* should be an object that has
+    'ushcn', 'ghcn', 'scar', 'hohenpeissenbreg' properties, each one
+    being a data source (typically, this input object is made by the
+    tool.giss_io.step0_input() function).
 
     """
-    ushcn_records = asdict(inputs.ushcn_source)
-    print "Load GHCN records"
-    ghcn_records = asdict(inputs.ghcn_source)
-    scar_records = asdict(inputs.antarc_source)
-    if 'hohenpeissenberg' in parameters.data_sources:
-        correct_Hohenpeissenberg(ghcn_records, inputs.hohenpeissenberg)
-    if ('ushcn' in parameters.data_sources and
-        'ghcn' in parameters.data_sources):
-        adjust_USHCN(ushcn_records, ghcn_records)
 
-    records = {}
+    # Read each data input into dictionary form.
+    data = {}
+    for source in ['ghcn', 'ushcn', 'scar']:
+        if source in parameters.data_sources:
+            print "Load %s records" % source.upper()
+            data[source] = asdict(getattr(input, source))
+
+    # Some GHCN records are replaced with Hohenpeissenberg data
+    # and USHCN data (if used).
     if 'ghcn' in parameters.data_sources:
-        records.update(ghcn_records)
-    if 'ushcn' in parameters.data_sources:
-        records.update(ushcn_records)
-    if 'scar' in parameters.data_sources:
-        records.update(scar_records)
+        if 'hohenpeissenberg' in parameters.data_sources:
+            correct_Hohenpeissenberg(data['ghcn'], input.hohenpeissenberg)
+        if 'ushcn' in parameters.data_sources:
+            adjust_USHCN(data['ushcn'], data['ghcn'])
+
+    # Join all data sources together.
+    records = {}
+    for source in ['ghcn', 'ushcn', 'scar']:
+        records.update(data.get(source, {}))
 
     # We sort here - as does GISTEMP - so that all the records for a
     # given 11-digit station ID are grouped together, ready for
-    # combining in the next step.  I believe our inputs already have
-    # this property (and we can assert it there as we go along), so we
-    # can probably ensure it here by doing the above processing with
-    # suitable care.
-    for uid, record in sorted(records.iteritems()):
+    # combining in the next step.
+    for _, record in sorted(records.iteritems()):
         if record:
             yield record
 

@@ -788,10 +788,10 @@ def step0_input():
     input = Struct()
     ushcn_map = read_USHCN_stations('input/ushcn2.tbl',
       'input/ushcnV2_cmb.tbl')
-    input.ushcn_source = read_USHCN_converted(ushcn_input_file(),
+    input.ushcn = read_USHCN_converted(ushcn_input_file(),
       ushcn_map)
-    input.ghcn_source = V2MeanReader("input/v2.mean", code.giss_data.BASE_YEAR)
-    input.antarc_source = itertools.chain(
+    input.ghcn = V2MeanReader("input/v2.mean", code.giss_data.BASE_YEAR)
+    input.scar = itertools.chain(
             read_antarctic("input/antarc1.txt", "input/antarc1.list", '8'),
             read_antarctic("input/antarc3.txt", "input/antarc3.list", '9'),
             read_australia("input/antarc2.txt", "input/antarc2.list", '7'))

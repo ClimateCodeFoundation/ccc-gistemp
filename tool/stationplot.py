@@ -141,7 +141,7 @@ def aplot(series, K):
 def plot(arg, mode, inp, out, meta, timewindow=None):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
-    name, location) is takem from the `meta` file (usually v2.inv).
+    name, location) is taken from the `meta` file (usually v2.inv).
     `mode` should be 'temp' to plot temperatures, or 'anom' to plot
     monthly anomalies.  `timewindow` restricts the plot to a particular
     range of times: None means that the entire time range is plotted;
@@ -436,6 +436,7 @@ def from_years(years):
         prev = year
         series.extend(data)
     return (series, begin)
+
 def from_lines(lines):
     """*lines* is a list of lines (strings) that comprise a station's
     entire record.  The lines are an extract from a file in the same

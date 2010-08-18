@@ -457,8 +457,11 @@ def V2MeanReader(path, year_min=None):
 class V2MeanWriter(object):
     """Write a file in GHCN v2.mean format. See also V2MeanReader."""
 
-    def __init__(self, path):
-        self.f = open(path, "w")
+    def __init__(self, path=None, file=None, **k):
+        if path is not None:
+            self.f = open(path, "w")
+        else:
+            self.f = file
 
     def to_text(self, t):
         if t == MISSING:
@@ -801,7 +804,7 @@ def step0_input():
     return input
 
 def step0_output(data):
-    out = V2MeanWriter("work/v2.mean_comb")
+    out = V2MeanWriter(path="work/v2.mean_comb")
     for thing in data:
         out.write(thing)
         yield thing
@@ -812,7 +815,7 @@ def step1_input():
     return V2MeanReader("work/v2.mean_comb")
 
 def step1_output(data):
-    out = V2MeanWriter("work/v2.step1.out")
+    out = V2MeanWriter(path="work/v2.step1.out")
     for thing in data:
         out.write(thing)
         yield thing
@@ -823,7 +826,7 @@ def step2_input():
     return V2MeanReader("work/v2.step1.out")
 
 def step2_output(data):
-    out = V2MeanWriter("work/v2.step2.out")
+    out = V2MeanWriter(path="work/v2.step2.out")
     for thing in data:
         out.write(thing)
         yield thing
@@ -836,7 +839,7 @@ def step3_input():
 def step3_output(data):
     out = SubboxWriter(open('result/SBBX1880.Ts.GHCN.CL.PA.1200', 'wb'),
       trimmed=False)
-    v2out = V2MeanWriter('work/v2.step3.out')
+    v2out = V2MeanWriter(path='work/v2.step3.out')
     gotmeta = False
     for thing in data:
         out.write(thing)

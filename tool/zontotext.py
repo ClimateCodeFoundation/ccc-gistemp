@@ -6,7 +6,7 @@
 #
 # Converts ZON.* file to plain text.
 # 
-# Nick Barnes.  Ravenbrook Limited.
+# Nick Barnes, David Jones.  Ravenbrook Limited.
 
 import struct
 import sys
@@ -25,7 +25,8 @@ jzm = jbm + nzs + 3 # NH, SH, global
 class Error(Exception):
     """Some problem."""
 
-def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False, bos='>'):
+def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
+  bos='>', format='v2'):
     """Convert zonal monthly averages to text format.
     
     If metaonly is True then only the zonal metadata is output, the
@@ -64,16 +65,59 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False, bos='>'):
         if r is None:
             raise Error('Unexpected end of file.')
         data = struct.unpack(descriptor, r)
-        output.write(data[-1] + '\n')
+        title = data[-1]
+        if format == 'v2':
+            title = v2title(title):
+        else:
+            output.write(title + '\n')
         if metaonly:
             continue
-        for set in range(2):
+        for idx in range(2):
             for year in range(first_year, last_year+1):
-                offset = (year-first_year)*m + (months * set)
-                output.write('%s[%4d]: %s\n' % (['AR','WT'][set],
-                                                year,
-                                                ' '.join(map(repr, data[offset:offset+m]))))
+                offset = (year-first_year)*m + (months * idx)
+                if format == 'v2':
+                    
+                output.write('%s[%4d]: %s\n' %
+                  (['AR','WT'][idx],
+                  year,
+                  ' '.join(map(repr, data[offset:offset+m]))))
 
+def v2title(s):
+    """Convert a title as it appears in the ZON file into an 11
+    character V2 Mean style station identifier.
+
+    The returned strings will be of the form "Z+SS.S+NN.N".
+    """
+
+    # http://docs.python.org/release/2.4.4/lib/module-re.html
+    import re
+
+    s = s.lower()
+
+    # Three special cases for hemispheres and global...
+    if 'global' in s:
+        return "Z-90.0+90.0"
+    if 'hemisphere' in s:
+        if 'north' in s:
+            return "Z+00.0+90.0"
+        if 'south' in s:
+            return "Z-90.0+00.0"
+
+    # One of the "regular" cases. We extract the zone boundaries from
+    # the title.
+
+    s = s.replace('equator', ' 00.0 n')
+    m = re.search(r'(\d\d\.\d\s+[ns]).*(\d\d\.\d\s+[ns])', s)
+    if not m:
+        raise ValueError("Cannot convert zone title string: %s" % s)
+    bound = m.groups()
+    def cvt(x):
+        """Convert "DD.D n" to "+DD.D" and "DD.D s" to "-DD.D"."""
+
+        x = x.replace('s', '-')
+        x = x.replace('n', '+')
+        return x[-1] + x[:4]
+    return 'Z' + ''.join(cvt(b) for b in bound)
 
 def main(argv=None):
     import getopt
@@ -81,19 +125,21 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
-    metaonly = False
-    bos = '>'
-    opt, arg = getopt.getopt(argv[1:], 'b:m')
+    k = {}
+    opt, arg = getopt.getopt(argv[1:], 'b:mt')
     for o,v in opt:
         if o == '-m':
-            metaonly = True
+            k['metaonly'] = True
         if o == '-b':
-            bos = v
+            k['bos'] = v
+        if o == '-t':
+            k['format'] = 'text'
+            
     if len(arg) == 0:
-        totext(sys.stdin, metaonly=metaonly, bos=bos)
+        totext(sys.stdin, **k)
     else:
         for n in arg:
-            totext(open(n, 'rb'), metaonly=metaonly, bos=bos)
+            totext(open(n, 'rb'), **k)
 
 if __name__ == '__main__':
     main()

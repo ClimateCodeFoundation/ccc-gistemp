@@ -284,9 +284,13 @@ def plot(arg, mode, inp, out, meta, timewindow=None):
     # Vertical label
     out.write("  <defs><path id='pvlabel' d='M-%d -20l0 -400'/></defs>\n" %
       (3.5*config.fontsize-8))
+    if 'temp' in mode:
+        value = 'Temperature'
+    else:
+        value = 'Anomaly'
     out.write("  <text text-anchor='start'>"
       "<textPath xlink:href='#pvlabel'>"
-      u"Temperature (\N{DEGREE SIGN}C)</textPath></text>\n")
+      u"%s (\N{DEGREE SIGN}C)</textPath></text>\n" % value)
     # End of vertical axis group.
     out.write("</g>\n")
     # End of "axes" group.

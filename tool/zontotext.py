@@ -49,7 +49,7 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
         output.write('%s\n' % r[n*w+80:])
 
     if 'v2' == format:
-        v2out = giss_io.V2MeanWriter(file=output)
+        v2out = giss_io.V2MeanWriter(file=output, scale=0.01)
 
     # m: time frames per year
     if info[2] == 6:
@@ -78,6 +78,9 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
         if metaonly:
             continue
         for idx in range(2):
+            if 'v2' == format and idx > 0:
+                # Only output temps, not weights. :todo: fix this.
+                continue
             for year in range(first_year, last_year+1):
                 offset = (year-first_year)*m + (months * idx)
                 temps = data[offset:offset+m]

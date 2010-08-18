@@ -36,18 +36,12 @@ import code.read_config
 #: reading or writing input and working files.
 MISSING = 9999
 
-# For all plausible integers i, float_to_tenths(tenths_to_float(i)) == i.
+# For all plausible integers, converting them from external to internal
+# to external again will preserve their value.
 def tenths_to_float(t):
     if t == MISSING:
         return code.giss_data.MISSING
     return t * 0.1
-
-
-def float_to_tenths(f):
-    if abs(f - code.giss_data.MISSING) < 0.01:
-        return MISSING
-    return int(round(f * 10.0))
-
 
 # TODO: How does this differ from float_to_tenths.
 #       Answer:
@@ -59,10 +53,11 @@ def as_tenths(v):
 
 
 # TODO: Probably should be a generator.
-def convert_to_tenths(series):
-    """Convert a series of values to integer tenths.  Normally this is
-    used to convert a series from degrees Celcius (internal representation)
-    to tenths of a degree.
+def internal_to_external(series, scale=0.1):
+    """Convert a series of values to external representation by
+    converting to integer tenths (or other scale).  Normally
+    this is used to convert a series from degrees Celcius to tenths
+    of a degree.
 
     :Param series:
         A list or iterable of floating point value; usually each value
@@ -73,12 +68,23 @@ def convert_to_tenths(series):
 
     """
 
-    return [float_to_tenths(v) for v in series]
+    # Note: 1/0.1 == 10.0; 1/0.01 == 100.0 (in other words even though
+    # 0.1 and 0.01 are not stored exactly, their reciprocal is exactly
+    # an integer)
+    scale = 1.0/scale
+
+    def toint(f):
+        # :todo: Use of abs() probably not needed.
+        if abs(f - code.giss_data.MISSING) < 0.01:
+            return MISSING
+        return int(round(f * scale))
+
+    return [toint(v) for v in series]
 
 
 # TODO: Probably should be a generator.
 def convert_tenths_to_float(tenths_series):
-    """The inverse of `convert_to_tenths`."""
+    """The inverse of `internal_to_external`."""
     t = []
     for v in tenths_series:
         if v == MISSING:
@@ -236,7 +242,7 @@ class StationRecordWriter(object):
             short_id = r.uid[3:]
 
             fmt = "%di" % len(r.series)
-            data = struct.pack(self.bos + fmt, *convert_to_tenths(r.series))
+            data = struct.pack(self.bos + fmt, *internal_to_external(r.series))
             data += struct.pack(self.bos + "iiii36sii", as_tenths(s.lat),
                     as_tenths(s.lon), int(short_id), s.elevation,
                     compound_name, rel_first_month, rel_last_month)
@@ -399,7 +405,7 @@ class StationTsWriter(object):
                 as_tenths(station.lat), as_tenths(station.lon),
                 record.uid, station.elevation, station.name))
 
-        data = convert_to_tenths(record.series)
+        data = internal_to_external(record.series)
         for y, offset in enumerate(range(0, len(record), 12)):
             months = ["%5d" % v for v in data[offset: offset + 12]]
             self.f.write('%4d%s\n' % (y + record.first_year, ''.join(months)))
@@ -456,11 +462,12 @@ def V2MeanReader(path, year_min=None):
 class V2MeanWriter(object):
     """Write a file in GHCN v2.mean format. See also V2MeanReader."""
 
-    def __init__(self, path=None, file=None, **k):
+    def __init__(self, path=None, file=None, scale=0.1, **k):
         if path is not None:
             self.f = open(path, "w")
         else:
             self.f = file
+        self.scale = scale
 
     def to_text(self, t):
         if t == MISSING:
@@ -480,7 +487,7 @@ class V2MeanWriter(object):
         contain 12 monthly values."""
 
         strings = [self.to_text(t)
-                   for t in convert_to_tenths(temps)]
+                   for t in internal_to_external(temps, scale=self.scale)]
         self.f.write('%s%04d%s\n' % (uid, year, ''.join(strings)))
 
     def close(self):

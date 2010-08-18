@@ -852,7 +852,7 @@ def step3_input():
 def step3_output(data):
     out = SubboxWriter(open('result/SBBX1880.Ts.GHCN.CL.PA.1200', 'wb'),
       trimmed=False)
-    v2out = V2MeanWriter(path='work/v2.step3.out')
+    v2out = V2MeanWriter(path='work/v2.step3.out', scale=0.01)
     gotmeta = False
     for thing in data:
         out.write(thing)
@@ -862,6 +862,7 @@ def step3_output(data):
         yield thing
     print "Step3: closing output file"
     out.close()
+    v2out.close()
 
 def make_3d_array(a, b, c):
     """Create an array with three dimensions.

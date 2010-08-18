@@ -37,7 +37,8 @@ the beginning of the first year and the beginning of the second year are
 displayed (in other words, the second year is excluded from the
 displayed range).
 
-Normally the output is an SVG document written to the file plot.svg.
+Normally the output is an SVG document written to the file
+station-id.svg (in other words, the first argument with ".svg" appended).
 The -o option can be used to change where it written ("-o -" specifies stdout).
 
 Normally the input is the GHCN dataset input/v2.mean; the -d option
@@ -552,7 +553,6 @@ def main(argv=None):
         argv = sys.argv
 
     try:
-        outfile = 'plot.svg'
         infile = 'input/v2.mean'
         metafile = 'input/v2.inv'
         mode = 'temp'
@@ -560,6 +560,7 @@ def main(argv=None):
         opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:t:y')
         if not arg:
             raise Usage('At least one identifier must be supplied.')
+        outfile = arg[0] + '.svg'
         for k,v in opt:
             if k == '-c':
                 update_config(config, v)

@@ -849,8 +849,10 @@ def step2_output(data):
 def step3_input():
     return V2MeanReader("work/v2.step2.out")
 
+STEP3_OUT = os.path.join('result', 'SBBX1880.Ts.GHCN.CL.PA.1200')
+
 def step3_output(data):
-    out = SubboxWriter(open('result/SBBX1880.Ts.GHCN.CL.PA.1200', 'wb'),
+    out = SubboxWriter(open(STEP3_OUT, 'wb'),
       trimmed=False)
     v2out = V2MeanWriter(path='work/v2.step3.out', scale=0.01)
     gotmeta = False
@@ -863,6 +865,12 @@ def step3_output(data):
     print "Step3: closing output file"
     out.close()
     v2out.close()
+
+def step3c_input():
+    """Use the output from the ordinary Step 3."""
+
+    land = SubboxReader(open(STEP3_OUT, 'rb'))
+    return iter(land)
 
 def make_3d_array(a, b, c):
     """Create an array with three dimensions.
@@ -982,7 +990,7 @@ def step4_output(data):
     out.close()
 
 def step5_input():
-    land = SubboxReader(open('result/SBBX1880.Ts.GHCN.CL.PA.1200', 'rb'))
+    land = SubboxReader(open(STEP3_OUT, 'rb'))
     ocean = SubboxReader(open('result/SBBX.HadR2', 'rb'))
 
     return itertools.izip(land, ocean)

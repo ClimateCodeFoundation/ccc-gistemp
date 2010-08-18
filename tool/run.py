@@ -19,6 +19,8 @@ Options:
 import getopt
 # http://www.python.org/doc/2.4.4/lib/module-os.html
 import os
+# http://docs.python.org/release/2.4.4/lib/module-re.html
+import re
 # http://www.python.org/doc/2.4.4/lib/module-sys.html
 import sys
 
@@ -78,6 +80,14 @@ def run_step3(data):
     result = step3.step3(data)
     return giss_io.step3_output(result)
 
+def run_step3c(data):
+    """An alternative to Step 3 that reads (copies) the output file
+    created by the ordinary Step 3.  Effectively using the data produced
+    by Step 3 without re-running it."""
+    if data:
+        raise ValueError("Expect to run 3c first in pipeline.")
+    return giss_io.step3c_input()
+
 def run_step4(data):
     from code import step4
     data = giss_io.step4_input(data) 
@@ -106,20 +116,20 @@ def vischeck(data):
     yield "vischeck completed"
 
 def parse_steps(steps):
+    """Parse the -s, steps, option.  Produces a list of strings."""
     steps = steps.strip()
     if not steps:
         return range(0, 6)
     result = set()
     for part in steps.split(','):
-        try:
-            # Is it a plain integer?
-            step = int(part)
-            result.add(step)
-        except ValueError:
-            # Assume part is of form '1-3'.
+        # Part can be integer number with an optional letter suffix...
+        if re.match(r'\d+[a-z]?', part):
+            result.add(part)
+        else:
+            # Or a range in the form '1-3'.
             try:
                 l,r = part.split('-')
-                result.update(range(int(l), int(r)+1))
+                result.update(str(s) for s in range(int(l), int(r)+1))
             except ValueError:
                 # Expect to catch both
                 # "ValueError: too many values to unpack" when the split
@@ -176,12 +186,13 @@ def main(argv=None):
             mkdir(d)
 
         step_fn = {
-            0: run_step0,
-            1: run_step1,
-            2: run_step2,
-            3: run_step3,
-            4: run_step4,
-            5: run_step5,
+            '0': run_step0,
+            '1': run_step1,
+            '2': run_step2,
+            '3': run_step3,
+            '3c': run_step3c,
+            '4': run_step4,
+            '5': run_step5,
         }
         
         # Record start time now, and ending times for each step.
@@ -196,10 +207,14 @@ def main(argv=None):
             logit = "STEP %d" % step_list[0]
         else:
             assert len(step_list) >= 2
-            if step_list == range(step_list[0], step_list[-1]+1):
-                logit = "STEPS %d to %d" % (step_list[0], step_list[-1])
+            try:
+                t = [str(s) for s in range(step_list[0], step_list[-1]+1)]
+            except:
+                t = []
+            if step_list == t:
+                logit = "STEPS %s to %s" % (step_list[0], step_list[-1])
             else:
-                logit = "STEPS %s" % str(step_list)
+                logit = "STEPS %s" % ', '.join(step_list)
         log("====> %s  ====" % logit)
         data = None
         for step in step_list:

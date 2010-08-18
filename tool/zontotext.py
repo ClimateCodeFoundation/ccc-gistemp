@@ -8,10 +8,11 @@
 # 
 # Nick Barnes.  Ravenbrook Limited.
 
-sys.path.append(os.path.join(os.getcwd(),'code'))
-import fort
 import struct
 import sys
+
+# Clear Climate Code
+import fort
 
 # Not sure what these constants are; cribbed from zonav.f.
 # They boil down to the fact that the ZON.* file contains 14 records.
@@ -30,9 +31,6 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False, bos='>'):
     If metaonly is True then only the zonal metadata is output, the
     time series are not.
     """
-
-    # :todo: move into common module
-    from zonav import swaw
 
     # The width of a standard word according to Python's struct module...
     w = len(struct.pack('=I', 0))
@@ -66,7 +64,7 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False, bos='>'):
         if r is None:
             raise Error('Unexpected end of file.')
         data = struct.unpack(descriptor, r)
-        output.write(swaw(data[-1]) + '\n')
+        output.write(data[-1] + '\n')
         if metaonly:
             continue
         for set in range(2):
@@ -75,6 +73,7 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False, bos='>'):
                 output.write('%s[%4d]: %s\n' % (['AR','WT'][set],
                                                 year,
                                                 ' '.join(map(repr, data[offset:offset+m]))))
+
 
 def main(argv=None):
     import getopt

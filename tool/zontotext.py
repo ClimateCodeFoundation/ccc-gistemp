@@ -13,6 +13,7 @@ import sys
 
 # Clear Climate Code
 import fort
+import giss_io
 
 # Not sure what these constants are; cribbed from zonav.f.
 # They boil down to the fact that the ZON.* file contains 14 records.
@@ -42,9 +43,13 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
     # Number of words in header, preceding title.
     n = 8
     info = struct.unpack(bos + ('%di' % n), r[:n*w])
-    output.write(repr(info))
-    output.write('\n%s\n' % r[n*w:n*w+80])
-    output.write('%s\n' % r[n*w+80:])
+    if 'v2' != format:
+        output.write(repr(info))
+        output.write('\n%s\n' % r[n*w:n*w+80])
+        output.write('%s\n' % r[n*w+80:])
+
+    if 'v2' == format:
+        v2out = giss_io.V2MeanWriter(file=output)
 
     # m: time frames per year
     if info[2] == 6:
@@ -67,7 +72,7 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
         data = struct.unpack(descriptor, r)
         title = data[-1]
         if format == 'v2':
-            title = v2title(title):
+            title = v2title(title)
         else:
             output.write(title + '\n')
         if metaonly:
@@ -75,12 +80,15 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
         for idx in range(2):
             for year in range(first_year, last_year+1):
                 offset = (year-first_year)*m + (months * idx)
-                if format == 'v2':
-                    
-                output.write('%s[%4d]: %s\n' %
-                  (['AR','WT'][idx],
-                  year,
-                  ' '.join(map(repr, data[offset:offset+m]))))
+                temps = data[offset:offset+m]
+                if 'v2' == format:
+                    assert 12 == m
+                    v2out.writeyear(title+('TW'[idx]), year, temps)
+                else:
+                    output.write('%s[%4d]: %s\n' %
+                      (['AR','WT'][idx],
+                      year,
+                      ' '.join(map(repr, temps))))
 
 def v2title(s):
     """Convert a title as it appears in the ZON file into an 11

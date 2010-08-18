@@ -24,6 +24,7 @@ import glob
 
 import math
 
+import extend_path
 import fort
 import code.giss_data
 import code.read_config
@@ -470,12 +471,19 @@ class V2MeanWriter(object):
             return "%5d" % t
 
     def write(self, record):
+        """Write an entire record out."""
         for year in range(record.first_year, record.last_year + 1):
             if not record.has_data_for_year(year):
                 continue
-            temps = [self.to_text(t)
-                    for t in convert_to_tenths(record.get_a_year(year))]
-            self.f.write('%s%04d%s\n' % (record.uid, year, ''.join(temps)))
+            self.writeyear(record.uid, year, record.get_a_year(year))
+
+    def writeyear(self, uid, year, temps):
+        """Write a single year's worth of data out.  *temps* should
+        contain 12 monthly values."""
+
+        strings = [self.to_text(t)
+                   for t in convert_to_tenths(temps)]
+        self.f.write('%s%04d%s\n' % (uid, year, ''.join(strings)))
 
     def close(self):
         self.f.close()

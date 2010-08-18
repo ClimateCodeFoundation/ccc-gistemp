@@ -53,29 +53,27 @@ def float_to_tenths(f):
 #       Answer:
 #           float_to_tenths(-0.95) == -10
 #           as_tenths(-0.95) == -9
+# Note: only used by obsolete file formats.
 def as_tenths(v):
     return int(math.floor(v * 10 + 0.5))
 
 
 # TODO: Probably should be a generator.
-def convert_to_tenths(celsius_series):
-    """Convert a series of celsius value to integer tenths of a degree.
+def convert_to_tenths(series):
+    """Convert a series of values to integer tenths.  Normally this is
+    used to convert a series from degrees Celcius (internal representation)
+    to tenths of a degree.
 
-    :Param celsius_series:
-        A list or iterable of floating point value, where each value
-        represents a temperature in celsius.
+    :Param series:
+        A list or iterable of floating point value; usually each value
+        represents a temperature in Celsius.
 
     :Return:
-        A new list of integer values.
+        A new list of values (ints).
 
     """
-    t = []
-    for v in celsius_series:
-        if v >= code.giss_data.MISSING:
-            t.append(MISSING)
-        else:
-            t.append(float_to_tenths(v))
-    return t
+
+    return [float_to_tenths(v) for v in series]
 
 
 # TODO: Probably should be a generator.

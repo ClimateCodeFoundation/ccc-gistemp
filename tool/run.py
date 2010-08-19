@@ -122,7 +122,7 @@ def parse_steps(steps):
     result = set()
     for part in steps.split(','):
         # Part can be integer number with an optional letter suffix...
-        if re.match(r'\d+[a-z]?', part):
+        if re.match(r'^\d+[a-z]?$', part):
             result.add(part)
         else:
             # Or a range in the form '1-3'.

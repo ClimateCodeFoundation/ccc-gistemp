@@ -118,7 +118,7 @@ def parse_steps(steps):
     """Parse the -s, steps, option.  Produces a list of strings."""
     steps = steps.strip()
     if not steps:
-        return range(0, 6)
+        return map(str, range(0, 6))
     result = set()
     for part in steps.split(','):
         # Part can be integer number with an optional letter suffix...

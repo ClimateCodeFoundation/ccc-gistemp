@@ -29,8 +29,7 @@ import extend_path
 import giss_io
 
 class Fatal(Exception):
-    def __init__(self, msg):
-        self.msg = msg
+    pass
 
 # :todo: remove me
 # Record the original standard output so we can log to it; in steps 2 and 5
@@ -85,7 +84,7 @@ def run_step3c(data):
     created by the ordinary Step 3.  Effectively using the data produced
     by Step 3 without re-running it."""
     if data:
-        raise ValueError("Expect to run 3c first in pipeline.")
+        raise Fatal("Expect to run 3c first in pipeline.")
     return giss_io.step3c_input()
 
 def run_step4(data):
@@ -149,6 +148,8 @@ def parse_options(arglist):
     parser.add_option("-s", "--steps", action="store", metavar="S[,S]",
             default="",
             help="Select range of steps to run")
+    parser.add_option('-p', '--parameter', action='store', default='',
+        help="Redefine parameter from parameters.py during run")
     parser.add_option("--no-work_files", "--suppress-work-files",
             action="store_false", default=True, dest="save_work",
             help="Do not save intermediate files in the work sub-directory")
@@ -159,6 +160,39 @@ def parse_options(arglist):
     options.steps = parse_steps(options.steps)
     return options, args
 
+def update_parameters(parm):
+    """Take a parameter string from the command line and update the
+    parameters.py module."""
+
+    if not parm:
+        return
+
+    from code import parameters
+
+    parm = parm.split(';')
+    for p in parm:
+        try:
+            key,value = p.split('=', 1)
+        except ValueError:
+            raise Fatal("Can't understand parameter option: %r" % p)
+        if not hasattr(parameters, key):
+            print "Ignoring unknown parameter %r" % key
+            continue
+        # Coerce value, a string, to the same type as the existing parameter
+        # value.  That works nicely for strings, ints, and floats...
+        x = getattr(parameters, key)
+        # ... but we need a hack for bool.
+        if type(x) == bool:
+            try:
+                value = ['false', 'true'].index(value.lower())
+            except ValueError:
+                raise Fatal("Boolean parameter %r must be True or False"
+                  % key)
+            # Now value is 0 or 1 and the default case will correctly
+            # coerce it.
+        value = type(x)(value)
+        setattr(parameters, key, value)
+
 
 def main(argv=None):
     import sys
@@ -168,6 +202,8 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
     options, args = parse_options(argv[1:])
+
+    update_parameters(options.parameter)
 
     step_list = options.steps
     try:
@@ -231,7 +267,7 @@ def main(argv=None):
 
         return 0
     except Fatal, err:
-        sys.stderr.write(err.msg)
+        sys.stderr.write(str(err))
         sys.stderr.write('\n')
         return 2
 

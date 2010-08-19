@@ -38,13 +38,14 @@ down (negative offset); its units are the same as in the data files
 class Error(Exception):
     """Some sort of problem."""
 
-def asann(f):
+def anomalies(f, extract=(65,72)):
     """Convert the text file *f* into a sequence of global anomalies.  An
     input file is expected to be one of the NH.*, SH.*, or GLB.* files
     that are the results of GISTEMP step 5.  The return value is an
     iterable over a sequence of pairs (year, datum); when present the
     datum is an integer, when not present it appears as None.  Normally
-    the data can be interpreted as centi-Kelvin.
+    the data can be interpreted as centi-Kelvin.  *extract* allows a
+    different range of columns to be extracted for the anomaly data.
     """
 
     import re
@@ -59,7 +60,7 @@ def asann(f):
         if re.match(r'\d{4}', l):
             year = int(l[:4])
             try:
-                yield (year, int(l[65:72]))
+                yield (year, int(l[extract[0]:extract[1]]))
             except ValueError:
                 yield (year, None)
 
@@ -268,7 +269,15 @@ def chartit(fs, options={}, out=sys.stdout):
     import re
     import urllib
 
-    url = asgooglechartURL(map(asann, fs), options)
+    k = {}
+    if 'extract' in options:
+        k['extract'] = options['extract']
+
+    def anom(f):
+        """Extract anomalies from file."""
+        return anomalies(f, **k)
+
+    url = asgooglechartURL(map(anom, fs), options)
     print >>out, url
 
 def main(argv=None):
@@ -281,7 +290,7 @@ def main(argv=None):
 
     options={}
     try:
-        opt,arg = getopt.getopt(argv[1:], 'o:',
+        opt,arg = getopt.getopt(argv[1:], 'x:o:',
           ['offset=', 'size=', 'colour='])
     except getopt.GetoptError, e:
         print >> sys.stderr, e.msg
@@ -296,6 +305,8 @@ def main(argv=None):
                 raise Error("--size w,h is required")
         if o == '--colour':
             options['colour'] = v.split(',')
+        if o == '-x':
+            options['extract'] = map(int, v.split(','))
             
     if len(arg):
         fs = map(urllib.urlopen, arg)

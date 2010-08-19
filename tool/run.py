@@ -204,7 +204,7 @@ def main(argv=None):
 
         # Create a message for stdout.
         if len(step_list) == 1:
-            logit = "STEP %d" % step_list[0]
+            logit = "STEP %s" % step_list[0]
         else:
             assert len(step_list) >= 2
             try:

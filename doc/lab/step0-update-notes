@@ -148,8 +148,10 @@ cmb2.ushcn.v2.f has changed to support the skip_US behaviour.
 
     So if $skip_US is zero, the semantics are identical.  If $skip_US
     is 1, it omits any GHCN lines from this range of station
-    IDs (which, based on the variable name, is the continental US) -
-    but still copies the USHCN lines.
+    IDs, but still copies the USHCN lines.  The skipped stations are the
+    contiguous US (based on the variable name and the fact that all the 425
+    stations not skipped are either north of 50 N (Alaska) or west of
+    150 W (Pacific islands).
 
 hohp_to_v2.f identical 
 

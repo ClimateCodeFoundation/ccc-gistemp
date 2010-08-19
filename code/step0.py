@@ -146,6 +146,21 @@ def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg):
                 # years.
                 record.set_series(cut * 12 + 1, new_data)
 
+def discard_contig_us(records):
+    """Discard stations in the contiguous US.  The stations are
+    discarded on the basis of their 11-digit GHCN ID: stations from
+    425710000000 to 425900000000 are excluded, not including the latter
+    end point.  Note: US stations below this range are in Alaska, US
+    stations after this range are Pacific Ocean islands.
+    """
+
+    for uid in records.keys():
+        assert len(uid) == 12
+        if '425710000000' <= uid < '425900000000':
+            # Note: records.keys() produces a fresh list and that's
+            # important for making this del safe.
+            del records[uid]
+
 
 def asdict(records):
     """Convert simple series of station records into a dictionary
@@ -170,13 +185,17 @@ def step0(input):
             print "Load %s records" % source.upper()
             data[source] = asdict(getattr(input, source))
 
-    # Some GHCN records are replaced with Hohenpeissenberg data
-    # and USHCN data (if used).
+    # If we're using GHCN (and we usually are) then we...
     if 'ghcn' in parameters.data_sources:
+        # ... adjust the Hohenpeissenberg data;
         if 'hohenpeissenberg' in parameters.data_sources:
             correct_Hohenpeissenberg(data['ghcn'], input.hohenpeissenberg)
+        # ... adjust the USHCN data;
         if 'ushcn' in parameters.data_sources:
             adjust_USHCN(data['ushcn'], data['ghcn'])
+        # ... optionally exclude contiguous US stations.
+        if not parameters.retain_contiguous_US:
+            discard_contig_us(data['ghcn'])
 
     # Join all data sources together.
     records = {}

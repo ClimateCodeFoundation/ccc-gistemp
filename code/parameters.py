@@ -35,6 +35,13 @@ algorithm starts in the current year and works back to
 *USHCN_offset_start_year*, computing an offset for each month using up
 to *USHCN_offset_max_months* records."""
 
+retain_contiguous_US = True
+"""Whether to retain GHCN records that are in the contiguous US.
+Ordinarily, USHCN replaces GHCN records, but: some stations have
+duplicates; some GHCN stations have no USHCN counterpart.  This
+parameter affects those records.
+"""
+
 station_combine_min_overlap = 4
 """The minimum number of years of overlap, between a combined record
 and a candidate record, to allow the candidate to be added into the

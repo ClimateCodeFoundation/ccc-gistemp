@@ -40,9 +40,14 @@ USHCN data:
   ushcnv2.gz
 """
 
+# http://docs.python.org/release/2.4.4/lib/module-os.path.html
+import os
+
 # Clear Climate Code
 from giss_data import valid
 import parameters
+
+log = open(os.path.join('log', 'step1.log'), 'w')
 
 def calc_monthly_USHCN_offsets(u_record, g_record):
     u_years = u_record.get_set_of_years(parameters.USHCN_offset_start_year,
@@ -68,11 +73,11 @@ def calc_monthly_USHCN_offsets(u_record, g_record):
 
 
 def adjust_USHCN(ushcn_records, ghcn_records):
-    """Where the GHCN dataset, *ghcn_records*, contains data for
-    stations in the USHCN dataset, *ushcn_records*, replace the
-    GHCN data with USHCN data, adjusted for differences in monthly
-    temperature means.  The GHCN data is updated; the corresponding
-    USHCN station is removed from *ushcn_records*.
+    """Each USHCN record is adjusted for differences in monthly means
+    between it and the corresponding record in GHCN.  The corresponding
+    GHCN record is removed.  USHCN records that have no
+    corresponding GHCN records are retained unadjusted (ordinarily there
+    are no such records, but may be if subsets are created by hand).
     """
 
     print "Adjust USHCN records"
@@ -82,12 +87,14 @@ def adjust_USHCN(ushcn_records, ghcn_records):
             return t - d
         return t
 
+    # Count of USHCN records that have no GHCN counterpart.
+    count_ushcn_only = 0
     # For each USHCN record look for a corresponding GHCN record.
-    to_remove = []
     for key, u_record in ushcn_records.iteritems():
         g_record = ghcn_records.get(key, None)
         if g_record is None:
-            print "NO MODS", u_record.uid
+            count_ushcn_only += 1
+            log.write("""%s action "ushcn only"\n""" % key)
             continue
         diffs = calc_monthly_USHCN_offsets(u_record, g_record)
 
@@ -102,11 +109,12 @@ def adjust_USHCN(ushcn_records, ghcn_records):
                 new_data.extend([adj(t, d) for t, d in zip(temps, diffs)])
             else:
                 new_data.extend(temps)
-        g_record.set_series(u_record.first_year * 12 + 1, new_data)
-        to_remove.append(key)
+        u_record.set_series(u_record.first_year * 12 + 1, new_data)
+        del ghcn_records[key]
 
-    for k in to_remove:
-        del ushcn_records[k]
+    if count_ushcn_only:
+        print count_ushcn_only, "USHCN records had no GHCN counterpart."
+
 
 def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg):
     """Replace Hohenpeissenberg data from 1880 to 2002 in the GHCN

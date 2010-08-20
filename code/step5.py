@@ -38,7 +38,7 @@ def SBBXtoBX(data):
     """
 
     meta = data.next()
-    land_meta, ocean_meta = meta
+    mask_meta, land_meta, ocean_meta = meta
 
     # TODO: Formalise use of only monthlies, see step 3.
     assert land_meta.mavg == 6
@@ -392,36 +392,50 @@ def annzon(zoned_averages, alternate={'global':2, 'hemi':True}):
     return (info, data, wt, ann, parameters.zone_annual_min_months, title)
 
 
-def select(data):
-    """Taking a stream of (land,ocean) record pairs, decide how to
-    weight the two series in subsequent combination and yield a stream
-    of (weight,land,ocean) triples.  *weight* will be 1 when the land
-    record is to be used, and 0 if the ocean record is to be used.
+def ensure_weight(data):
+    """Take a stream of (weight,land,ocean) record triples, if the
+    weight stream is None (the usual case in fact), then generate a
+    weight by considering the land and ocean records.  A series of
+    triples is yielded.
+
+    *weight* will be 1 when the land record is to be used, and 0
+    if the ocean record is to be used.
     """
 
     meta = data.next()
-    yield meta
-
-    for land,ocean in data:
-        if (ocean.good_count < parameters.subbox_min_valid
-            or land.d < parameters.subbox_land_range):
-            landmask = 1.0
-        else:
-            landmask = 0.0
-
-        yield landmask, land, ocean
+    maskmeta, landmeta, oceanmeta = meta
+    if maskmeta:
+        yield meta
+        for t in data:
+            yield t
+    else:
+        meta = list(meta)
+        meta[0] = 'mask computed in Step 5'
+        yield tuple(meta)
+        for _,land,ocean in data:
+            if (ocean.good_count < parameters.subbox_min_valid
+                or land.d < parameters.subbox_land_range):
+                landmask = 1.0
+            else:
+                landmask = 0.0
+            yield landmask, land, ocean
 
 def step5(data):
     """Step 5 of GISTEMP.
 
     This step takes input provided by steps 3 and 4 (zipped together).
-    Alternatively just Step 3's output can be used.
+
+    The usual generator of the *data* argument is giss_io.step5_input()
+    and this allows for various missing and/or synthesized inputs,
+    allowing just-land, just-ocean, override-weights.
 
     :Param data:
-        These are the land and ocean sub-box data, zipped together.
+        *data* should be an iterable of (weight, land, ocean) triples.  The
+        first triple is metadata (and this is a hack).  Subsequently
+        there is one triple per subbox (of which, 8000).
 
     """
-    subboxes = select(data)
+    subboxes = ensure_weight(data)
     subboxes = giss_io.step5_mask_output(subboxes)
     boxed = SBBXtoBX(subboxes)
     boxed = giss_io.step5_bx_output(boxed)

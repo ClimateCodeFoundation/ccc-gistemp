@@ -997,7 +997,21 @@ def step5_input(data):
         data = itertools.izip(land, ocean)
     else:
         data = ensure_landocean(data)
-    return data
+    # Add optional mask.
+    try:
+        mask = open(os.path.join('input', 'step5mask'))
+    except IOError:
+        mask = None
+    meta = data.next()
+    if mask is None:
+        yield (None,) + tuple(meta)
+        for land, ocean in data:
+            yield None, land, ocean
+    else:
+        yield ('mask from %s' % mask.name,) + tuple(meta)
+        for maskrow, (land, ocean) in itertools.izip(mask, data):
+            maskv = float(maskrow[16:21])
+            yield maskv, land, ocean
 
 def ensure_landocean(data):
     """Ensure that the data stream has a land and an ocean series.  If

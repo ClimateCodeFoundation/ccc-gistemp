@@ -16,14 +16,15 @@ This is just a stepping stone.
 __docformat__ = "restructuredtext"
 
 
+import glob
 import itertools
+import math
 import os
 import re
 import struct
-import glob
 
-import math
 
+# Clear Climate Code
 import extend_path
 import fort
 import code.giss_data
@@ -989,11 +990,67 @@ def step4_output(data):
     print "Step4: closing output file"
     out.close()
 
-def step5_input():
-    land = SubboxReader(open(STEP3_OUT, 'rb'))
-    ocean = SubboxReader(open('result/SBBX.HadR2', 'rb'))
+def step5_input(data):
+    if not data:
+        land = SubboxReader(open(STEP3_OUT, 'rb'))
+        ocean = SubboxReader(open('result/SBBX.HadR2', 'rb'))
+        data = itertools.izip(land, ocean)
+    else:
+        data = ensure_landocean(data)
+    return data
 
-    return itertools.izip(land, ocean)
+def ensure_landocean(data):
+    """Ensure that the data stream has a land and an ocean series.  If
+    we are piping Step 3 straight into Step 5 then we only have a land
+    series.  In that case we synthesize missing ocean data.
+    """
+
+    # First item from iterator is normally a pair of metadata objects,
+    # one for land, one for ocean.  If we are piping step3 straight into
+    # step5 then it is not a pair.
+
+    meta = data.next()
+    try:
+        land_meta, ocean_meta = meta
+    except (TypeError, ValueError):
+        # Use the land meta object for both land and ocean data
+        land_meta,ocean_meta = meta, meta
+        print "No ocean data; using land data only"
+        data = add_blank(data, 'ocean')
+
+    if land_meta is None:
+        # Synthesize land data
+        land_meta = ocean_meta
+        print "No land data; using ocean data only"
+        data = add_blank(extract_ocean(data), 'land')
+
+    yield land_meta, ocean_meta
+    for series in data:
+        yield series
+
+def extract_ocean(data):
+    for land,ocean in data:
+        yield ocean
+
+def add_blank(data, required):
+    """Augment a single data series with blank data to make a data
+    series pair.  *required* should be 'land' to synthesize the first of
+    the pair; or 'ocean' to synthesize the second of the pair.
+    """
+
+    assert required in ('land', 'ocean')
+
+    for this_box in data:
+        other_series = [MISSING] * len(this_box.series)
+        other_box = code.giss_data.Series(series=other_series,
+            box=this_box.box,
+            stations=0, station_months=0,
+            d=MISSING)
+        if required == 'land':
+            yield other_box, this_box
+        else:
+            yield this_box, other_box
+
 
 def step5_bx_output(data):
     """Write box (BX) output file."""

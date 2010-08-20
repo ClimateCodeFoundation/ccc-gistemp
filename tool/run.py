@@ -89,14 +89,18 @@ def run_step3c(data):
 
 def run_step4(data):
     from code import step4
+    # Unlike earlier steps, Step 4 always gets input data, ocean
+    # temperatures, from disk; data from earlier stages is land data and
+    # is zipped up.
     data = giss_io.step4_input(data) 
     result = step4.step4(data)
     return giss_io.step4_output(result)
 
 def run_step5(data):
     from code import step5
-    if data is None:
-        data = giss_io.step5_input()
+    # Step 5 takes a land mask as optional input, this is all handled in
+    # the step5_input() function.
+    data = giss_io.step5_input(data)
     result = step5.step5(data)
     giss_io.step5_output(result)
     return vischeck(result)

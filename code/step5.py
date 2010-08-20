@@ -67,8 +67,10 @@ def SBBXtoBX(data):
         # Eat the records from land and ocean 100 (nsubbox) at a time.
         # In other words, all 100 subboxes for the box.
         landweight,landsub,oceansub = zip(*itertools.islice(data, nsubbox))
-        # :todo: combine below zip with above zip?
-        for i, t, l, o in zip(range(nsubbox), landweight, landsub, oceansub):
+        # Check that we got nsubbox items.  Is this fails, truncated
+        # input files is the likely culprit.
+        assert set([nsubbox]) == set(map(len, [landweight, landsub, oceansub]))
+        for t, l, o in zip(landweight, landsub, oceansub):
             # Simple version only selects either land or ocean
             assert t in (0,1)
             a = [MISSING]*combined_n_months
@@ -409,59 +411,6 @@ def select(data):
 
         yield landmask, land, ocean
 
-def ensure_landocean(data):
-    """Ensure that the data stream has a land and an ocean series.  If
-    we are piping Step 3 straight into Step 5 then we only have a land
-    series.  In that case we synthesize missing ocean data.
-    """
-
-    # First item from iterator is normally a pair of metadata objects,
-    # one for land, one for ocean.  If we are piping step3 straight into
-    # step5 then it is not a pair.
-
-    meta = data.next()
-    try:
-        land_meta, ocean_meta = meta
-    except (TypeError, ValueError):
-        # Use the land meta object for both land and ocean data
-        land_meta,ocean_meta = meta, meta
-        print "No ocean data; using land data only"
-        data = add_blank(data, 'ocean')
-
-    if land_meta is None:
-        # Synthesize land data
-        land_meta = ocean_meta
-        print "No land data; using ocean data only"
-        data = add_blank(extract_ocean(data), 'land')
-
-    yield land_meta, ocean_meta
-    for series in data:
-        yield series
-
-def extract_ocean(data):
-    for land,ocean in data:
-        yield ocean
-
-def add_blank(data, required):
-    """Augment a single data series with blank data to make a data
-    series pair.  *required* should be 'land' to synthesize the first of
-    the pair; or 'ocean' to synthesize the second of the pair.
-    """
-
-    assert required in ('land', 'ocean')
-
-    for this_box in data:
-        other_series = [MISSING] * len(this_box.series)
-        other_box = giss_data.Series(series=other_series,
-            box=this_box.box,
-            stations=0, station_months=0,
-            d=MISSING)
-        if required == 'land':
-            yield other_box, this_box
-        else:
-            yield this_box, other_box
-
-
 def step5(data):
     """Step 5 of GISTEMP.
 
@@ -472,8 +421,7 @@ def step5(data):
         These are the land and ocean sub-box data, zipped together.
 
     """
-    landocean = ensure_landocean(data)
-    subboxes = select(landocean)
+    subboxes = select(data)
     subboxes = giss_io.step5_mask_output(subboxes)
     boxed = SBBXtoBX(subboxes)
     boxed = giss_io.step5_bx_output(boxed)

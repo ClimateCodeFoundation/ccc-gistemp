@@ -692,11 +692,27 @@ def read_USHCN(path):
         """The 6 digit USHCN identifier."""
         return l[0:6]
 
+    noted_element = False
+    def note_element(line):
+        """Print the meteorological element we are reading."""
+        # See ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/readme.txt
+        element = line[6]
+        assert element in '1234'
+        element = {'1':'mean maximum temperature',
+                   '2':'mean minimum temperature',
+                   '3':'average temperature',
+                   '4':'precipitation',
+                  }[element]
+        print "Reading", element
+
     for id,lines in itertools.groupby(open_or_uncompress(path), id6):
         record = code.giss_data.Series(uid=id)
         for line in lines:
-            # '3' indicates mean temperatures.
-            assert line[6] == '3'
+            if not noted_element:
+                note_element(line)
+                noted_element = True
+            # '1', '2', '3' indicate (max, min, average) temperatures.
+            assert line[6] in '123'
             year = int(line[7:11])
             if year < code.giss_data.BASE_YEAR: # discard data before 1880
                 continue

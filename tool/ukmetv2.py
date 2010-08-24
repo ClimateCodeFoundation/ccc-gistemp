@@ -10,6 +10,8 @@
 import itertools
 import re
 import sys
+# http://docs.python.org/release/2.4.4/lib/module-traceback.html
+import traceback
 import urllib
 
 # Requires Python 2.5.
@@ -43,12 +45,11 @@ def scrapeit(prefix):
     out.max = giss_io.V2MeanWriter(path=prefix + '.v2.max')
     out.inv = open(prefix + '.v2.inv', 'w')
 
-
-    for url in getlocations():
-        print "Data from", url, "..."
+    for url in geturls():
+        print "from", url
         scrape1(url, out)
 
-def getlocations():
+def geturls():
     """Return a sequence of URLs, each one being a text file containing
     temperature data.  Scraped from "Historic station data" of the UK
     Met Office."""
@@ -78,6 +79,9 @@ def scrape1(url, out):
     f = urllib.urlopen(url)
     name = f.readline()
     try:
+        nl = name.split('/')
+        if len(nl) > 1:
+            print "Split location"
         shortname = name.replace(' ', '')
         shortname = (shortname + '_'*6)[:7]
         assert 7 == len(shortname)
@@ -85,30 +89,47 @@ def scrape1(url, out):
         id12 = id11 + '0'
         location = f.readline()
         assert location.lower().startswith('location')
-        loc = location.split()[1:3]
-        loc[1] = loc[1].strip(',')
-        # Sort by last char, so that easting comes first.
-        loc.sort(key=lambda x:x[-1])
-        assert loc[0].endswith('E')
-        assert loc[1].endswith('N')
-        loc = [x[:-1] for x in loc]
-        # Extend to 6 figures (metres)
-        loc = [x + '0'*(6-len(x)) for x in loc]
-        # Convert to number, metres.
-        easting, northing = map(int, loc)
-        # Don't forget to use http://gridconvert.appspot.com/ to convert
-        # from OSGB to GRS80.
-        # :todo: save metadata instead of ignoring it.
+        # Optional commas, spaces, "m"/"metres".  And two stations are
+        # on the island of Ireland and therefore use the Irish Grid.
+        GRIDRE = re.compile(
+          r'(\d+)E\s*(\d+)N(\s*\(Irish Grid\))?(?:\s|,)*(\d+)\s*m')
+        locs = re.findall(GRIDRE, location)
+        if len(locs) != 1:
+            print len(locs), "grid locations found"
+        for loc in locs:
+            # Extend Easting and Northing to 6 figures (metres)
+            loc = [x + '0'*(6-len(x)) for x in loc[0:2]] + list(loc[2:])
+            # Convert to number, metres.
+            # easting, northing, irishgrid, height = map(int, loc)
+            # Don't forget to use http://gridconvert.appspot.com/ to convert
+            # from OSGB to GRS80. (which won't work for Irish Grid)
+            # :todo: save metadata instead of ignoring it.
+            if len(locs) > 1:
+                print ','.join(loc)
+
     except AssertionError, err:
         print "Skipping metadata"
-        print err
+        traceback.print_exc()
 
     def year(row):
         """Extract the year from a row."""
         return re.match(r'\s*(\d{4})', row).group(1)
 
+    # List of splits created by hand
+    # Key is (uid, year, month) triple, value is the new 12 character
+    # uid (which sticks until there is another split).  year, month
+    # specifies the first month of the newly split record.
+    split = {
+      ('UKMOWHITBYC0',2000,1): 'UKMETOWHITBY_',
+      }
+
     for y,rows in itertools.groupby(datarows(f), year):
+        # Split at beginning of year.
         yr = int(y)
+        newsplit = split.get((id12, yr, 1), None)
+        if newsplit:
+            id12 = newsplit
+            print "Changing ID to", id12
         # 12 months of temps:
         mins = [LARGE]*12
         maxs = [LARGE]*12

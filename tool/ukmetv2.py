@@ -22,10 +22,6 @@ import extend_path
 from code.giss_data import MISSING
 import giss_io
 
-urls="""
-http://www.metoffice.gov.uk/climate/uk/stationdata/oxforddata.txt
-""".split()
-
 PAGE = """http://www.metoffice.gov.uk/climate/uk/stationdata/"""
 
 def scrapeit(prefix):

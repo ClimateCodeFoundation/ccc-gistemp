@@ -1015,7 +1015,9 @@ def step5_input(data):
         data = ensure_landocean(data)
     # Add optional mask.
     try:
-        mask = open(os.path.join('input', 'step5mask'))
+        p = os.path.join('input', 'step5mask')
+        mask = open(p)
+        print "Using mask from", p
     except IOError:
         mask = None
     meta = data.next()

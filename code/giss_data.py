@@ -544,6 +544,9 @@ class Series(object):
     # Mutators below here
 
     def set_series(self, first_month, series):
+        """*first_month* specifies the first month of the series where
+        January of (a hypothetical) 0 AD is 1."""
+
         self._first_month = first_month
         self._good_start_idx = sys.maxint
         self._good_end_idx = 0

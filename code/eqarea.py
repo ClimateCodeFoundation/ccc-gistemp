@@ -185,7 +185,8 @@ def grid8k() :
     """Generator: As `gridsub`, but flattened.
 
     Yields the same set of boxes as `gridsub`, but returns a single generator
-    for all 8000 subboxes.  Not used by real code, but it useful for debugging.
+    for all 8000 subboxes.  Not used by core code, but used by tools and useful
+    for debugging.
 
     """
     for box in gridsub():

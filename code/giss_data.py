@@ -351,10 +351,7 @@ class Series(object):
             self.source = v2_sources().get(self.uid, "UNKNOWN")
         elif hasattr(self, 'box'):
             # Generally applies to subbox series.
-            # Synthesize a uid attribute based on the box's centre.
-            import eqarea
-            lat,lon = eqarea.centre(self.box)
-            self.uid = "%+05.1f%+06.1fC" % (lat,lon)
+            self.uid = boxuid(self.box)
 
     def __repr__(self):
         # A bit ugly, because it tries to do something sensible for both
@@ -636,3 +633,8 @@ class SubboxMetaData(object):
     def __repr__(self):
         return 'SubboxMetadata(%r)' % self.__dict__
 
+def boxuid(box):
+    """Synthesize a uid attribute based on the box's centre."""
+    import eqarea
+    lat,lon = eqarea.centre(box)
+    return "%+05.1f%+06.1fC" % (lat,lon)

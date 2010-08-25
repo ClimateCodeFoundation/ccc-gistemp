@@ -6,6 +6,8 @@
 #
 # Scrape and convert UK Met Office station data from their website and
 # convert to GHCN v2.mean format.
+#
+# Requires: Python 2.5 (or higher) and BeautifulSoup.
 
 import itertools
 # http://docs.python.org/release/2.5.4/lib/module-math.html
@@ -28,6 +30,48 @@ PAGE = """http://www.metoffice.gov.uk/climate/uk/stationdata/"""
 
 class Struct:
     pass
+
+# Static list of pages, instead of scraping index page.  Used when
+# BeautifulSoup is not available.
+static_list = """
+http://www.metoffice.gov.uk/climate/uk/stationdata/aberporthdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/armaghdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/ballypatrickdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/bradforddata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/braemardata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/cambornedata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/cambridgedata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/cardiffdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/chivenordata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/cwmystwythdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/dunstaffnagedata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/durhamdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/eastbournedata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/eskdalemuirdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/heathrowdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/hurndata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/lerwickdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/leucharsdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/lowestoftdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/manstondata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/nairndata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/newtonriggdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/oxforddata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/paisleydata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/ringwaydata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/rossonwyedata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/shawburydata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/sheffielddata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/southamptondata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/stornowaydata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/suttonboningtondata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/tireedata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/valleydata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/waddingtondata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/whitbydata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/wickairportdata.txt
+http://www.metoffice.gov.uk/climate/uk/stationdata/yeoviltondata.txt
+""".split()
 
 def scrapeit(prefix):
     """Creates files of the form:
@@ -55,7 +99,15 @@ def geturls():
     # http://docs.python.org/release/2.4.4/lib/module-urlparse.html
     import urlparse
 
-    from BeautifulSoup import BeautifulSoup
+    try:
+        from BeautifulSoup import BeautifulSoup
+    except ImportError:
+        BeautifulSoup = None
+
+    if not BeautifulSoup:
+        for u in static_list:
+            yield u
+        return
 
     text = urllib.urlopen(PAGE).read()
     souped = BeautifulSoup(text)
@@ -128,16 +180,19 @@ def scrape1(url, out):
             locs.append(loc)
         if len(locs) != 1:
             print len(locs), "grid locations found"
+        meta = Struct()
         old = None
         for loc in locs:
             grid = loc.grid.groups()
-            # Extend Easting and Northing to 6 figures (metres)
-            easting, northing = [x + '0'*(6-len(x)) for x in grid[0:2]]
-            height = grid[3]
+            easting, northing, irishgrid, height = grid
             if len(locs) > 1:
                 print ','.join([easting, northing, height]), grid[2]
             # Convert to number, metres.
             easting, northing, height = map(int, [easting, northing, height])
+            # Easting and Northing given are in units of 100m.  It
+            # doesn't say that, but they are.  Note in particular
+            # http://www.metoffice.gov.uk/climate/uk/stationdata/cambornedata.txt
+            easting, northing = [100*x for x in [easting, northing]]
             if old:
                 print "Move: %.0f along; height change: %+d" % (
                   math.hypot(easting-old[0], northing-old[1]),
@@ -145,10 +200,16 @@ def scrape1(url, out):
             old = (easting, northing, height)
             # Don't forget to use http://gridconvert.appspot.com/ to convert
             # from OSGB to GRS80. (which won't work for Irish Grid)
-            # :todo: save metadata instead of ignoring it.
-        meta = Struct()
+            irishgrid = grid[2]
+            if irishgrid:
+                print "Irish Grid, can't compute lat/lon."
+            else:
+                lat,lon,h = osgbtolatlon(easting, northing, height)
+                meta.lat = lat
+                meta.lon = lon
         meta.uid = id12
         meta.name = nl[0].strip()
+        # Note: Height above Mean Sea Level, not GRS80 ellipsoid height.
         meta.height = height
         out.inv.write(metav2(meta) + '\n')
 
@@ -192,6 +253,29 @@ def scrape1(url, out):
         out.min.writeyear(id12, yr, mins)
         out.max.writeyear(id12, yr, maxs)
 
+def osgbtolatlon(easting, northing, height):
+    """*easting* and *northing* are the easting and northing in metres
+    on the Ordanance Survery National Grid.  *height* is the height
+    above mean sea level.  Return (lat,lon,height) triple for the GRS80
+    ellipsoid (returned height is ellipsoid height).
+    """
+
+    # See http://gridconvert.appspot.com/
+    SERVICE = "http://gridconvert.appspot.com/osgb36/etrs89/"
+    url = "%s%r,%r,%r" % (SERVICE, easting, northing, height)
+    result = urllib.urlopen(url).read()
+    # *result* is a JSON object, but we parse it with regular
+    # expressions (to avoid a json dependency).
+    # RE for a JSON number.  See http://www.json.org/
+    json_no = r'(-?\d+(?:\.\d+)?)'
+    try:
+        lat = re.search(r'ETRS89_Latitude[^-\d]*' + json_no, result).group(1)
+        lon = re.search(r'ETRS89_Longitude[^-\d]*' + json_no, result).group(1)
+        height = re.search(r'ETRS89_Height[^-\d]*' + json_no, result).group(1)
+    except:
+        return None
+    return float(lat),float(lon),height
+
 def metav2(meta):
     """Convert a metadata object for a station into a v2.inv style
     record.  A string is returned (with no trailing newline).
@@ -201,10 +285,18 @@ def metav2(meta):
     # function in code/giss_data.py
 
     inv = [' ']*106
+    def convertlat(x):
+        return "%6.2f" % x
+    def convertlon(x):
+        return "%7.2f" % x
+    def convertheight(x):
+        return "%4d" % x
     fields = (
         (0,   11,  'uid',               str),
         (12,  42,  'name',              str),
-        (58,  62,  'height',            str),
+        (43,  49,  'lat',               convertlat),
+        (50,  57,  'lon',               convertlon),
+        (58,  62,  'height',            convertheight),
     )
     for a,b,attr,convert in fields:
         if hasattr(meta, attr):

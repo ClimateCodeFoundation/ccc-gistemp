@@ -55,13 +55,16 @@ def centrein(box, resolution):
     to latitude.
     """
 
+    def floor(x):
+        return int(math.floor(x))
+
     s,n,w,e = box
-    for y in range(math.floor((s + 90.0)/resolution + 0.5),
-                   math.floor((n + 90.0)/resolution + 0.5)):
-        for x in range(math.floor((w + 180.0)/resolution + 0.5),
-                       math.floor((e + 180.0)/resolution + 0.5)):
+    for y in range(floor((s + 90.0)/resolution + 0.5),
+                   floor((n + 90.0)/resolution + 0.5)):
+        for x in range(floor((w + 180.0)/resolution + 0.5),
+                       floor((e + 180.0)/resolution + 0.5)):
             # Flip y
-            yield x,int(90/resolution - y - 1)
+            yield x,int(180/resolution - y - 1)
 
 def grid(inp):
     """Convert ASCII file to regular grid."""

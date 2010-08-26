@@ -388,7 +388,7 @@ def prepare_series(from_year, combined, urban_series, counts):
 # Maximum length of any yearly series.  Used to correctly size the
 # combined rural series for each urban station.
 # (only used in rural_differences function)
-MAX_YEARS = giss_data.get_ghcn_last_year() - giss_data.BASE_YEAR + 1
+MAX_YEARS = giss_data.get_last_year() - giss_data.BASE_YEAR + 1
 
 def rural_difference(urban, rural_stations):
     """For the urban station *urban*, generate a combined rural record

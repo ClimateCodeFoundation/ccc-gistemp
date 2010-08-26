@@ -46,7 +46,6 @@ def valid(v):
 
 _stations = None
 _v2_sources = None
-_ghcn_last_year = None
 
 
 class Station(object):
@@ -147,29 +146,16 @@ def stations():
     return _stations
 
 
+def get_last_year():
+    """Get the latest year of the data.
 
-def get_ghcn_last_year():
-    """Get the latest year in the GHCN data.
-
-    This simply reads the ``input/v2.mean`` file and extracts the year from
-    each line.
-
-    In the original GISTEMP code, this piece of information was cached in the
-    file ``work/GHCN.last_year`` by step0. This alternative approach avoids the
-    need for this file and perfectly quick enough.
+    We use today's date.  It's much simpler and more reliable than
+    anything else.
     """
-    global _ghcn_last_year
-    if _ghcn_last_year is None:
-        f = open("input/v2.mean")
-        max_year = 0
-        for l in f:
-            if l[12:13] == '2': # first digit of year is a '2'
-                max_year = max(int(l[12:16]), max_year)
-        _ghcn_last_year = max_year
-        f.close()
 
-    return _ghcn_last_year
-
+    # http://docs.python.org/release/2.4.4/lib/module-time.html
+    import time
+    return time.localtime().tm_year
 
 def v2_sources():
     """Return (and cache) a sources dictionary that maps from 12-digit

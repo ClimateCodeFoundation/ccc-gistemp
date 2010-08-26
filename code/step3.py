@@ -273,7 +273,7 @@ def step3(records, radius=parameters.gridding_radius, year_begin=1880):
     # Most of the metadata here used to be synthesized in step2.py and
     # copied from the first yielded record.  Now we synthesize here
     # instead.
-    last_year = giss_data.get_ghcn_last_year()
+    last_year = giss_data.get_last_year()
     year_begin = giss_data.BASE_YEAR
     assert year_begin <= last_year
     # Compute total number of months in a fixed length record.

@@ -13,20 +13,6 @@ from giss_data import valid, invalid, MISSING
 Shared series-processing code in the GISTEMP algorithm.
 """
 
-def container(item):
-    """Takes either a container or a non-container *item*,
-    returns either the same *item* or a container which
-    contains that item at every index."""
-    try:
-        item[0]
-    except TypeError:
-        constant = item
-        class constant_list:
-            def __getitem__(self, i):
-                return constant
-        item = constant_list()
-    return item
-
 
 def combine(average, weight, new, new_weight,
             first_year, last_year, min_overlap):
@@ -51,7 +37,7 @@ def combine(average, weight, new, new_weight,
     the existing weights for *average*.
     """
 
-    new_weight = container(new_weight)
+    new_weight = ensure_array(weight, new_weight)
 
     months_combined = 0
     for m in range(12):
@@ -79,6 +65,18 @@ def combine(average, weight, new, new_weight,
             weight[i] = new_month_weight
             months_combined += 1
     return months_combined
+
+def ensure_array(exemplar, item):
+    """Coerces *item* to be an array (linear sequence); if *item* is
+    already an array it is returned unchanged.  Otherwise, an array of
+    the same length as exemplar is created which contains *item* at
+    every index.  The fresh array is returned.
+    """
+
+    try:
+        item[0]
+    except TypeError:
+        return (item,)*len(exemplar)
 
 def anomalize(data, reference_period=None, base_year=-9999):
     """Turn the series *data* into anomalies, based on monthly

@@ -75,6 +75,7 @@ def ensure_array(exemplar, item):
 
     try:
         item[0]
+        return item
     except TypeError:
         return (item,)*len(exemplar)
 

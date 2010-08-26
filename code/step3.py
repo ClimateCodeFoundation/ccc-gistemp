@@ -275,6 +275,7 @@ def step3(records, radius=parameters.gridding_radius, year_begin=1880):
     # instead.
     last_year = giss_data.get_ghcn_last_year()
     year_begin = giss_data.BASE_YEAR
+    assert year_begin <= last_year
     # Compute total number of months in a fixed length record.
     monm = 12 * (last_year - year_begin + 1)
     meta = giss_data.SubboxMetaData(mo1=None, kq=1, mavg=6, monm=monm,

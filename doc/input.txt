@@ -53,3 +53,11 @@ input/
 
   It is okay, but messy, to copy the entire contents of these
   subdirectories into input/.
+
+  There is one optional file:
+
+  step5mask
+
+  If present this file is used in Step 5 to select which cells use land
+  data.  Its format is novel to ccc-gistemp and is in the same format as
+  the file work/step5mask that is produced by Step 5.

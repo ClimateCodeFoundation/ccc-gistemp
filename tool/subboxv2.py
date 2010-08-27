@@ -11,13 +11,13 @@ import extend_path
 # Clear Climate Code
 import giss_io
 
-def convert(inp, outpath):
+def convert(inp, out):
     """Convert a file inp from subbox to V2 mean format."""
 
     # Clear Climate Code
     from code import eqarea
 
-    v2 = giss_io.V2MeanWriter(path=outpath, scale=0.01)
+    v2 = giss_io.V2MeanWriter(file=out, scale=0.01)
 
     subbox = iter(giss_io.SubboxReader(inp))
     # First record is metadata, which we ignore.
@@ -29,13 +29,17 @@ def convert(inp, outpath):
     v2.close()
 
 def main(argv=None):
+    import sys
     if argv is None:
-        import sys
         argv = sys.argv
 
     arg = argv[1:]
+    if len(arg) <= 1:
+        out = sys.stdout
+    else:
+        out = open(arg[1])
     
-    return convert(open(arg[0]), arg[1])
+    return convert(open(arg[0]), out)
 
 if __name__ == '__main__':
     main()

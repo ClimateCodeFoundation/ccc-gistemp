@@ -58,10 +58,14 @@ def topng(inp):
         for x,y in centrein(box, resolution):
             a[y][x] = v
 
+    try:
+        outpath = inp.name + '.png'
+    except:
+        outpath = 'out.png'
     w = png.Writer(width=width, height=height,
       greyscale=True, alpha=False,
       bitdepth=8)
-    w.write(open('out.png', 'wb'), a)
+    w.write(open(outpath, 'wb'), a)
 
 def main(argv=None):
     import sys
@@ -72,7 +76,11 @@ def main(argv=None):
         argv = sys.argv
 
     arg = argv[1:]
-    topng(fileinput.input(arg[0:1]))
+    if arg:
+        for p in arg:
+            topng(open(p))
+    else:
+        topng(sys.stdin)
 
 if __name__ == '__main__':
     main()

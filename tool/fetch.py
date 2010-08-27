@@ -94,8 +94,13 @@ def fetch(files, prefix='input/', output=sys.stdout):
     http://ccc-gistemp.googlecode.com/files/ccc-gistemp-test-2009-12-28.tar.gz
     """.split()
 
+    # Not normally used; see tool/landmask.py
+    land_mask = """
+    http://islscp2.sesda.com/ISLSCP2_1/data/ancillary/land_water_masks_xdeg/land_ocean_masks_xdeg.zip
+    """.split()
+
     # This is all the inputs that are simple URLs
-    all = noaa + giss + giss_test
+    all = noaa + giss + giss_test + land_mask
 
     # *place* is a dictionary that maps from short name to URL or some
     # other indicator of location.

@@ -344,7 +344,7 @@ class Series(object):
         # station records and subbox series.
         if hasattr(self, 'box'):
             return ('Series(box=(%+06.2f,%+06.2f,%+07.2f,%+07.2f))' %
-              self.box)
+              tuple(self.box))
         else:
             # Assume it is a station record with a uid.
             return "Series(uid=%r)" % self.uid

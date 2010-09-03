@@ -23,20 +23,33 @@ http://islscp2.sesda.com/ISLSCP2_1/html_pages/groups/ancillary/land_water_masks_
 
 """
 
-import math
-
 # http://code.google.com/p/pypng/
 import png
 
-def topng(inp, out):
+def topng(inp, out, binary=False):
     """Given a land percent file as input, produce a PNG image
     as output."""
 
+    import itertools
+
     land = grid(inp)
     w = png.Writer(width=land.w, height=land.h,
-      greyscale=True, alpha=False,
+      greyscale=True, alpha=binary,
       bitdepth=8)
-    w.write(out, ([int(round(x/100.0*255)) for x in row] for row in land.a))
+    if binary:
+        makepixel = frombin
+    else:
+        makepixel = frompercent
+    w.write(out, (itertools.chain(*[makepixel(x) for x in row]) for
+      row in land.a))
+
+def frompercent(x):
+    return (int(round(x/100.0*255)),)
+
+def frombin(x):
+    if x:
+        return (0,255)
+    return (128,0)
 
 # Copied from landmask.py
 def grid(inp):
@@ -53,16 +66,21 @@ def grid(inp):
     return gridded
 
 def main(argv=None):
+    import getopt
     import sys
     if argv is None:
         argv = sys.argv
 
-    arg = argv[1:]
+    k = {}
+    opt,arg = getopt.getopt(argv[1:], '', ['binary'])
     if not arg:
         print __doc__
         return 2
+    for o,v in opt:
+        if o == '--binary':
+            k['binary'] = True
 
-    topng(open(arg[0]), sys.stdout)
+    topng(open(arg[0], 'rU'), sys.stdout, **k)
 
 if __name__ == '__main__':
     main()

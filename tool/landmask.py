@@ -89,7 +89,7 @@ def main(argv=None):
         print __doc__
         return 2
 
-    maskit(open(arg[0]), sys.stdout)
+    maskit(open(arg[0], 'rU'), sys.stdout)
 
 if __name__ == '__main__':
     main()

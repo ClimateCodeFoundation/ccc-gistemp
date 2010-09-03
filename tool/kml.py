@@ -182,15 +182,22 @@ def chart_anom(anom):
 
     return prefix + '?' + '&'.join(chart)
 
+def usage():
+    import sys
+    print >>sys.stderr, __doc__
+
 def main(argv=None):
     import sys
-    from getopt import getopt
+    import getopt
 
     if argv is None:
         argv = sys.argv
 
     key = {}
-    opts, arg = getopt(argv[1:], '', ['longitude=', 'latitude='])
+    try:
+        opts, arg = getopt.getopt(argv[1:], '', ['longitude=', 'latitude='])
+    except getopt.GetoptError:
+        return usage()
     for o,v in opts:
         if o == '--longitude':
             key['lon'] = map(float, v.split(','))

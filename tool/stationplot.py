@@ -18,7 +18,7 @@
 Usage: python stationplot.py [options] station-id
 
 The options are:
-  [-a] [-d v2.mean] [-o file.svg] [-t YYYY,YYYY]
+  [-a] [-d v2.mean] [-o file.svg] [-t YYYY,YYYY] [-s 0.01]
 
 Tool to plot the records for a station.  Stations have an 11-digit
 identifier, and in the GHCN file v2.mean they have a single digit added, the
@@ -138,7 +138,7 @@ def aplot(series, K):
             continue
         yield list(block)
 
-def plot(arg, mode, inp, out, meta, timewindow=None):
+def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
     name, location) is taken from the `meta` file (usually v2.inv).
@@ -156,7 +156,7 @@ def plot(arg, mode, inp, out, meta, timewindow=None):
     def valid(datum):
         return datum != BAD
 
-    datadict = asdict(arg, inp, mode)
+    datadict = asdict(arg, inp, mode, scale)
     if not datadict:
         raise Error('No data found for %s' % (', '.join(arg)))
         
@@ -441,7 +441,7 @@ def from_years(years):
         series.extend(data)
     return (series, begin)
 
-def from_lines(lines):
+def from_lines(lines, scale=0.1):
     """*lines* is a list of lines (strings) that comprise a station's
     entire record.  The lines are an extract from a file in the same
     format as the GHCN file v2.mean.Z.  The data are converted to a
@@ -485,13 +485,13 @@ def from_lines(lines):
                 datum = BAD
             else:
                 # Convert to floating point and degrees C.
-                datum *= 0.1
+                datum *= scale
             temps.append(datum)
         years.append((year, temps))
     return from_years(years)
         
 
-def asdict(arg, inp, mode):
+def asdict(arg, inp, mode, scale=0.1):
     """`arg` should be a list of 11-digit station identifiers or
     12-digit record identifiers.  The records from `inp` are extracted
     and returned as a dictionary (that maps identifiers to (data,begin)
@@ -507,7 +507,7 @@ def asdict(arg, inp, mode):
     table = {}
     for id in arg:
         for id12,series in v2.get(id):
-            data,begin = from_lines(series)
+            data,begin = from_lines(series, scale)
             if mode == 'anom':
                 # Clear Climate Code, code directory
                 from code.series import anomalize
@@ -560,17 +560,16 @@ def main(argv=None):
     try:
         infile = 'input/v2.mean'
         metafile = 'input/v2.inv'
-        mode = 'temp'
-        timewindow = None
-        opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:t:y')
+        opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:s:t:y')
         if not arg:
             raise Usage('At least one identifier must be supplied.')
         outfile = arg[0] + '.svg'
+        key = {}
         for k,v in opt:
             if k == '-c':
                 update_config(config, v)
             if k == '-a':
-                mode = 'anom'
+                key['mode'] = 'anom'
             if k == '-o':
                 outfile = v
             if k == '-d':
@@ -578,9 +577,11 @@ def main(argv=None):
             if k == '-m':
                 metafile = v
             if k == '-t':
-                timewindow = parse_topt(v)
+                key['timewindow'] = parse_topt(v)
             if k == '-y':
-                mode = 'annual'
+                key['mode'] = 'annual'
+            if k == '-s':
+                key['scale'] = float(v)
         if outfile == '-':
             outfile = sys.stdout
         else:
@@ -593,8 +594,7 @@ def main(argv=None):
             infile = open(infile)
         metafile = open(metafile)
         derive_config(config)
-        return plot(arg, mode=mode, timewindow=timewindow,
-          inp=infile, out=outfile, meta=metafile)
+        return plot(arg, inp=infile, out=outfile, meta=metafile, **key)
     except (getopt.GetoptError, Usage), e:
         sys.stdout.write('%s\n' % str(e))
         sys.stdout.write(__doc__)

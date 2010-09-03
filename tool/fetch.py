@@ -97,6 +97,8 @@ def fetch(files, prefix='input/', output=sys.stdout):
     # Not normally used; see tool/landmask.py
     land_mask = """
     http://islscp2.sesda.com/ISLSCP2_1/data/ancillary/land_water_masks_xdeg/land_ocean_masks_xdeg.zip
+    http://islscp2.sesda.com/ISLSCP2_1/data/ancillary/land_outlines_xdeg/land_water_outlines_xdeg.zip
+    http://islscp2.sesda.com/ISLSCP2_1/data/ancillary/land_outlines_xdeg/land_only_outlines_xdeg.zip
     """.split()
 
     # This is all the inputs that are simple URLs

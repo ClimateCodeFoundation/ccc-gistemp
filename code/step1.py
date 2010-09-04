@@ -119,46 +119,45 @@ def monthly_annual(data):
     return (annual_mean, annual_anom)
 
 
-def average(sums, counts, years):
+def average(sums, counts):
     """Return an array with sums[i]/counts[i], and MISSING where
     counts[i] is zero.
     """
 
-    assert len(sums) == years * 12
-    assert len(counts) == years * 12
+    assert len(sums) == len(counts)
 
-    data = [MISSING] * (years*12)
+    data = [MISSING] * (len(sums))
 
-    for i in range(len(counts)):
-        count = counts[i]
-        if count != 0:
-            data[i] = float(sums[i]) / count
+    for i,(sum,count) in enumerate(zip(sums, counts)):
+        if count:
+            data[i] = float(sum) / count
 
     return data
 
-def final_average(sums, wgts, years, begin):
-    """Compute an average from *sums* and *wgts*, return a new
+# :todo: unify with code in get_actual_endpoints
+def final_average(sums, weights, begin):
+    """Compute an average from *sums* and *weights*, return a new
     (*begin*,*data*) pair.  The results are trimmed so that the first
     and last years have valid data.
     """
 
     y_min, y_max = 9999, -9999
-    assert len(wgts) == 12*years
+    assert len(weights) % 12 == 0
     # Find the minimum and maximum years with data.
-    for i in range(years):
-        if sum(wgts[i*12:(i+1)*12]) > 0:
-            y_min = min(y_min, i)
-            y_max = max(y_max, i)
-    if y_min == 0 and y_max == years - 1:
-        return begin, average(sums, wgts, years)
+    for i in range(0, len(weights), 12):
+        if sum(weights[i:i+12]) > 0:
+            y = i//12
+            y_min = min(y_min, y)
+            y_max = max(y_max, y)
+    # Trim (won't actually trim if first and last year have data).
     years = y_max - y_min + 1
     begin = begin + y_min
     month_base = y_min * 12
     month_limit = (y_max+1) * 12
     sums = sums[month_base:month_limit]
-    wgts = wgts[month_base:month_limit]
-    assert len(wgts) == 12*years
-    return begin, average(sums, wgts, years)
+    weights = weights[month_base:month_limit]
+    assert len(weights) == 12*years
+    return begin, average(sums, weights)
 
 def add(sums, wgts, diff, begin, record):
     """Add the data from *record* to the *sums* and *wgts* arrays, first
@@ -217,9 +216,9 @@ def get_longest_overlap(new_data, begin, records):
         return 0, 0, MISSING
     return best_record, best_id, diff
 
-def combine(sums, wgts, begin, years, records, log, new_id=None):
+def combine(sums, wgts, begin, records, log, new_id_):
     while records:
-        record, rec_id, diff = get_longest_overlap(average(sums, wgts, years),
+        record, rec_id, diff = get_longest_overlap(average(sums, wgts),
                                                    begin, records)
         if invalid(diff):
             log.write("\tno other records okay\n")
@@ -230,8 +229,9 @@ def combine(sums, wgts, begin, years, records, log, new_id=None):
                                         record.last_year - 1, diff))
 
 def get_best(records):
-    """Given a set of records (a dict really), return the best one, and
-    its key in the *records* dict.
+    """Given a dict of records, return the "best" one, and
+    its key in the *records* dict.  "best" considers the source of the
+    record, preferring MCDW over USHCN over SUMOFDAY over UNKNOWN.
     """
 
     ranks = {'MCDW': 4, 'USHCN2': 3, 'SUMOFDAY': 2, 'UNKNOWN': 1}
@@ -377,30 +377,38 @@ def pieces_get_longest_overlap(new_data, begin, records):
     return best_record, best_id
 
 # :todo: unify with code in final_average
-def get_actual_endpoints(wgts, begin, years):
-    assert len(wgts) == 12*years
+def get_actual_endpoints(wgts, begin):
+    """For the array of weights in *wgts* return the first and last
+    calendar years that have some weight (contain a month with non-zero
+    weight); assuming the array starts in year *begin*."""
+
+    # Exact number of years.
+    assert len(wgts) % 12 == 0
     y_min = 9999
     y_max = 0
-    for i in range(years):
-        if sum(wgts[i*12:(i+1)*12]) > 0:
-            y_min = min(y_min, i)
-            y_max = max(y_max, i)
+    for i in range(0, len(wgts), 12):
+        if sum(wgts[i:i+12]) > 0:
+            y = i//12
+            y_min = min(y_min, y)
+            y_max = max(y_max, y)
     return begin+y_min, begin+y_max
 
 def find_quintuples(new_sums, new_wgts,
-                    begin, years, record, rec_begin,
+                    begin, record, rec_begin,
                     new_id, rec_id, log):
+    """Returns a boolean."""
+
     rec_begin = record.first_year
     rec_end = rec_begin + record.last_year - record.first_year
 
-    actual_begin, actual_end = get_actual_endpoints(new_wgts, begin, years)
+    actual_begin, actual_end = get_actual_endpoints(new_wgts, begin)
 
     max_begin = max(actual_begin, rec_begin)
     min_end = min(actual_end, rec_end)
     middle_year = int(.5 * (max_begin + min_end) + 0.5)
     log.write("max begin: %s\tmin end: %s\n" % (max_begin, min_end))
 
-    new_data = average(new_sums, new_wgts, years)
+    new_data = average(new_sums, new_wgts)
     new_ann_mean, new_ann_anoms = monthly_annual(new_data)
     ann_std_dev = sigma(new_ann_anoms)
     log.write("ann_std_dev = %s\n" % ann_std_dev)
@@ -412,8 +420,13 @@ def find_quintuples(new_sums, new_wgts,
     rec_offset = (middle_year - rec_begin)
     rec_len = len(rec_ann_anoms)
 
-    ov_success = 0
-    okay_flag = 0
+    # Whether we have an "overlap" or not.  We have an "overlap" if
+    # within *rad* years either side of *middle_year* both records have
+    # *parameters.station_combine_min_mid_year* valid annnual anomalies.
+    ov_success = False
+    # The overlap is "okay" when the difference in annual temperature is
+    # below a certain threshold.
+    okay_flag = False
     for rad in range(1, parameters.station_combine_bucket_radius + 1):
         count1 = sum1 = 0
         count2 = sum2 = 0
@@ -440,13 +453,13 @@ def find_quintuples(new_sums, new_wgts,
         if (count1 >= parameters.station_combine_min_mid_years
             and count2 >= parameters.station_combine_min_mid_years):
             log.write("overlap success: %s %s\n" % (new_id, rec_id))
-            ov_success = 1
+            ov_success = True
             avg1 = sum1 / float(count1)
             avg2 = sum2 / float(count2)
             diff = abs(avg1 - avg2)
             log.write("diff = %s\n" % diff)
             if diff < ann_std_dev:
-                okay_flag = 1
+                okay_flag = True
                 log.write("combination success: %s %s\n" % (new_id, rec_id))
             else:
                 log.write("combination failure: %s %s\n" % (new_id, rec_id))
@@ -456,9 +469,9 @@ def find_quintuples(new_sums, new_wgts,
     log.write("counts: %s\n" % ((count1, count2),))
     return okay_flag
 
-def pieces_combine(sums, wgts, begin, years, records, log, new_id):
+def pieces_combine(sums, wgts, begin, records, log, new_id):
     while records:
-        record, rec_id = pieces_get_longest_overlap(average(sums, wgts, years),
+        record, rec_id = pieces_get_longest_overlap(average(sums, wgts),
                                                     begin, records)
         rec_begin = record.first_year
         rec_end = rec_begin + record.last_year - record.first_year
@@ -466,7 +479,7 @@ def pieces_combine(sums, wgts, begin, years, records, log, new_id):
         log.write("\t %s %d %d\n" % (rec_id, rec_begin, rec_end - 1))
 
         is_okay = find_quintuples(sums, wgts,
-                                  begin, years, record, rec_begin,
+                                  begin, record, rec_begin,
                                   new_id, rec_id, log)
 
         if is_okay:
@@ -503,8 +516,8 @@ def do_combine(stream, log, select_func, combine_func):
     :Param log:
         Open log file file.
     :Param select_func:
-        A function to call to select the the 'best' records from a set of
-        records belonging to the same station.
+        A function to call to select the 'best' record from a collection
+        of records (belonging to the same station).
     :Param combine_func:
         A function to call to perform the data combining.
 
@@ -527,10 +540,10 @@ def do_combine(stream, log, select_func, combine_func):
             record, rec_id = select_func(record_dict)
             del record_dict[rec_id]
             sums, wgts = fresh_arrays(record, begin, years)
-            log.write("\t%s %s %s -- %s\n" % (rec_id, begin,
-                begin + years -1, record.source))
-            combine_func(sums, wgts, begin, years, record_dict, log, rec_id)
-            begin, final_data = final_average(sums, wgts, years, begin)
+            log.write("\t%s %s %s -- %s\n" % (rec_id, begin, end,
+                record.source))
+            combine_func(sums, wgts, begin, record_dict, log, rec_id)
+            begin, final_data = final_average(sums, wgts, begin)
             record.set_series(begin * 12 + 1, final_data)
             yield record
             ids = record_dict.keys()

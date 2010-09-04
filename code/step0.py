@@ -180,7 +180,7 @@ def step0(input):
 
     # Read each data input into dictionary form.
     data = {}
-    for source in ['ghcn', 'ushcn', 'scar']:
+    for source in ['ghcn', 'ushcn', 'scar', 'v3']:
         if source in parameters.data_sources:
             print "Load %s records" % source.upper()
             data[source] = asdict(getattr(input, source))
@@ -199,7 +199,7 @@ def step0(input):
 
     # Join all data sources together.
     records = {}
-    for source in ['ghcn', 'ushcn', 'scar']:
+    for source in ['ghcn', 'ushcn', 'scar', 'v3']:
         records.update(data.get(source, {}))
 
     # We sort here - as does GISTEMP - so that all the records for a

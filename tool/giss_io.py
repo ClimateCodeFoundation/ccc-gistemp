@@ -414,13 +414,74 @@ class StationTsWriter(object):
     def close(self):
         self.f.close()
 
+def GHCNV3Reader(inp, year_min=None, scale=None):
+    """Reads a file in GHCN V3 .dat format and yields each station
+    record.  For now, this treats all the data for a station as a single
+    record (compare with GHCN V2 which could have several "duplicates"
+    for a single station).
+
+    If `year_min` is specified, then only years >= year_min are kept
+    (the default, None, keeps all years).
+    
+    If *scale* is specified then the (integer) values in the file are
+    multiplied by *scale* before being returned.  When it is not
+    specified (the normal case), the scale is derived from the element
+    specified in the file (normally for monthly means this is "TAVG" and
+    the scale implied by that is 0.01 (degrees C)).
+    """
+
+    # See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README.pdf for format
+    # of this file.
+
+    def id11(l):
+        """Extract the 11-digit station identifier."""
+        return l[:11]
+
+    element_scale = dict(TAVG=0.01)
+    # Flags that cause value to be rejected. :todo: make parameter.
+    reject = 'DKOSTW'
+
+    def convert(s):
+        """Convert single value. *s* is the 8 character string, 5
+        characters for value, 3 for flags."""
+
+        # This function captures *multiplier* which can, in principle,
+        # change for each line.
+
+        v = int(s[:5])
+        # Flags for Measurement (missing days), Quality, and
+        # Source.
+        m,q,s = s[5:8]
+        if q in reject or v == -9999:
+            v = MISSING
+        else:
+            v *= multiplier
+        return v
+
+    all_missing = [MISSING]*12
+
+    for id,lines in itertools.groupby(inp, id11):
+        record = code.giss_data.Series(uid=id+'G', first_year=year_min)
+        for line in lines:
+            year = int(line[11:15])
+            element = line[15:19]
+            if scale:
+                multiplier = scale
+            else:
+                multiplier = element_scale[element]
+            values = [convert(line[i:i+8]) for i in range(19,115,8)]
+            if values != all_missing:
+                record.add_year(year, values)
+        if len(record) != 0:
+            yield record
+
 
 def V2MeanReader(path, year_min=None):
     """Reads a file in GHCN v2.mean format and yields each station.
     
     If `year_min` is specified, then only years >= year_min are kept
     (the default, None, keeps all years).
-    
+
     Traditionally a file in this format was the output of Step 0 (and
     of course the format used by the GHCN source), but modern ccc-gistemp
     produces this format for the outputs of Steps 0, 1, and 2."""
@@ -703,7 +764,7 @@ def read_USHCN(path):
                    '3':'average temperature',
                    '4':'precipitation',
                   }[element]
-        print "Reading", element
+        print "(Reading %s)" % element
 
     for id,lines in itertools.groupby(open_or_uncompress(path), id6):
         record = code.giss_data.Series(uid=id)
@@ -810,6 +871,21 @@ def ushcn_input_file():
             return f
     raise ValueError, "no USHCN data file in input directory; run tool/preflight.py."
 
+def ghcn3_input_file():
+    """Find the GHCN V3 input file.  Looks in the input/ directory for
+    sub-directories that start "ghcnm", then picks the most recent one
+    and looks inside that for the .dat file (using the last 8 characters
+    of the directory name to determine most recent)."""
+
+    dirs = filter(os.path.isdir, glob.glob('input/ghcnm*'))
+    dirs.sort(key=lambda x: x[:8], reverse=True)
+    if not dirs:
+        return None
+    dir = dirs[0]
+    dats = glob.glob(os.path.join(dir, '*.dat'))
+    return dats[0]
+
+
 # Each of the stepN_input functions below produces an iterator that
 # yields that data for that step feeding from data files.
 # Each of the stepN_output functions below is effectively a "tee" that
@@ -824,6 +900,10 @@ def step0_input():
     input.ushcn = read_USHCN_converted(ushcn_input_file(),
       ushcn_map)
     input.ghcn = V2MeanReader("input/v2.mean", code.giss_data.BASE_YEAR)
+    ghcn3file = ghcn3_input_file()
+    if ghcn3file:
+        input.v3 = GHCNV3Reader(open(ghcn3file),
+          code.giss_data.BASE_YEAR)
     input.scar = itertools.chain(
             read_antarctic("input/antarc1.txt", "input/antarc1.list", '8'),
             read_antarctic("input/antarc3.txt", "input/antarc3.list", '9'),

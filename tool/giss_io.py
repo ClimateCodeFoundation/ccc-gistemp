@@ -1196,10 +1196,21 @@ def step5_mask_output(data):
 
     for datum in data:
         mask,land,ocean = datum
-        assert land.uid == ocean.uid
+        assert boxid_eq(land.uid, ocean.uid)
         out.write("%sMASK%.3f\n" % (land.uid, mask))
         yield datum
     out.close()
+
+def boxid_eq(uid1, uid2):
+    """Compare two IDs both of which are from subboxes.  They should be
+    of the form -SS.S+EEE.EC.  They should be the same, but due to
+    rounding differences, they can differ by 1 in the last digit."""
+
+    lat1 = float(uid1[:5])
+    lon1 = float(uid1[5:11])
+    lat2 = float(uid2[:5])
+    lon2 = float(uid2[5:11])
+    return abs(lat1 - lat2) < 0.15 and abs(lon1 - lon2) < 0.15
 
 def step5_zone_titles():
     """Return the titles used for the 14 zones."""

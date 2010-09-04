@@ -439,10 +439,10 @@ def GHCNV3Reader(inp, meta=None, year_min=None, scale=None):
     specified (the normal case), the scale is derived from the element
     specified in the file (normally for monthly means this is "TAVG" and
     the scale implied by that is 0.01 (degrees C)).
-    """
 
-    # See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README.pdf for format
-    # of this file.
+    See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README.pdf for format
+    of this file.
+    """
 
     def id11(l):
         """Extract the 11-digit station identifier."""

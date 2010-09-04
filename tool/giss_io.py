@@ -52,6 +52,13 @@ def tenths_to_float(t):
 def as_tenths(v):
     return int(math.floor(v * 10 + 0.5))
 
+# Load GHCN V2 metadata, if present.
+v2inv = os.path.join('input', 'v2.inv')
+try:
+    v2meta = code.giss_data.read_stations(v2inv, format='v2')
+except IOError:
+    v2meta = None
+
 
 # TODO: Probably should be a generator.
 def internal_to_external(series, scale=0.1):
@@ -414,11 +421,15 @@ class StationTsWriter(object):
     def close(self):
         self.f.close()
 
-def GHCNV3Reader(inp, year_min=None, scale=None):
+def GHCNV3Reader(inp, meta=None, year_min=None, scale=None):
     """Reads a file in GHCN V3 .dat format and yields each station
-    record.  For now, this treats all the data for a station as a single
-    record (compare with GHCN V2 which could have several "duplicates"
-    for a single station).
+    record (as a giss_data.Series instance).  For now, this treats
+    all the data for a station as a single record (contrast with GHCN V2
+    which could have several "duplicates" for a single station).
+
+    If a *meta* dict is supplied then the Series instance will have its
+    "station" attribute set to value corresponding to the 11-digit ID in
+    the *meta* dict.
 
     If `year_min` is specified, then only years >= year_min are kept
     (the default, None, keeps all years).
@@ -437,12 +448,18 @@ def GHCNV3Reader(inp, year_min=None, scale=None):
         """Extract the 11-digit station identifier."""
         return l[:11]
 
+    noted_element = False
+    def note_element(element):
+        """Print the meteorological element we are reading."""
+        friendly = dict(TAVG='average temperature')
+        print "(Reading %s)" % friendly[element]
+
     element_scale = dict(TAVG=0.01)
     # Flags that cause value to be rejected. :todo: make parameter.
     reject = 'DKOSTW'
 
     def convert(s):
-        """Convert single value. *s* is the 8 character string, 5
+        """Convert single value. *s* is the 8 character string: 5
         characters for value, 3 for flags."""
 
         # This function captures *multiplier* which can, in principle,
@@ -461,10 +478,18 @@ def GHCNV3Reader(inp, year_min=None, scale=None):
     all_missing = [MISSING]*12
 
     for id,lines in itertools.groupby(inp, id11):
-        record = code.giss_data.Series(uid=id+'G', first_year=year_min)
+        key = dict(uid=id+'G',
+          first_year=year_min,
+          )
+        if meta and meta.get(id):
+            key['station'] = meta[id]
+        record = code.giss_data.Series(**key)
         for line in lines:
             year = int(line[11:15])
             element = line[15:19]
+            if not noted_element:
+                note_element(element)
+                noted_element = True
             if scale:
                 multiplier = scale
             else:
@@ -476,8 +501,12 @@ def GHCNV3Reader(inp, year_min=None, scale=None):
             yield record
 
 
-def V2MeanReader(path, year_min=None):
+def V2MeanReader(path, meta=None, year_min=None):
     """Reads a file in GHCN v2.mean format and yields each station.
+
+    If a *meta* dict is supplied then the Series instance will have its
+    "station" attribute set to value corresponding to the 11-digit ID in
+    the *meta* dict.
     
     If `year_min` is specified, then only years >= year_min are kept
     (the default, None, keeps all years).
@@ -503,7 +532,12 @@ def V2MeanReader(path, year_min=None):
     for (id, lines) in itertools.groupby(f, id12):
         # lines is a set of lines which all begin with the same 12
         # character id.
-        record = code.giss_data.Series(uid=id, first_year=year_min)
+        key = dict(uid=id, first_year=year_min)
+        # 11-digit station ID.
+        stid = id[:11]
+        if meta and meta.get(stid):
+            key['station'] = meta[stid]
+        record = code.giss_data.Series(**key)
         prev_line = None
         for line in lines:
             if line != prev_line:
@@ -899,11 +933,15 @@ def step0_input():
       'input/ushcnV2_cmb.tbl')
     input.ushcn = read_USHCN_converted(ushcn_input_file(),
       ushcn_map)
-    input.ghcn = V2MeanReader("input/v2.mean", code.giss_data.BASE_YEAR)
+    input.ghcn = V2MeanReader("input/v2.mean",
+        meta=v2meta,
+        year_min=code.giss_data.BASE_YEAR)
     ghcn3file = ghcn3_input_file()
     if ghcn3file:
+        invfile = ghcn3file.replace('.dat', '.inv')
         input.v3 = GHCNV3Reader(open(ghcn3file),
-          code.giss_data.BASE_YEAR)
+          meta=code.giss_data.read_stations(invfile, format='v3'),
+          year_min=code.giss_data.BASE_YEAR)
     input.scar = itertools.chain(
             read_antarctic("input/antarc1.txt", "input/antarc1.list", '8'),
             read_antarctic("input/antarc3.txt", "input/antarc3.list", '9'),
@@ -922,7 +960,7 @@ def step0_output(data):
     out.close()
 
 def step1_input():
-    return V2MeanReader("work/v2.mean_comb")
+    return V2MeanReader("work/v2.mean_comb", meta=v2meta)
 
 def step1_output(data):
     out = V2MeanWriter(path="work/v2.step1.out")
@@ -933,7 +971,7 @@ def step1_output(data):
     out.close()
 
 def step2_input():
-    return V2MeanReader("work/v2.step1.out")
+    return V2MeanReader("work/v2.step1.out", meta=v2meta)
 
 def step2_output(data):
     out = V2MeanWriter(path="work/v2.step2.out")
@@ -944,7 +982,7 @@ def step2_output(data):
     out.close()
 
 def step3_input():
-    return V2MeanReader("work/v2.step2.out")
+    return V2MeanReader("work/v2.step2.out", meta=v2meta)
 
 STEP3_OUT = os.path.join('result', 'SBBX1880.Ts.GHCN.CL.PA.1200')
 

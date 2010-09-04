@@ -53,16 +53,29 @@ class Station(object):
 
     This holds the information about a single monitoring station. Not
     all the attributes are used by the CCC code.  For a list of
-    attributes and documentation, see the stations() function.
+    attributes and documentation, see the read_stations() function.
     """
     def __init__(self, **values):
         self.__dict__.update(values)
+        self.values = dict(values)
+
+    def __repr__(self):
+        return "Station(%r)" % self.values
 
 
 def stations():
     """Return a dictionary of all known Stations, keyed by
     Station.uid.  The first time this is called, it reads the station
-    inventory file input/v2.inv.
+    inventory file (usually input/v2.inv).
+    """
+
+    global _stations
+    if not _stations:
+        _stations = read_stations(path='input/v2.inv')
+    return _stations
+
+def read_stations(path, format='v2'):
+    """Read station metadata from file, return it as a dictionary.
 
     The input file is in the same format as the GHCN V2 file v2.temperature.inv
     (in fact, it's the same file, but with records added for the Antarctic
@@ -87,9 +100,9 @@ def stations():
        lon                 -98.20               -87.90
         The longitude, in degrees to two decimal places.
     1  elevs               274                  205
-        The station elevation? in metres?
+        The station elevation in metres.
     2  elevg               287                  197
-        The ground elevation? in metres?
+        The grid elevation in metres (value taken from gridded dataset).
     3  pop                 R                    U
         'R' for rural,  'S' for semi-urban, 'U' for urban
     4  ipop                -9                   6216
@@ -111,39 +124,80 @@ def stations():
         A global brightness index, range 0-186 (at least)
     """
 
-    global _stations
-    if _stations is None:
-        fields = (
-            (0,   11,  'uid',              str),
-            (12,  42,  'name',             str),
-            (43,  49,  'lat',              float),
-            (50,  57,  'lon',              float),
-            (58,  62,  'elevation',        int),
-            (62,  67,  'ground_elevation', int),
-            (67,  68,  'pop',              str),
-            (68,  73,  'ipop',             int),
-            (73,  75,  'topo',             str),
-            (75,  77,  'stveg',            str),
-            (77,  79,  'stloc',            str),
-            (79,  81,  'iloc',             str),    #int?
-            (81,  82,  'airstn',           str),
-            (82,  84,  'itowndis',         str),    #int?
-            (84,  100, 'grveg',            str),
-            (100, 101, 'GHCN_brightness',  str),
-            (101, 102, 'US_brightness',    str),
-            (102, 106, 'global_brightness',int),
-        )
+    assert format in ('v2', 'v3')
 
-        _stations = {}
-        try:
-            for line in open("input/v2.inv"):
-                dd = dict((field, convert(line[a:b]))
-                          for a, b, field, convert in fields)
-                _stations[dd['uid']] = Station(**dd)
-        except IOError:
-            warnings.warn("Could not load GHCN metadata (v2.inv) file.")
+    # With the beta GHCN V3 metadata, several fields are blank for some
+    # stations.  When processed as ints, these will get converted to
+    # None."""
+    def blank_int(s):
+        """Convert a field to an int, or if it is blank, convert to
+        None."""
 
-    return _stations
+        if s.isspace():
+            return None
+        return int(s)
+
+    # GISTEMP only uses some of the fields: uid, lat, lon, pop (for
+    # old-school rural/urban designation), US_brightness (for old-school
+    # rural/urban designation in the US), global_brightness (for
+    # 2010-style rural/urban designation).
+
+    v2fields = (
+        (0,   11,  'uid',              str),
+        (12,  42,  'name',             str),
+        (43,  49,  'lat',              float),
+        (50,  57,  'lon',              float),
+        (58,  62,  'elevation',        int),
+        (62,  67,  'grid_elevation',   int),
+        (67,  68,  'pop',              str),
+        (68,  73,  'ipop',             int),
+        (73,  75,  'topo',             str),
+        (75,  77,  'stveg',            str),
+        (77,  79,  'stloc',            str),
+        (79,  81,  'iloc',             str),    #int?
+        (81,  82,  'airstn',           str),
+        (82,  84,  'itowndis',         str),    #int?
+        (84,  100, 'grveg',            str),
+        (100, 101, 'GHCN_brightness',  str),
+        (101, 102, 'US_brightness',    str),
+        (102, 106, 'global_brightness',int),
+    )
+    # See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README.pdf for format
+    # of metadata file.
+    v3fields = (
+        (0,    11, 'uid',               str),
+        (12,   20, 'lat',               float),
+        (21,   30, 'lon',               float),
+        (31,   37, 'elevation',         float),
+        (38,   68, 'name',              str),
+        (69,   73, 'grid_elevation',    blank_int),
+        (73,   74, 'pop',               str),
+        (75,   79, 'popsiz',            blank_int),
+        (79,   81, 'topo',              str),
+        (81,   83, 'stveg',             str),
+        (83,   85, 'stloc',             str),
+        (85,   87, 'ocndis',            blank_int),
+        (87,   88, 'aistn',             str),
+        (88,   90, 'towndis',           blank_int),
+        (90,  106, 'grveg',             str),
+        (106, 107, 'popcss',            str),
+    )
+        
+    if 'v2' == format:
+        fields = v2fields
+    else:
+        fields = v3fields
+
+    result = {}
+    try:
+        for line in open(path):
+            d = dict((field, convert(line[a:b]))
+                      for a, b, field, convert in fields)
+            result[d['uid']] = Station(**d)
+    except IOError:
+        warnings.warn("Could not load GHCN metadata (v2.inv) file.")
+
+    return result
 
 
 def get_last_year():
@@ -512,15 +566,6 @@ class Series(object):
     def trim(self):
         self.station_months = len(self._series) - self._series.count(
                 MISSING)
-
-    @property
-    def station(self):
-        """The corresponding `Station` instance.  Only works for station
-        records."""
-        st = stations().get(self.station_uid)
-        if st is None:
-            print "BUM!", self.uid, self.station_uid
-        return st
 
     @property
     def station_uid(self):

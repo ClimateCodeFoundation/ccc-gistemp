@@ -216,10 +216,9 @@ def is_rural(station):
     """
     if parameters.use_global_brightness:
         return station.global_brightness <= parameters.max_rural_brightness
-    else:
-        return (station.US_brightness == '1' or
-                (station.US_brightness == ' ' and
-                 station.pop == 'R'))
+    if parameters.rural_us_special and station.US_brightness != ' ':
+        return station.US_brightness == '1'
+    return station.pop == 'R'
 
 class Struct(object):
     pass

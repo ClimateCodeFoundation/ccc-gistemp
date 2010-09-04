@@ -70,10 +70,19 @@ immediately prior to the peri-urban adjustment step."""
 use_global_brightness = True
 """If this is true, the global brightness field from station metadata
 is used to identify rural stations (global brightness at most
-max_rural_brightness).
-If this is false, the US brightness field is used if it is present (US
-brightness equal to 1), and the population index is used otherwise
-('R' for rural)."""
+max_rural_brightness).  This brightness field was introduced by GISS in
+2010 and is particular to the v2.inv file obtained from GISS.
+If this is false, the GHCN population index ('RSU') is used; except
+(when *rural_us_special* is true) that for the US brightness field
+when present (the US and some neighbouring stations).
+"""
+
+rural_us_special = False
+"""When *use_global_brightness* is false, this flag determines whether
+to treat the US specially (see *use_global_brightness*).  Traditionally,
+prior to 2010, this flag would have been true and
+*use_global_brightness* would have been false.
+"""
 
 max_rural_brightness = 10
 """(when use_global_brightness is true) the maximum brightness value for

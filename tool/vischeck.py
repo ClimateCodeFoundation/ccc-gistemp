@@ -210,7 +210,9 @@ def slope_markers(slopes, coefficients, colours):
     import itertools
     import urllib
 
-    l = [u'Trend (\N{DEGREE SIGN}C/Century) and R\N{SUPERSCRIPT TWO}'.encode('utf-8')] + [format_slope(['full','30-year'], *pl) for pl in zip(slopes, coefficients)]
+    l = [u'Trend in \N{DEGREE SIGN}C/century (R\N{SUPERSCRIPT TWO})'.encode('utf-8')] + [
+      format_slope(['full','30-year'], s, c)
+      for s, c in zip(slopes, coefficients)]
     colours = ['000000'] + colours
     return [
       urllib.quote_plus('@t%s,%s,0,%.2f:%.2f,12' % (
@@ -220,8 +222,9 @@ def slope_markers(slopes, coefficients, colours):
         zip(l, colours, itertools.count())]
 
 def format_slope(texts, slopes, coefficients):
-    """Return a string for the slopes and coefficients in pl, which is a list of pairs."""
-    return ' / '.join('%s: %.2f (%.2f)' % p for p in zip(texts, slopes, coefficients))
+    """Return a string for the slopes and coefficients."""
+
+    return '; '.join('%s: %.2f (%.2f)' % p for p in zip(texts, slopes, coefficients))
 
 class Struct:
     pass

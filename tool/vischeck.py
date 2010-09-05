@@ -93,18 +93,18 @@ def trend(data):
 
 def asgooglechartURL(seq, options={}):
     """*seq* is a sequence of iterables (each one assumed to be the
-    output from :meth:`asann`) into a URL suitable for passing to the
-    Google Chart API.
+    output from :meth:`asann`); convert into a URL suitable for passing
+    to the Google Chart API.
 
     Each element of the sequence corresponds to a different data series,
     all the series are plotted on the same chart.
 
-    *Options* is a dict mapping keywords to optional attributes:
+    *options* is a dict mapping keywords to optional attributes:
 
-    option.offset: specifies the inter-chart offset, as per the -o option
+    options.offset: specifies the inter-chart offset, as per the -o option
     (see module docstring).  The default is zero.
 
-    option.size: specifies the chart size as a tuple (width,
+    options.size: specifies the chart size as a tuple (width,
     height). The default is (600, 500).
     """
 
@@ -135,11 +135,24 @@ def asgooglechartURL(seq, options={}):
             y[i]=''
     xaxis = '|' + '|'.join(map(str, y))
 
+    # Trendlines returns a trend object (describing the 2 trend lines
+    # (short and long)); get one for each data series.
     trends = [trendlines(l) for l in data]
-    trenddata = [t[0] for t in trends]
-    slopes = [t[1:len(data)+1] for t in trends]
-    coefficients = [t[len(data)+1:] for t in trends]
-    ds = ['-999|' + chartsingle(l) for l in data] + trenddata
+    trendfrags = [t.urlfrag for t in trends]
+    slopes = [[t.b_full, t.b_short] for t in trends]
+    coefficients = [[t.r2_full, t.r2_short] for t in trends]
+    # Arrange the series for the "chd=" parameter of the URL.
+    # In an X-Y chart (cht=lxy) each series as drawn consists of a
+    # sequence of xs and a sequence of ys.  In order we have...
+    #   data series 1 (xs then ys),
+    #   data series 2 (xs then ys),
+    #   ...
+    #   long trend 1 (xs then ys),
+    #   short trend 1 (xs then ys),
+    #   long trend 2 (xs then ys),
+    #   short trend 2 (xs then ys)
+    #   ...
+    ds = ['-999|' + chartsingle(l) for l in data] + trendfrags
 
     vaxis = '||-0.5|+0.0|+0.5|'
     chxl = 'chxl=0:'+xaxis+'|1:'+vaxis+'|2:'+vaxis
@@ -210,6 +223,9 @@ def format_slope(texts, slopes, coefficients):
     """Return a string for the slopes and coefficients in pl, which is a list of pairs."""
     return ' / '.join('%s: %.2f (%.2f)' % p for p in zip(texts, slopes, coefficients))
 
+class Struct:
+    pass
+
 def trendlines(data):
     """Return a a triple of (url,slopelong,slopeshort) for
     the full and 30-year trend lines (url is a fragment)."""
@@ -235,10 +251,16 @@ def trendlines(data):
     left_x = -100 + 200*float(i)/(yearmax-yearmin)
     right_y = int(round(a_30 + (yearmin+last_valid) * b_30))
     right_x = -100 + 200*float(last_valid)/(yearmax-yearmin)
-    return ("-100,100|%d,%d|%.0f,%.0f|%d,%d" % (full_left_y, full_right_y,
-                                                left_x, right_x,
-                                                left_y, right_y),
-            b, b_30, r2, r2_30)
+    result = Struct()
+    result.urlfrag = ("-100,100|%d,%d|%.0f,%.0f|%d,%d" %
+        (full_left_y, full_right_y,
+        left_x, right_x,
+        left_y, right_y))
+    result.b_full = b
+    result.b_short = b_30
+    result.r2_full = r2
+    result.r2_short = r2_30
+    return result
 
 def chartsingle(l):
     """Take a list and return a URL fragment for its Google

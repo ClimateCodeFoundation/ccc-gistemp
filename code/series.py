@@ -158,3 +158,62 @@ def monthly_anomalies(data, reference_period=None, base_year=-9999):
         else:
             monthly_anom.append([MISSING]*years)
     return monthly_mean, monthly_anom
+
+# Originally from step1.py
+def monthly_annual(data):
+    """From a sequence of monthly data, compute an annual mean and
+    sequence of annual anomalies.  This has a particular algorithm
+    (via monthly and then seasonal means and anomalies), which must
+    be maintained for bit-for-bit compatibility with GISTEMP; maybe
+    we can drop it later.  A pair (annual_mean, annual_anomalies) is
+    returned.
+    """
+    
+    years = len(data) // 12
+    monthly_mean, monthly_anom = monthly_anomalies(data)
+
+    # :todo:
+    # The seasonal calculation shoud be abstracted into a function.
+    # inputs: years, monthly_anom, monthly_mean
+    # outputs: seasonal_anom, seasonal_mean
+    # Average monthly means to make seasonal means,
+    # and monthly anomalies to make seasonal anomalies.
+    seasonal_mean = []
+    seasonal_anom = []
+    # Compute seasonal anomalies; each season consists of 3 months.
+    for months in [[11, 0, 1],
+                   [2, 3, 4],
+                   [5, 6, 7],
+                   [8, 9, 10],]:
+        # Need at least two valid months for a valid season.
+        seasonal_mean.append(valid_mean((monthly_mean[m] for m in months),
+                                        min = 2))
+        # A list of 3 data series, each being an extract for a
+        # particular month.
+        month_in_season = []
+        for m in months:
+            row = monthly_anom[m] # the list of anomalies for month m
+            if m == 11:
+                # For December, we take the December of the previous
+                # year.  Which we do by shifting the array, and not
+                # using the most recent December.
+                row[1:] = row[:-1]
+                row[0] = MISSING
+            month_in_season.append(row)
+        seasonal_anom_row = []
+        for n in range(years):
+            m = valid_mean((data[n] for data in month_in_season),
+                           min = 2)
+            seasonal_anom_row.append(m)
+        seasonal_anom.append(seasonal_anom_row)
+
+    # Average seasonal means to make annual mean,
+    # and average seasonal anomalies to make annual anomalies
+    # (note: annual anomalies are December-to-November).
+    annual_mean = valid_mean(seasonal_mean, min = 3)
+    annual_anom = []
+    for n in range(years):
+        annual_anom.append(valid_mean((data[n] for data in seasonal_anom),
+                                      min = 3))
+    return (annual_mean, annual_anom)
+

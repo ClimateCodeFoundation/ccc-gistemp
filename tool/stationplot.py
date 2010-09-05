@@ -501,21 +501,19 @@ def asdict(arg, inp, mode, scale=0.1):
 
     # Clear Climate Code, tool directory
     import v2index
+    # Clear Climate Code
+    from code import series
 
     v2 = v2index.File(inp)
 
     table = {}
     for id in arg:
-        for id12,series in v2.get(id):
-            data,begin = from_lines(series, scale)
+        for id12,rows in v2.get(id):
+            data,begin = from_lines(rows, scale)
             if mode == 'anom':
-                # Clear Climate Code, code directory
-                from code.series import anomalize
-                anomalize(data, None)
+                series.anomalize(data, None)
             if mode == 'annual':
-                # Clear Climate code, code directory
-                from code.step1 import monthly_annual
-                _, data = monthly_annual(data)
+                _, data = series.monthly_annual(data)
             table[id12] = (data,begin)
 
     return table

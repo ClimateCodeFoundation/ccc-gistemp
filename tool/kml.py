@@ -150,10 +150,10 @@ def station_annual_anomalies(data):
     maps from station record identifier (12-digit) to an annual anomaly
     series.  All the data series start in 1880."""
 
-    from code import step1
+    from code import series
     from giss_io import V2MeanReader
 
-    return ((record.uid, step1.monthly_annual(record.series)[1])
+    return ((record.uid, series.monthly_annual(record.series)[1])
       for record in V2MeanReader(data, year_min=1880))
 
 def chart_anom(anom):

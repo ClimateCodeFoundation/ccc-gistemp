@@ -45,79 +45,6 @@ import parameters
 import series
 
 
-def valid_mean(seq, min=1):
-    """Takes a sequence, *seq*, and computes the mean of the valid
-    items (using the valid() function).  If there are fewer than *min*
-    valid items, the mean is MISSING."""
-
-    count = 0
-    sum = 0.0
-    for x in seq:
-        if valid(x):
-            sum += x
-            count += 1
-    if count >= min:
-        return sum/float(count)
-    else:
-        return MISSING
-
-def monthly_annual(data):
-    """Computing a mean and set of annual anomalies.  This has a
-    particular algorithm (via monthly and then seasonal means and
-    anomalies), which must be maintained for bit-for-bit compatibility
-    with GISTEMP; maybe we can drop it later.
-    """
-    
-    from series import valid_mean
-
-    years = len(data) // 12
-    monthly_mean, monthly_anom = series.monthly_anomalies(data)
-
-    # :todo:
-    # The seasonal calculation shoud be abstracted into a function.
-    # inputs: years, monthly_anom, monthly_mean
-    # outputs: seasonal_anom, seasonal_mean
-    # Average monthly means to make seasonal means,
-    # and monthly anomalies to make seasonal anomalies.
-    seasonal_mean = []
-    seasonal_anom = []
-    # Compute seasonal anomalies; each season consists of 3 months.
-    for months in [[11, 0, 1],
-                   [2, 3, 4],
-                   [5, 6, 7],
-                   [8, 9, 10],]:
-        # Need at least two valid months for a valid season.
-        seasonal_mean.append(valid_mean((monthly_mean[m] for m in months),
-                                        min = 2))
-        # A list of 3 data series, each being an extract for a
-        # particular month.
-        month_in_season = []
-        for m in months:
-            row = monthly_anom[m] # the list of anomalies for month m
-            if m == 11:
-                # For December, we take the December of the previous
-                # year.  Which we do by shifting the array, and not
-                # using the most recent December.
-                row[1:] = row[:-1]
-                row[0] = MISSING
-            month_in_season.append(row)
-        seasonal_anom_row = []
-        for n in range(years):
-            m = valid_mean((data[n] for data in month_in_season),
-                           min = 2)
-            seasonal_anom_row.append(m)
-        seasonal_anom.append(seasonal_anom_row)
-
-    # Average seasonal means to make annual mean,
-    # and average seasonal anomalies to make annual anomalies
-    # (note: annual anomalies are December-to-November).
-    annual_mean = valid_mean(seasonal_mean, min = 3)
-    annual_anom = []
-    for n in range(years):
-        annual_anom.append(valid_mean((data[n] for data in seasonal_anom),
-                                      min = 3))
-    return (annual_mean, annual_anom)
-
 
 def average(sums, counts):
     """Return an array with sums[i]/counts[i], and MISSING where
@@ -182,7 +109,7 @@ def get_longest_overlap(new_data, begin, records):
     overlap with the *new_data* by considering annual anomalies.
     """
 
-    ann_mean, ann_anoms = monthly_annual(new_data)
+    ann_mean, ann_anoms = series.monthly_annual(new_data)
     overlap = 0
     # :todo: the records are consulted in an essentially arbitrary
     # order (chosen by the implementation of items()), but the order
@@ -353,7 +280,7 @@ def sigma(list):
 
 # Annoyingly similar to get_longest_overlap
 def pieces_get_longest_overlap(new_data, begin, records):
-    ann_mean, ann_anoms = monthly_annual(new_data)
+    _, ann_anoms = series.monthly_annual(new_data)
     overlap = 0
     for rec_id, record in records.items():
         rec_ann_anoms = record.ann_anoms
@@ -409,7 +336,7 @@ def find_quintuples(new_sums, new_wgts,
     log.write("max begin: %s\tmin end: %s\n" % (max_begin, min_end))
 
     new_data = average(new_sums, new_wgts)
-    new_ann_mean, new_ann_anoms = monthly_annual(new_data)
+    new_ann_mean, new_ann_anoms = series.monthly_annual(new_data)
     ann_std_dev = sigma(new_ann_anoms)
     log.write("ann_std_dev = %s\n" % ann_std_dev)
     new_offset = (middle_year - begin)
@@ -527,7 +454,7 @@ def do_combine(stream, log, select_func, combine_func):
         records = {}
         for record in record_set:
             records[record.uid] = record
-            ann_mean, ann_anoms = monthly_annual(record.series)
+            ann_mean, ann_anoms = series.monthly_annual(record.series)
             record.set_ann_anoms(ann_anoms)
             record.ann_mean = ann_mean
         ids = records.keys()

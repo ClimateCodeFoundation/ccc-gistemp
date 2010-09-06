@@ -89,17 +89,10 @@ def internal_to_external(series, scale=0.1):
 
     return [toint(v) for v in series]
 
-
 # TODO: Probably should be a generator.
 def convert_tenths_to_float(tenths_series):
     """The inverse of `internal_to_external`."""
-    t = []
-    for v in tenths_series:
-        if v == MISSING:
-            t.append(code.giss_data.MISSING)
-        else:
-            t.append(tenths_to_float(v))
-    return t
+    return [tenths_to_float(v) for v in tenths_series]
 
 
 def open_or_uncompress(filename):
@@ -519,22 +512,30 @@ def V2MeanReader(path=None, file=None, meta=None, year_min=None):
         f = open(path)
     else:
         f = file
+
     def id12(l):
         """Extract the 12-digit station record identifier."""
         return l[:12]
 
-    def v2_int(s):
-        v = int(s)
-        if v == -9999:
-            return MISSING
-        return v
+    def v2_float(s):
+        """Convert a single datum from string to float; converts missing
+        values from their V2 representation, "-9999", to internal
+        representation, giss_data.MISSING; scales temperatures to
+        convert them from integer tenths to fractional degrees C.
+        """
+
+        if "-9999" == s:
+            return code.giss_data.MISSING
+        else:
+            return float(s) * 0.1
 
     # The Series.add_year protocol assumes that the years are in
     # increasing sequence.  This is so in the v2.mean file but does not
     # seem to be documented (it seems unlikely to change either).
+
+    # Group the input file into blocks of lines, all of which share the
+    # same 12-digit ID.
     for (id, lines) in itertools.groupby(f, id12):
-        # lines is a set of lines which all begin with the same 12
-        # character id.
         key = dict(uid=id, first_year=year_min)
         # 11-digit station ID.
         stid = id[:11]
@@ -545,8 +546,8 @@ def V2MeanReader(path=None, file=None, meta=None, year_min=None):
         for line in lines:
             if line != prev_line:
                 year = int(line[12:16])
-                tenths = [v2_int(line[a:a+5]) for a in range(16, 16+12*5, 5)]
-                record.add_year(year, convert_tenths_to_float(tenths))
+                temps = [v2_float(line[a:a+5]) for a in range(16, 16+12*5, 5)]
+                record.add_year(year, temps)
                 prev_line = line
             else:
                 print ("NOTE: repeated record found: Station %s year %s;"

@@ -307,10 +307,6 @@ class Series(object):
     inclusive. Months are counted from a non-existant year zero. So January,
     1 AD has a month number of 13, February is 14, etc.
 
-    Within series, some leading months and some trailing months may be set to
-    the `MISSING` value. The `good_start_idx` and `good_end_idx` members define
-    the Python range within the series that excludes these missing value.
-
     The GISTEMP/CCC code only uses data that starts from `BASE_YEAR` (1880).
     Some code works on data series that start from this base year. So it is
     convenient to be able to work in terms of years and months relative to this
@@ -368,8 +364,6 @@ class Series(object):
     """
     def __init__(self, **k):
         self._first_month = sys.maxint
-        self._good_start_idx = sys.maxint
-        self._good_end_idx = 0
         self._series = []
         self._good_count = None
         self._ann_anoms_good_count = None
@@ -411,26 +405,6 @@ class Series(object):
     def __len__(self):
         """The length of the series."""
         return len(self._series)
-
-    @property
-    def good_start_idx(self):
-        """Index of the first good value in the `series`.
-
-        It is always true that ``series[good_start_idx:good_end_idx]`` will
-        either be empty or start and end with a valid value.
-
-        """
-        return self._good_start_idx
-
-    @property
-    def good_end_idx(self):
-        """Index of the entry after the last good value in the `series`.
-
-        It is always true that ``series[good_start_idx:good_end_idx]`` will
-        either be empty or start and end with a valid value.
-
-        """
-        return self._good_end_idx
 
     @property
     def first_month(self):
@@ -579,17 +553,7 @@ class Series(object):
         January of (a hypothetical) 0 AD is 1."""
 
         self._first_month = first_month
-        self._good_start_idx = sys.maxint
-        self._good_end_idx = 0
-        self._series = []
-        for v in series:
-            if invalid(v):
-                self._series.append(MISSING)
-            else:
-                self._good_start_idx = min(self._good_start_idx,
-                        len(self._series))
-                self._series.append(v)
-                self._good_end_idx = max(self._good_end_idx, len(self._series))
+        self._series = list(series)
 
     def add_year(self, year, data):
         """Add a year's worth of data.  *data* should be a sequence of
@@ -605,7 +569,7 @@ class Series(object):
             # Note: This assumes the series is a whole number of years.
             gap = year - self.last_year - 1
             if gap > 0:
-                self._series.extend([MISSING] * gap * 12)
+                self._series.extend([MISSING] * (gap * 12))
         assert self.first_month % 12 == 1
         if year < self.first_year:
             # Ignore years before the first year.  Previously this case
@@ -613,14 +577,7 @@ class Series(object):
             return
         assert year == self.last_year + 1
          
-        for v in data:
-            if invalid(v):
-                self._series.append(MISSING)
-            else:
-                self._good_start_idx = min(self._good_start_idx,
-                        len(self._series))
-                self._series.append(v)
-                self._good_end_idx = max(self._good_end_idx, len(self._series))
+        self._series.extend(data)
     add_year = clear_cache(add_year)
 
     def set_value(self, idx, value):

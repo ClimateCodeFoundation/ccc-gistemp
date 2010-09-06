@@ -501,7 +501,7 @@ def GHCNV3Reader(inp, meta=None, year_min=None, scale=None):
             yield record
 
 
-def V2MeanReader(path, meta=None, year_min=None):
+def V2MeanReader(path=None, file=None, meta=None, year_min=None):
     """Reads a file in GHCN v2.mean format and yields each station.
 
     If a *meta* dict is supplied then the Series instance will have its
@@ -515,7 +515,10 @@ def V2MeanReader(path, meta=None, year_min=None):
     of course the format used by the GHCN source), but modern ccc-gistemp
     produces this format for the outputs of Steps 0, 1, and 2."""
 
-    f = open(path)
+    if path:
+        f = open(path)
+    else:
+        f = file
     def id12(l):
         """Extract the 12-digit station record identifier."""
         return l[:12]

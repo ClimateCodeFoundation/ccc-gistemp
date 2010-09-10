@@ -459,6 +459,19 @@ class Series(object):
             self._good_count = len(self._series) - bad_count
         return self._good_count
 
+    def first_valid_year(self):
+        """The first calendar year with any valid data."""
+        index = (i for i,x in enumerate(self.series) if x != MISSING)
+        first = index.next()
+        return first//12 + self.first_year
+
+    def last_valid_year(self):
+        """The last calendar year with any valid data."""
+        index = (i for i,x in reversed(list(enumerate(self.series)))
+          if x != MISSING)
+        last = index.next()
+        return last//12 + self.first_year
+
     def get_monthly_valid_counts(self):
         """Get number of good values for each month.
 

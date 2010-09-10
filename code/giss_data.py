@@ -44,7 +44,6 @@ def valid(v):
     return not invalid(v)
 
 
-_stations = None
 _v2_sources = None
 
 
@@ -62,24 +61,13 @@ class Station(object):
     def __repr__(self):
         return "Station(%r)" % self.values
 
-
-def stations():
-    """Return a dictionary of all known Stations, keyed by
-    Station.uid.  The first time this is called, it reads the station
-    inventory file (usually input/v2.inv).
-    """
-
-    global _stations
-    if not _stations:
-        _stations = read_stations(path='input/v2.inv')
-    return _stations
-
 def read_stations(path, format='v2'):
     """Read station metadata from file, return it as a dictionary.
 
-    The input file is in the same format as the GHCN V2 file v2.temperature.inv
-    (in fact, it's the same file, but with records added for the Antarctic
-    stations that GHCN doesn't have).   Descriptions of that file's
+    The input file is nearly in the same format as the
+    GHCN V2 file v2.temperature.inv (it has extra fields for satellite
+    brightness and extra records for Antarctic stations that GHCN doesn't
+    have).   Descriptions of that file's
     format can be found in the Fortran programs:
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.read.inv.f
     ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.read.data.f
@@ -96,9 +84,9 @@ def read_stations(path, format='v2'):
        name                ALMASIPPI,MA         CHICAGO/O'HARE, ILLINOIS
         The station's name.
        lat                 49.55                42.00
-        The latitude, in degrees to two decimal places.
+        The latitude, in degrees (two decimal places).
        lon                 -98.20               -87.90
-        The longitude, in degrees to two decimal places.
+        The longitude, in degrees (two decimal places).
     1  elevs               274                  205
         The station elevation in metres.
     2  elevg               287                  197
@@ -106,6 +94,7 @@ def read_stations(path, format='v2'):
     3  pop                 R                    U
         'R' for rural,  'S' for semi-urban, 'U' for urban
     4  ipop                -9                   6216
+        Population of town in thousands
     5  topo                FL                   FL
         The topography
     6  stveg               xx                   xx
@@ -114,7 +103,7 @@ def read_stations(path, format='v2'):
     9  airstn              x                    A
     10 itowndis            -9                   1
        grveg               COOL FIELD/WOODS     COOL CROPS
-        An indication of the type of ground vegetation. For example,
+        An indication of vegetation, from a gridded dataset. For example,
         'TROPICAL DRY FOR'.
     G  GHCN_brightness     A                    C
     U  US_brightness       1                    3
@@ -195,7 +184,8 @@ def read_stations(path, format='v2'):
                       for a, b, field, convert in fields)
             result[d['uid']] = Station(**d)
     except IOError:
-        warnings.warn("Could not load GHCN metadata (v2.inv) file.")
+        warnings.warn("Could not load %s GHCN metadata file: %s" %
+          (format, path))
 
     return result
 
@@ -297,11 +287,11 @@ class StationMetaData(object):
 class Series(object):
     """Monthly temperature Series.
 
-    Instances contain a series of average monthly temperatures, which are
-    accessible via the `series` property. The series propery always provides
-    an array of floating point values in celsius. This property should
-    **always** be treated as read-only; the effect of modifying elements is
-    undefined.
+    An instance contains a series of monthly data (in ccc-gistemp
+    the data are average monthly temperature values in degrees
+    Celsius), accessible via the `series` property.  This property
+    should **always** be treated as read-only; the effect of modifying
+    elements is undefined.
 
     The series coveres the months from `first_month` to `last_month` month
     inclusive. Months are counted from a non-existant year zero. So January,
@@ -522,6 +512,7 @@ class Series(object):
     def set_ann_anoms(self, ann_anoms):
         self.ann_anoms[:] = ann_anoms
 
+    # :todo: consider removing @property
     @property
     def ann_anoms_good_count(self):
         """Number of good values in the annual anomalies"""

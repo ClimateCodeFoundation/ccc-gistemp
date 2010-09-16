@@ -660,11 +660,14 @@ class DecimalWriter(object):
         self.f.close()
 
 
+# :todo: read_antarctic and read_australia are probably too similar.
+# :todo: read_antarctic and read_australia would probably benefit from
+# itertools.groupby
 
 antarc_discard_re = re.compile(r'^$|^Get |^[12A-Z]$')
 antarc_temperature_re = re.compile(r'^(.*) .* *temperature')
 
-def read_antarctic(path, station_path, discriminator):
+def read_antarctic(path, station_path, discriminator, meta=None):
     stations = read_antarc_station_ids(station_path, discriminator)
     record = None
     for line in open(path):
@@ -677,7 +680,11 @@ def read_antarctic(path, station_path, discriminator):
             id12 = stations[station_name]
             if record is not None:
                 yield record
-            record = code.giss_data.Series(uid=id12)
+            key = dict(uid=id12)
+            id11 = id12[:11]
+            if meta and meta.get(id11):
+                key['station'] = meta[id11]
+            record = code.giss_data.Series(**key)
             continue
         line = line.strip()
         if line.find('.') >= 0 and line[0] in '12':
@@ -692,7 +699,7 @@ def read_antarctic(path, station_path, discriminator):
 austral_discard_re = re.compile(r'^$|:')
 austral_header_re = re.compile(r'^\s*(.+?)  .*(E$|E )')
 
-def read_australia(path, station_path, discriminator):
+def read_australia(path, station_path, discriminator, meta=None):
     stations = read_antarc_station_ids(station_path, discriminator)
     record = None
     for line in open(path):
@@ -704,7 +711,11 @@ def read_australia(path, station_path, discriminator):
             id12 = stations[station_name]
             if record is not None:
                 yield record
-            record = code.giss_data.Series(uid=id12)
+            key = dict(uid=id12)
+            id11 = id12[:11]
+            if meta and meta.get(id11):
+                key['station'] = meta[id11]
+            record = code.giss_data.Series(**key)
             continue
         line = line.strip()
         if line.find('.') >= 0 and line[0] in '12':
@@ -947,9 +958,12 @@ def step0_input():
           meta=code.giss_data.read_stations(invfile, format='v3'),
           year_min=code.giss_data.BASE_YEAR)
     input.scar = itertools.chain(
-            read_antarctic("input/antarc1.txt", "input/antarc1.list", '8'),
-            read_antarctic("input/antarc3.txt", "input/antarc3.list", '9'),
-            read_australia("input/antarc2.txt", "input/antarc2.list", '7'))
+        read_antarctic("input/antarc1.txt", "input/antarc1.list", '8',
+          meta=v2meta),
+        read_antarctic("input/antarc3.txt", "input/antarc3.list", '9',
+          meta=v2meta),
+        read_australia("input/antarc2.txt", "input/antarc2.list", '7',
+          meta=v2meta))
     input.hohenpeissenberg = read_hohenpeissenberg(
             "input/t_hohenpeissenberg_200306.txt_as_received_July17_2003")
 

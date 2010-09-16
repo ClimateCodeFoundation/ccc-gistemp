@@ -763,14 +763,19 @@ def read_antarc_station_ids(path, discriminator):
     return dict
 
 
-def convert_USHCN_id(record_stream, stations):
+def convert_USHCN_id(record_stream, stations, meta=None):
     """Convert all the records in *record_stream* from having (6-digit)
     USHCN identifiers to having 12-digit GHCN identifiers (using the
-    *stations* dictionary)."""
+    *stations* dictionary).  If *meta* (a dictionary) is specified then
+    station metadata is added to each record (if it has a 11-digit GHCN
+    station ID that is in the meta dictionary)."""
 
     for record in record_stream:
         id12 = stations[int(record.uid)]
         record.uid = id12
+        id11 = id12[:11]
+        if meta and id11 in meta:
+            record.station = meta[id11]
         yield record
 
 def convert_F_to_C(record_stream):
@@ -844,7 +849,7 @@ def read_USHCN(path):
                 record.add_year(year, temps)
         yield record
 
-def read_USHCN_converted(path, stations):
+def read_USHCN_converted(path, stations, meta=None):
     """Read the USHCN data in the file *path*, converting each record to
     degrees Celsius, and converting their station identifiers to use the
     12-digit GHCN identifiers specified in the *stations* dict.
@@ -852,7 +857,7 @@ def read_USHCN_converted(path, stations):
 
     ushcn = read_USHCN(path)
     celsius = convert_F_to_C(ushcn)
-    ghcn_ids = convert_USHCN_id(celsius, stations)
+    ghcn_ids = convert_USHCN_id(celsius, stations, meta)
     return ghcn_ids
 
 
@@ -947,7 +952,7 @@ def step0_input():
     ushcn_map = read_USHCN_stations('input/ushcn2.tbl',
       'input/ushcnV2_cmb.tbl')
     input.ushcn = read_USHCN_converted(ushcn_input_file(),
-      ushcn_map)
+      ushcn_map, meta=v2meta)
     input.ghcn = V2MeanReader("input/v2.mean",
         meta=v2meta,
         year_min=code.giss_data.BASE_YEAR)

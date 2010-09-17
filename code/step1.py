@@ -152,8 +152,9 @@ def combine(sums, wgts, begin, records, log, new_id_):
             return
         del records[rec_id]
         add(sums, wgts, diff, begin, record)
-        log.write("\t %s %d %d %f\n" % (rec_id, record.first_year,
-                                        record.last_year - 1, diff))
+        log.write("\t %s %d %d %f\n" % (rec_id,
+            record.first_valid_year(),
+            record.last_valid_year(), diff))
 
 def get_best(records):
     """Given a dict of records, return the "best" one, and
@@ -325,8 +326,8 @@ def find_quintuples(new_sums, new_wgts,
                     new_id, rec_id, log):
     """Returns a boolean."""
 
-    rec_begin = record.first_year
-    rec_end = rec_begin + record.last_year - record.first_year
+    rec_begin = record.first_valid_year()
+    rec_end = record.last_valid_year()
 
     actual_begin, actual_end = get_actual_endpoints(new_wgts, begin)
 
@@ -401,9 +402,9 @@ def pieces_combine(sums, wgts, begin, records, log, new_id):
         record, rec_id = pieces_get_longest_overlap(average(sums, wgts),
                                                     begin, records)
         rec_begin = record.first_year
-        rec_end = rec_begin + record.last_year - record.first_year
+        rec_end = record.last_year
 
-        log.write("\t %s %d %d\n" % (rec_id, rec_begin, rec_end - 1))
+        log.write("\t %s %d %d\n" % (rec_id, rec_begin, rec_end))
 
         is_okay = find_quintuples(sums, wgts,
                                   begin, record, rec_begin,
@@ -412,7 +413,7 @@ def pieces_combine(sums, wgts, begin, records, log, new_id):
         if is_okay:
             del records[rec_id]
             add(sums, wgts, 0.0, begin, record)
-            log.write("\t %s %d %d\n" % (rec_id, rec_begin, rec_end - 1))
+            log.write("\t %s %d %d\n" % (rec_id, rec_begin, rec_end))
         else:
             log.write("\t***no other pieces okay***\n")
             return

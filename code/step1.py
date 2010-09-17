@@ -321,8 +321,8 @@ def get_actual_endpoints(wgts, begin):
             y_max = max(y_max, y)
     return begin+y_min, begin+y_max
 
-def find_quintuples(new_sums, new_wgts,
-                    begin, record, rec_begin,
+def find_quintuples(new_sums, new_wgts, begin,
+                    record,
                     new_id, rec_id, log):
     """Returns a boolean."""
 
@@ -333,6 +333,8 @@ def find_quintuples(new_sums, new_wgts,
 
     max_begin = max(actual_begin, rec_begin)
     min_end = min(actual_end, rec_end)
+    # Since max_begin and min_end are integers, this rounds fractional
+    # middle years up.
     middle_year = int(.5 * (max_begin + min_end) + 0.5)
     log.write("max begin: %s\tmin end: %s\n" % (max_begin, min_end))
 
@@ -345,7 +347,7 @@ def find_quintuples(new_sums, new_wgts,
 
     rec_ann_anoms = record.ann_anoms
     rec_ann_mean = record.ann_mean
-    rec_offset = (middle_year - rec_begin)
+    rec_offset = (middle_year - record.first_year)
     rec_len = len(rec_ann_anoms)
 
     # Whether we have an "overlap" or not.  We have an "overlap" if
@@ -401,13 +403,13 @@ def pieces_combine(sums, wgts, begin, records, log, new_id):
     while records:
         record, rec_id = pieces_get_longest_overlap(average(sums, wgts),
                                                     begin, records)
-        rec_begin = record.first_year
-        rec_end = record.last_year
+        rec_begin = record.first_valid_year()
+        rec_end = record.last_valid_year()
 
         log.write("\t %s %d %d\n" % (rec_id, rec_begin, rec_end))
 
-        is_okay = find_quintuples(sums, wgts,
-                                  begin, record, rec_begin,
+        is_okay = find_quintuples(sums, wgts, begin,
+                                  record,
                                   new_id, rec_id, log)
 
         if is_okay:

@@ -167,7 +167,7 @@ def get_best(records):
     longest = 0
     for rec_id in sorted(records.keys()):
         record = records[rec_id]
-        length = record.ann_anoms_good_count
+        length = record.ann_anoms_good_count()
         rank = ranks[record.source]
         if rank > best:
             best = rank
@@ -428,7 +428,7 @@ def get_longest(records):
     # :todo: The order depends on the implementation of records.items,
     # and could matter.
     for rec_id, record in records.items():
-        length = record.ann_anoms_good_count
+        length = record.ann_anoms_good_count()
         if length > longest:
             longest = length
             longest_rec = record

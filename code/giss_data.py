@@ -229,7 +229,6 @@ def clear_cache(func):
     """
     def f(self, *args, **kwargs):
         self._good_count = None
-        self._ann_anoms_good_count = None
         return func(self, *args, **kwargs)
 
     return f
@@ -356,7 +355,6 @@ class Series(object):
         self._first_month = sys.maxint
         self._series = []
         self._good_count = None
-        self._ann_anoms_good_count = None
         self.ann_anoms = []
         series = None
         if 'first_year' in k:
@@ -525,16 +523,13 @@ class Series(object):
     def set_ann_anoms(self, ann_anoms):
         self.ann_anoms[:] = ann_anoms
 
-    # :todo: consider removing @property
-    @property
     def ann_anoms_good_count(self):
         """Number of good values in the annual anomalies"""
-        if self._ann_anoms_good_count is None:
-            bad = 0
-            for v in self.ann_anoms:
-                bad += invalid(v)
-            self._ann_anoms_good_count = len(self.ann_anoms) - bad
-        return self._ann_anoms_good_count
+        bad = 0
+        for v in self.ann_anoms:
+            bad += invalid(v)
+        good_count = len(self.ann_anoms) - bad
+        return good_count
 
     def pad_with_missing(self, n):
         while len(self) < n:

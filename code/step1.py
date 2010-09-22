@@ -40,7 +40,7 @@ import struct
 import itertools
 
 import read_config
-from giss_data import valid, invalid, MISSING
+from giss_data import valid, invalid, MISSING, BASE_YEAR
 import parameters
 import series
 
@@ -60,31 +60,6 @@ def average(sums, counts):
             data[i] = float(sum) / count
 
     return data
-
-# :todo: unify with code in get_actual_endpoints
-def final_average(sums, weights, begin):
-    """Compute an average from *sums* and *weights*, return a new
-    (*begin*,*data*) pair.  The results are trimmed so that the first
-    and last years have valid data.
-    """
-
-    y_min, y_max = 9999, -9999
-    assert len(weights) % 12 == 0
-    # Find the minimum and maximum years with data.
-    for i in range(0, len(weights), 12):
-        if sum(weights[i:i+12]) > 0:
-            y = i//12
-            y_min = min(y_min, y)
-            y_max = max(y_max, y)
-    # Trim (won't actually trim if first and last year have data).
-    years = y_max - y_min + 1
-    begin = begin + y_min
-    month_base = y_min * 12
-    month_limit = (y_max+1) * 12
-    sums = sums[month_base:month_limit]
-    weights = weights[month_base:month_limit]
-    assert len(weights) == 12*years
-    return begin, average(sums, weights)
 
 def add(sums, wgts, diff, begin, record):
     """Add the data from *record* to the *sums* and *wgts* arrays, first
@@ -235,6 +210,7 @@ def fresh_arrays(record, begin, years):
 
     return sums, wgts
 
+comb_log = open('log/comb.log','w')
 
 def comb_records(stream):
     """Combine records for the same station (the same id11) where
@@ -242,7 +218,7 @@ def comb_records(stream):
     at most the number of original records (in the case where no
     combining is possible), and each combined record is yielded."""
 
-    return do_combine(stream, open('log/comb.log','w'), get_best, combine)
+    return do_combine(stream, comb_log, get_best, combine)
 
 
 def adjust_helena(stream):
@@ -304,7 +280,6 @@ def pieces_get_longest_overlap(new_data, begin, records):
         best_record = record
     return best_record, best_id
 
-# :todo: unify with code in final_average
 def get_actual_endpoints(wgts, begin):
     """For the array of weights in *wgts* return the first and last
     calendar years that have some weight (contain a month with non-zero
@@ -473,13 +448,14 @@ def do_combine(stream, log, select_func, combine_func):
             log.write("\t%s %s %s -- %s\n" % (rec_id, begin, end,
                 record.source))
             combine_func(sums, wgts, begin, record_dict, log, rec_id)
-            begin, final_data = final_average(sums, wgts, begin)
+            final_data = average(sums, wgts)
             record.set_series(begin * 12 + 1, final_data)
             yield record
             ids = record_dict.keys()
             if not ids:
                 break
 
+pieces_log = open('log/pieces.log','w')
 
 def comb_pieces(stream):
     """comb_pieces() attempts to further combine the records produced
@@ -489,8 +465,7 @@ def comb_pieces(stream):
     have in common) are on average closer together than the standard
     deviation of the combined record."""
 
-    return do_combine(stream, open('log/pieces.log','w'),
-                      get_longest, pieces_combine)
+    return do_combine(stream, pieces_log, get_longest, pieces_combine)
 
 
 def drop_strange(data):
@@ -503,6 +478,7 @@ def drop_strange(data):
         changes = changes_dict.get(record.uid, [])
         series = record.series
         begin = record.first_year
+        # :todo: Use record.last_year
         end = begin + (len(series)//12) - 1
         for (kind, year, x) in changes:
             if kind == 'years':
@@ -510,30 +486,26 @@ def drop_strange(data):
                 year1 = year
                 year2 = x
                 if year1 <= begin and year2 >= end:
-                    # drop this whole record
+                    # Drop this whole record.  Note: avoids "else:"
+                    # clause at end of "for" loop.
                     break
 
-                if year1 <= begin:
-                    if year2 >= begin:
-                        # trim at the start
-                        series = series[(year2 - begin + 1)*12:]
-                        begin = year2 + 1
+                # Clamp range of deleted years to the range of the
+                # series.
+                year1 = max(year1, begin)
+                year2 = min(year2, end)
+                if year2 < year1:
+                    # Happens when deleted range is entirely outside the
+                    # range of the series.  In which case, pass record
+                    # unchanged.
                     continue
-
-                if year2 >= end:
-                    if year1 <= end:
-                        # trim at the end
-                        series = series[:(year1 - begin)*12]
-                        end = year1 - 1
-                    continue
-                # remove some years from mid-series
+                # Invalidate the data.
                 nmonths = (year2 + 1 - year1) * 12
                 series[(year1-begin)*12:(year2+1-begin)*12] = [
                         MISSING] * nmonths
 
             else: # remove a single month
                 series[(year-begin)*12 + x-1] = MISSING
-
         else:
             record.set_series(begin * 12 + 1, series)
             yield record
@@ -577,4 +549,5 @@ def step1(record_source):
     combined_pieces = comb_pieces(helena_adjusted)
     without_strange = drop_strange(combined_pieces)
     for record in alter_discont(without_strange):
+        assert record.first_year == BASE_YEAR
         yield record

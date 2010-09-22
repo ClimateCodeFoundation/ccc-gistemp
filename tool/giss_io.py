@@ -667,7 +667,8 @@ class DecimalWriter(object):
 antarc_discard_re = re.compile(r'^$|^Get |^[12A-Z]$')
 antarc_temperature_re = re.compile(r'^(.*) .* *temperature')
 
-def read_antarctic(path, station_path, discriminator, meta=None):
+def read_antarctic(path, station_path, discriminator,
+  meta=None, year_min=None):
     stations = read_antarc_station_ids(station_path, discriminator)
     record = None
     for line in open(path):
@@ -680,7 +681,7 @@ def read_antarctic(path, station_path, discriminator, meta=None):
             id12 = stations[station_name]
             if record is not None:
                 yield record
-            key = dict(uid=id12)
+            key = dict(uid=id12, first_year=year_min)
             id11 = id12[:11]
             if meta and meta.get(id11):
                 key['station'] = meta[id11]
@@ -699,7 +700,8 @@ def read_antarctic(path, station_path, discriminator, meta=None):
 austral_discard_re = re.compile(r'^$|:')
 austral_header_re = re.compile(r'^\s*(.+?)  .*(E$|E )')
 
-def read_australia(path, station_path, discriminator, meta=None):
+def read_australia(path, station_path, discriminator,
+  meta=None, year_min=None):
     stations = read_antarc_station_ids(station_path, discriminator)
     record = None
     for line in open(path):
@@ -711,7 +713,7 @@ def read_australia(path, station_path, discriminator, meta=None):
             id12 = stations[station_name]
             if record is not None:
                 yield record
-            key = dict(uid=id12)
+            key = dict(uid=id12, first_year=year_min)
             id11 = id12[:11]
             if meta and meta.get(id11):
                 key['station'] = meta[id11]
@@ -821,7 +823,8 @@ def read_USHCN(path):
         print "(Reading %s)" % element
 
     for id,lines in itertools.groupby(open_or_uncompress(path), id6):
-        record = code.giss_data.Series(uid=id)
+        record = code.giss_data.Series(uid=id,
+          first_year=code.giss_data.BASE_YEAR)
         for line in lines:
             if not noted_element:
                 note_element(line)
@@ -829,8 +832,6 @@ def read_USHCN(path):
             # '1', '2', '3' indicate (max, min, average) temperatures.
             assert line[6] in '123'
             year = int(line[7:11])
-            if year < code.giss_data.BASE_YEAR: # discard data before 1880
-                continue
 
             temps = []
             valid = False
@@ -964,11 +965,11 @@ def step0_input():
           year_min=code.giss_data.BASE_YEAR)
     input.scar = itertools.chain(
         read_antarctic("input/antarc1.txt", "input/antarc1.list", '8',
-          meta=v2meta),
+          meta=v2meta, year_min=code.giss_data.BASE_YEAR),
         read_antarctic("input/antarc3.txt", "input/antarc3.list", '9',
-          meta=v2meta),
+          meta=v2meta, year_min=code.giss_data.BASE_YEAR),
         read_australia("input/antarc2.txt", "input/antarc2.list", '7',
-          meta=v2meta))
+          meta=v2meta, year_min=code.giss_data.BASE_YEAR))
     input.hohenpeissenberg = read_hohenpeissenberg(
             "input/t_hohenpeissenberg_200306.txt_as_received_July17_2003")
 
@@ -983,7 +984,9 @@ def step0_output(data):
     out.close()
 
 def step1_input():
-    return V2MeanReader("work/v2.mean_comb", meta=v2meta)
+    return V2MeanReader("work/v2.mean_comb",
+        meta=v2meta,
+        year_min=code.giss_data.BASE_YEAR)
 
 def step1_output(data):
     out = V2MeanWriter(path="work/v2.step1.out")

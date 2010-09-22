@@ -5,9 +5,14 @@
 # step1.py
 #
 # Nick Barnes, Ravenbrook Limited, 2008-08-06
+# David Jones, Climate Code Foundation, 2010-09-22
 
 """
-Python code reproducing the STEP1 part of the GISTEMP algorithm.
+Python code reproducing the Step 1 part of the GISTEMP algorithm.  In
+this step: duplicate records from the same station (a GHCN v2 feature)
+are combined into a single record, if possible; certain records (or
+parts) are adjusted or dropped, under the control of configuration
+files.
 
 Requires the following files in the input/ directory,
 from GISTEMP STEP1/input_files/:
@@ -36,18 +41,18 @@ Also requires the existence of writeable work/ and log/ directories.
 """
 
 import math
-import struct
 import itertools
 
+# Clear Climate Code
 import read_config
 from giss_data import valid, invalid, MISSING, BASE_YEAR
 import parameters
 import series
 
 
-
 def average(sums, counts):
-    """Return an array with sums[i]/counts[i], and MISSING where
+    """Divide *sums* by *counts* to make a series of averages.
+    Return an array with sums[i]/counts[i], and MISSING where
     counts[i] is zero.
     """
 
@@ -63,25 +68,24 @@ def average(sums, counts):
 
 def add(sums, wgts, diff, begin, record):
     """Add the data from *record* to the *sums* and *wgts* arrays, first
-    shifting it by subtracting *diff*."""
+    shifting it by subtracting *diff*.  *begin* is the first year for
+    the *sums* and *wgts* array which is assumed (and asserted) to be
+    the same as *record.first_year*."""
 
-    rec_begin = record.first_year
-    rec_years = record.last_year - record.first_year + 1
-    rec_data = record.series
-    assert len(rec_data) == 12*rec_years
-    offset = rec_begin - begin
-    offset *= 12
-    for i in range(len(rec_data)):
-        datum = rec_data[i]
+    assert record.first_year == begin
+    for i,datum in enumerate(record.series):
         if invalid(datum):
             continue
-        index = i + offset
-        sums[index] += datum - diff
-        wgts[index] += 1
+        sums[i] += datum - diff
+        wgts[i] += 1
 
 def get_longest_overlap(new_data, begin, records):
     """Find the record in the *records* dict that has the longest
     overlap with the *new_data* by considering annual anomalies.
+
+    A triple (record, id, diff) is returned, or if the overlap is
+    less than parameters.station_combine_min_overlap years,
+    (None, None, MISSING) is returned.
     """
 
     ann_mean, ann_anoms = series.monthly_annual(new_data)
@@ -96,12 +100,9 @@ def get_longest_overlap(new_data, begin, records):
         rec_years = record.last_year - record.first_year + 1
         rec_begin = record.first_year
         sum = wgt = 0
-        for n in range(rec_years):
-            rec_anom = rec_ann_anoms[n]
+        for rec_anom,anom in zip(rec_ann_anoms, ann_anoms):
             if invalid(rec_anom):
                 continue
-            year = n + rec_begin
-            anom = ann_anoms[year - begin]
             if invalid(anom):
                 continue
             wgt += 1
@@ -115,14 +116,14 @@ def get_longest_overlap(new_data, begin, records):
         best_id = rec_id
         best_record = record
     if overlap < parameters.station_combine_min_overlap:
-        return 0, 0, MISSING
+        return None, None, MISSING
     return best_record, best_id, diff
 
 def combine(sums, wgts, begin, records, log, new_id_):
     while records:
         record, rec_id, diff = get_longest_overlap(average(sums, wgts),
                                                    begin, records)
-        if invalid(diff):
+        if not record:
             log.write("\tno other records okay\n")
             return
         del records[rec_id]
@@ -165,48 +166,41 @@ def make_record_dict(records, ids):
     *record_dict* contains all the new dictionaries made; *year_min* and
     *year_max* are the minimum and maximum years with data, across all
     the records consulted.
+
+    This function asserts that all the records have the same first year
+    (which will be *year_min*)
     """
 
     record_dict = {}
-    y_min, y_max = 9999, -9999
-    for rec_id in ids:
-        record = records[rec_id]
-        begin = record.first_year
-        end = record.last_year
-        y_min = min(y_min, begin)
-        y_max = max(y_max, end)
-        record_dict[rec_id] = record
+    record_dict = dict((rec_id, records[rec_id]) for rec_id in ids)
+    first_years = set(record.first_year for record in record_dict.values())
+    assert 1 == len(first_years)
+    y_min = list(first_years)[0]
+    y_max = max(record.last_year for record in record_dict.values())
     return record_dict, y_min, y_max
 
 def fresh_arrays(record, begin, years):
     """Make and return a fresh set of sums, and wgts arrays.  Each
     array is list (of length 12 * years).
 
-    *begin* should be the starting year for the arrays, which must
-    be no later than the starting year for the record.
+    *begin* should be the starting year for the arrays, which is
+    assumed, and asserted, to be the same as *record.first_year*.
     """
+
+    assert record.first_year == begin
 
     nmonths = years * 12
 
-    rec_data = record.series
-    rec_begin = record.first_year
-    rec_years = record.last_year - record.first_year + 1
     # Number of months in record.
-    rec_months = rec_years * 12
-    assert rec_months == len(record)
-    assert rec_months == len(rec_data)
-    # The record may begin at a later year from the arrays we are
-    # creating, so we need to offset it when we copy.
-    offset = rec_begin - begin
-    assert offset >= 0
-    offset *= 12
+    rec_months = len(record)
+    assert rec_months <= nmonths
 
     sums = [0.0] * nmonths
     # Copy valid data rec_data into sums, assigning 0 for invalid data.
-    sums[offset:offset+rec_months] = (valid(x)*x for x in rec_data)
+    sums[:rec_months] = (valid(x)*x for x in record.series)
     # Let wgts[i] be 1 where sums[i] is valid.
     wgts = [0] * nmonths
-    wgts[offset:offset+rec_months] = (int(valid(x)) for x in rec_data)
+    wgts[:rec_months] = (int(valid(x)) for x in record.series)
 
     return sums, wgts
 
@@ -257,22 +251,17 @@ def sigma(list):
 
 # Annoyingly similar to get_longest_overlap
 def pieces_get_longest_overlap(new_data, begin, records):
+    """Like other functions, assumes (and asserts) that *begin* is
+    the first year for all the records."""
+
     _, ann_anoms = series.monthly_annual(new_data)
     overlap = 0
     for rec_id, record in records.items():
-        rec_ann_anoms = record.ann_anoms
-        rec_years = record.last_year - record.first_year + 1
-        rec_begin = record.first_year
-        wgt = 0
-        for n in range(rec_years):
-            rec_anom = rec_ann_anoms[n]
-            if invalid(rec_anom):
-                continue
-            year = n + rec_begin
-            anom = ann_anoms[year - begin]
-            if invalid(anom):
-                continue
-            wgt = wgt + 1
+        assert record.first_year == begin
+        common = [(rec_anom,anom)
+          for rec_anom, anom in zip(record.ann_anoms, ann_anoms)
+          if valid(rec_anom) and valid(anom)]
+        wgt = len(common)
         if wgt < overlap:
             continue
         overlap = wgt
@@ -301,6 +290,8 @@ def find_quintuples(new_sums, new_wgts, begin,
                     new_id, rec_id, log):
     """Returns a boolean."""
 
+    assert record.first_year == begin
+
     rec_begin = record.first_valid_year()
     rec_end = record.last_valid_year()
 
@@ -317,12 +308,11 @@ def find_quintuples(new_sums, new_wgts, begin,
     new_ann_mean, new_ann_anoms = series.monthly_annual(new_data)
     ann_std_dev = sigma(new_ann_anoms)
     log.write("ann_std_dev = %s\n" % ann_std_dev)
-    new_offset = (middle_year - begin)
+    offset = (middle_year - begin)
     new_len = len(new_ann_anoms)
 
     rec_ann_anoms = record.ann_anoms
     rec_ann_mean = record.ann_mean
-    rec_offset = (middle_year - record.first_year)
     rec_len = len(rec_ann_anoms)
 
     # Whether we have an "overlap" or not.  We have an "overlap" if
@@ -339,22 +329,17 @@ def find_quintuples(new_sums, new_wgts, begin,
             for sign in [-1, 1]:
                 if sign == 1 and i == 0:
                     continue
-                index1 = i * sign + new_offset
-                index2 = i * sign + rec_offset
-                if index1 < 0 or index1 >= new_len:
-                    anom1 = MISSING
-                else:
-                    anom1 = new_ann_anoms[index1]
-                if index2 < 0 or index2 >= rec_len:
-                    anom2 = MISSING
-                else:
-                    anom2 = rec_ann_anoms[index2]
-                if valid(anom1):
-                    sum1 += anom1 + new_ann_mean
-                    count1 += 1
-                if valid(anom2):
-                    sum2 += anom2 + rec_ann_mean
-                    count2 += 1
+                index = i * sign + offset
+                if 0 <= index < new_len:
+                    anom1 = new_ann_anoms[index]
+                    if valid(anom1):
+                        sum1 += anom1 + new_ann_mean
+                        count1 += 1
+                if 0 < index < rec_len:
+                    anom2 = rec_ann_anoms[index]
+                    if valid(anom2):
+                        sum2 += anom2 + rec_ann_mean
+                        count2 += 1
         if (count1 >= parameters.station_combine_min_mid_years
             and count2 >= parameters.station_combine_min_mid_years):
             log.write("overlap success: %s %s\n" % (new_id, rec_id))
@@ -371,7 +356,7 @@ def find_quintuples(new_sums, new_wgts, begin,
             break
     if not ov_success:
         log.write("overlap failure: %s %s\n" % (new_id, rec_id))
-    log.write("counts: %s\n" % ((count1, count2),))
+    log.write("counts: %d %d\n" % (count1, count2))
     return okay_flag
 
 def pieces_combine(sums, wgts, begin, records, log, new_id):

@@ -103,13 +103,13 @@ def do_combine(stream, log, select_func, combine_func):
                 break
             record_dict, begin, end = make_record_dict(records, ids)
             years = end - begin + 1
-            record, rec_id = select_func(record_dict)
-            del record_dict[rec_id]
+            record = select_func(record_dict)
+            del record_dict[record.uid]
             sums, wgts = fresh_arrays(record, begin, years)
             log.write("\t%s %s %s -- %s\n" % (record.uid,
                 record.first_valid_year(), record.last_valid_year(),
                 record.source))
-            combine_func(sums, wgts, begin, record_dict, log, rec_id)
+            combine_func(sums, wgts, begin, record_dict, log, record.uid)
             final_data = average(sums, wgts)
             record.set_series(begin * 12 + 1, final_data)
             yield record
@@ -131,38 +131,41 @@ def combine(sums, wgts, begin, records, log, new_id_):
             record.last_valid_year(), diff))
 
 def get_best(records):
-    """Given a dict of records, return the "best" one, and
-    its key in the *records* dict.  "best" considers the source of the
-    record, preferring MCDW over USHCN over SUMOFDAY over UNKNOWN.
+    """Given a dict of records, return the "best" one.
+    "best" considers the source of the record, preferring MCDW over
+    USHCN over SUMOFDAY over UNKNOWN.
+
+    (this is passed to do_combine() as a select_func argument)
     """
 
     ranks = {'MCDW': 4, 'USHCN2': 3, 'SUMOFDAY': 2, 'UNKNOWN': 1}
     best = 1
     longest = 0
-    for rec_id in sorted(records.keys()):
-        record = records[rec_id]
+    for record in sorted(records.values(), key=lambda r: r.uid):
         length = record.ann_anoms_good_count()
         rank = ranks[record.source]
         if rank > best:
             best = rank
             best_rec = record
-            best_id = rec_id
         elif length > longest:
             longest = length
             longest_rec = record
-            longest_id = rec_id
     if best > 1:
-        return best_rec, best_id
-    return longest_rec, longest_id
+        return best_rec
+    return longest_rec
 
 def pieces_combine(sums, wgts, begin, records, log, new_id):
+    """The combine_func (passed to do_combine()) for comb_pieces().
+
+    Combines remaining records that have insufficient overlap.
+    """
+
     while records:
         record, diff_, overlap_ = get_longest_overlap(average(sums, wgts),
                                                       begin, records)
-        rec_begin = record.first_valid_year()
-        rec_end = record.last_valid_year()
-
-        log.write("\t %s %d %d\n" % (record.uid, rec_begin, rec_end))
+        log.write("\t %s %d %d\n" % (record.uid,
+           record.first_valid_year(),
+           record.last_valid_year()))
 
         is_okay = find_quintuples(sums, wgts, begin,
                                   record,
@@ -177,18 +180,20 @@ def pieces_combine(sums, wgts, begin, records, log, new_id):
 
 def get_longest(records):
     """Considering the records in the *records* dict, return the longest
-    one."""
+    one.  This is the select_func (passed to do_combine()) used by
+    comb_pieces."""
 
-    longest = 0
-    # :todo: The order depends on the implementation of records.items,
-    # and could matter.
-    for rec_id, record in records.items():
-        length = record.ann_anoms_good_count()
-        if length > longest:
-            longest = length
-            longest_rec = record
-            longest_id = rec_id
-    return longest_rec, longest_id
+    def length(rec):
+        """Length of a record, according to the number of valid annual
+        anomalies."""
+
+        return rec.ann_anoms_good_count()
+
+    # :todo: If two records have the same "length", then which one is
+    # chosen depends on the implementation of max() and
+    # records.values(); it could matter.
+
+    return max(records.values(), key=length)
 
 def find_quintuples(new_sums, new_wgts, begin,
                     record,
@@ -231,7 +236,8 @@ def find_quintuples(new_sums, new_wgts, begin,
         count1 = sum1 = 0
         count2 = sum2 = 0
         # Try from -rad to rad (inclusive) around the middle year.
-        for index in range(-rad, rad + 1):
+        for i in range(-rad, rad + 1):
+            index = offset+i
             if 0 <= index < new_len:
                 anom1 = new_ann_anoms[index]
                 if valid(anom1):

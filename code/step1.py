@@ -169,7 +169,7 @@ def pieces_combine(sums, wgts, begin, records, log, new_id):
 
         is_okay = find_quintuples(sums, wgts, begin,
                                   record,
-                                  new_id, record.uid, log)
+                                  new_id, log)
 
         if is_okay:
             del records[record.uid]
@@ -196,11 +196,13 @@ def get_longest(records):
     return max(records.values(), key=length)
 
 def find_quintuples(new_sums, new_wgts, begin,
-                    record,
-                    new_id, rec_id, log):
+                    record, new_id, log):
     """Returns a boolean."""
 
     assert record.first_year == begin
+
+    # An identifier common to all the log output.
+    logid = "%s %s" % (new_id, record.uid)
 
     rec_begin = record.first_valid_year()
     rec_end = record.last_valid_year()
@@ -250,7 +252,7 @@ def find_quintuples(new_sums, new_wgts, begin,
                     count2 += 1
         if (count1 >= parameters.station_combine_min_mid_years
             and count2 >= parameters.station_combine_min_mid_years):
-            log.write("overlap success: %s %s\n" % (new_id, rec_id))
+            log.write("overlap success: %s\n" % logid)
             ov_success = True
             avg1 = sum1 / float(count1)
             avg2 = sum2 / float(count2)
@@ -258,12 +260,12 @@ def find_quintuples(new_sums, new_wgts, begin,
             log.write("diff = %s\n" % diff)
             if diff < ann_std_dev:
                 okay_flag = True
-                log.write("combination success: %s %s\n" % (new_id, rec_id))
+                log.write("combination success: %s\n" % logid)
             else:
-                log.write("combination failure: %s %s\n" % (new_id, rec_id))
+                log.write("combination failure: %s\n" % logid)
             break
     if not ov_success:
-        log.write("overlap failure: %s %s\n" % (new_id, rec_id))
+        log.write("overlap failure: %s\n" % logid)
     log.write("counts: %d %d\n" % (count1, count2))
     return okay_flag
 

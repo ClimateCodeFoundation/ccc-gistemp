@@ -105,7 +105,7 @@ def do_combine(stream, log, select_func, combine_func):
             years = end - begin + 1
             record = select_func(record_dict)
             del record_dict[record.uid]
-            sums, wgts = fresh_arrays(record, begin, years)
+            sums, wgts = fresh_arrays(record, years)
             log.write("\t%s %s %s -- %s\n" % (record.uid,
                 record.first_valid_year(), record.last_valid_year(),
                 record.source))
@@ -125,7 +125,7 @@ def combine(sums, wgts, begin, records, log, new_id_):
             log.write("\tno other records okay\n")
             return
         del records[record.uid]
-        add(sums, wgts, diff, begin, record)
+        offset_and_add(sums, wgts, diff, record)
         log.write("\t %s %d %d %f\n" % (record.uid,
             record.first_valid_year(),
             record.last_valid_year(), diff))
@@ -167,13 +167,11 @@ def pieces_combine(sums, wgts, begin, records, log, new_id):
            record.first_valid_year(),
            record.last_valid_year()))
 
-        is_okay = find_quintuples(sums, wgts, begin,
-                                  record,
-                                  new_id, log)
+        is_okay = find_quintuples(sums, wgts, record, new_id, log)
 
         if is_okay:
             del records[record.uid]
-            add(sums, wgts, 0.0, begin, record)
+            offset_and_add(sums, wgts, 0.0, record)
         else:
             log.write("\t***no other pieces okay***\n")
             return
@@ -195,11 +193,10 @@ def get_longest(records):
 
     return max(records.values(), key=length)
 
-def find_quintuples(new_sums, new_wgts, begin,
+def find_quintuples(sums, wgts,
                     record, new_id, log):
-    """Returns a boolean."""
-
-    assert record.first_year == begin
+    """The *sums* and *wgts* arrays are assumed to being in the same
+    year as *record*.  Returns a boolean."""
 
     # An identifier common to all the log output.
     logid = "%s %s" % (new_id, record.uid)
@@ -207,25 +204,23 @@ def find_quintuples(new_sums, new_wgts, begin,
     rec_begin = record.first_valid_year()
     rec_end = record.last_valid_year()
 
-    actual_begin, actual_end = get_actual_endpoints(new_wgts, begin)
+    actual_begin, actual_end = get_actual_endpoints(wgts, record.first_year)
 
     max_begin = max(actual_begin, rec_begin)
     min_end = min(actual_end, rec_end)
     # Since max_begin and min_end are integers, this rounds fractional
     # middle years up.
     middle_year = int(.5 * (max_begin + min_end) + 0.5)
+    offset = (middle_year - record.first_year)
     log.write("max begin: %s\tmin end: %s\n" % (max_begin, min_end))
 
-    new_data = average(new_sums, new_wgts)
+    new_data = average(sums, wgts)
     new_ann_mean, new_ann_anoms = series.monthly_annual(new_data)
     ann_std_dev = sigma(new_ann_anoms)
     log.write("ann_std_dev = %s\n" % ann_std_dev)
-    offset = (middle_year - begin)
-    new_len = len(new_ann_anoms)
 
     rec_ann_anoms = record.ann_anoms
     rec_ann_mean = record.ann_mean
-    rec_len = len(rec_ann_anoms)
 
     # Whether we have an "overlap" or not.  We have an "overlap" if
     # within *rad* years either side of *middle_year* both records have
@@ -235,27 +230,21 @@ def find_quintuples(new_sums, new_wgts, begin,
     # below a certain threshold.
     okay_flag = False
     for rad in range(1, parameters.station_combine_bucket_radius + 1):
-        count1 = sum1 = 0
-        count2 = sum2 = 0
-        # Try from -rad to rad (inclusive) around the middle year.
-        for i in range(-rad, rad + 1):
-            index = offset+i
-            if 0 <= index < new_len:
-                anom1 = new_ann_anoms[index]
-                if valid(anom1):
-                    sum1 += anom1 + new_ann_mean
-                    count1 += 1
-            if 0 <= index < rec_len:
-                anom2 = rec_ann_anoms[index]
-                if valid(anom2):
-                    sum2 += anom2 + rec_ann_mean
-                    count2 += 1
-        if (count1 >= parameters.station_combine_min_mid_years
-            and count2 >= parameters.station_combine_min_mid_years):
+        # For the two series, get data from from -rad to rad (inclusive)
+        # around the middle year.
+        base = offset-rad
+        base = max(0, base)
+        limit = offset+rad+1
+        new_middle = [x for x in new_ann_anoms[base:limit] if valid(x)]
+        rec_middle = [x for x in rec_ann_anoms[base:limit] if valid(x)]
+        if (len(new_middle) >= parameters.station_combine_min_mid_years
+            and len(rec_middle) >= parameters.station_combine_min_mid_years):
             log.write("overlap success: %s\n" % logid)
             ov_success = True
-            avg1 = sum1 / float(count1)
-            avg2 = sum2 / float(count2)
+            avg1 = sum(anom+new_ann_mean for anom in new_middle) / float(
+              len(new_middle))
+            avg2 = sum(anom+rec_ann_mean for anom in rec_middle) / float(
+              len(rec_middle))
             diff = abs(avg1 - avg2)
             log.write("diff = %s\n" % diff)
             if diff < ann_std_dev:
@@ -266,7 +255,7 @@ def find_quintuples(new_sums, new_wgts, begin,
             break
     if not ov_success:
         log.write("overlap failure: %s\n" % logid)
-    log.write("counts: %d %d\n" % (count1, count2))
+    log.write("counts: %d %d\n" % (len(new_middle), len(rec_middle)))
     return okay_flag
 
 
@@ -377,13 +366,12 @@ def average(sums, counts):
 
     return data
 
-def add(sums, wgts, diff, begin, record):
+def offset_and_add(sums, wgts, diff, record):
     """Add the data from *record* to the *sums* and *wgts* arrays, first
-    shifting it by subtracting *diff*.  *begin* is the first year for
-    the *sums* and *wgts* array which is assumed (and asserted) to be
-    the same as *record.first_year*."""
+    shifting it by subtracting *diff*.  The arrays and *record* are
+    assumd to start with the same year.
+    """
 
-    assert record.first_year == begin
     for i,datum in enumerate(record.series):
         if invalid(datum):
             continue
@@ -449,15 +437,14 @@ def make_record_dict(records, ids):
     y_max = max(record.last_year for record in record_dict.values())
     return record_dict, y_min, y_max
 
-def fresh_arrays(record, begin, years):
-    """Make and return a fresh set of sums, and wgts arrays.  Each
-    array is list (of length 12 * years).
+def fresh_arrays(record, years):
+    """Make and return a fresh pair of arrays: (*sums*, *wgts*).
+    Each array is list (of length 12 * years; the input record should
+    not be longer).
 
-    *begin* should be the starting year for the arrays, which is
-    assumed, and asserted, to be the same as *record.first_year*.
+    The start of the result arrays will be the same as the start of the
+    input *record*, which should generally be the same for all inputs.
     """
-
-    assert record.first_year == begin
 
     nmonths = years * 12
 

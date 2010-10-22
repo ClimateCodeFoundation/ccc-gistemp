@@ -55,9 +55,10 @@ pieces_log = open('log/pieces.log','w')
 
 def comb_records(stream):
     """Combine records for the same station (the same id11) where
-    possible.  For each station, the number of combined records will be
-    at most the number of original records (in the case where no
-    combining is possible), and each combined record is yielded."""
+    possible.  Records are combined by offsetting based on the average
+    difference over their common period, then averaged.  Each combined
+    record is yielded.
+    """
 
     return do_combine(stream, comb_log, get_best, combine)
 
@@ -90,32 +91,31 @@ def do_combine(stream, log, select_func, combine_func):
     """
     for id11, record_set in itertools.groupby(stream, lambda r: r.station_uid):
         log.write('%s\n' % id11)
-        records = {}
+        records = set()
         for record in record_set:
-            records[record.uid] = record
+            records.add(record)
             ann_mean, ann_anoms = series.monthly_annual(record.series)
             record.set_ann_anoms(ann_anoms)
             record.ann_mean = ann_mean
-        ids = records.keys()
-        while 1:
-            if len(ids) == 1:
-                yield records[ids[0]]
+        begin, end = records_begin_end(records)
+        years = end - begin + 1
+        # reduce the collection of records (by combining) until there
+        # are none (or one) left.
+        while records:
+            if len(records) == 1:
+                # Just one left, yield it.
+                yield records.pop()
                 break
-            record_dict, begin, end = make_record_dict(records, ids)
-            years = end - begin + 1
-            record = select_func(record_dict)
-            del record_dict[record.uid]
+            record = select_func(records)
+            records.remove(record)
             sums, wgts = fresh_arrays(record, years)
             log.write("\t%s %s %s -- %s\n" % (record.uid,
                 record.first_valid_year(), record.last_valid_year(),
                 record.source))
-            combine_func(sums, wgts, begin, record_dict, log, record.uid)
+            combine_func(sums, wgts, begin, records, log, record.uid)
             final_data = average(sums, wgts)
             record.set_series(begin * 12 + 1, final_data)
             yield record
-            ids = record_dict.keys()
-            if not ids:
-                break
 
 def combine(sums, wgts, begin, records, log, new_id_):
     while records:
@@ -124,14 +124,14 @@ def combine(sums, wgts, begin, records, log, new_id_):
         if overlap < parameters.station_combine_min_overlap:
             log.write("\tno other records okay\n")
             return
-        del records[record.uid]
+        records.remove(record)
         offset_and_add(sums, wgts, diff, record)
         log.write("\t %s %d %d %f\n" % (record.uid,
             record.first_valid_year(),
             record.last_valid_year(), diff))
 
 def get_best(records):
-    """Given a dict of records, return the "best" one.
+    """Given a set of records, return the "best" one.
     "best" considers the source of the record, preferring MCDW over
     USHCN over SUMOFDAY over UNKNOWN.
 
@@ -141,7 +141,7 @@ def get_best(records):
     ranks = {'MCDW': 4, 'USHCN2': 3, 'SUMOFDAY': 2, 'UNKNOWN': 1}
     best = 1
     longest = 0
-    for record in sorted(records.values(), key=lambda r: r.uid):
+    for record in sorted(records, key=lambda r: r.uid):
         length = record.ann_anoms_good_count()
         rank = ranks[record.source]
         if rank > best:
@@ -170,14 +170,14 @@ def pieces_combine(sums, wgts, begin, records, log, new_id):
         is_okay = find_quintuples(sums, wgts, record, new_id, log)
 
         if is_okay:
-            del records[record.uid]
+            records.remove(record)
             offset_and_add(sums, wgts, 0.0, record)
         else:
             log.write("\t***no other pieces okay***\n")
             return
 
 def get_longest(records):
-    """Considering the records in the *records* dict, return the longest
+    """Considering the records in the *records* set, return the longest
     one.  This is the select_func (passed to do_combine()) used by
     comb_pieces."""
 
@@ -188,14 +188,16 @@ def get_longest(records):
         return rec.ann_anoms_good_count()
 
     # :todo: If two records have the same "length", then which one is
-    # chosen depends on the implementation of max() and
-    # records.values(); it could matter.
+    # chosen depends on an implementation dependent order (and the order
+    # can change the result, by a tiny little bit).  To get the
+    # exact same order as previous versions we create a temporary dict
+    # here.  Going forwards, we should define the order more carefully.
 
-    return max(records.values(), key=length)
+    t = dict((record.uid, record) for record in records)
+    return max(t.values(), key=length)
 
-def find_quintuples(sums, wgts,
-                    record, new_id, log):
-    """The *sums* and *wgts* arrays are assumed to being in the same
+def find_quintuples(sums, wgts, record, new_id, log):
+    """The *sums* and *wgts* arrays are assumed to begin in the same
     year as *record*.  Returns a boolean."""
 
     # An identifier common to all the log output.
@@ -379,7 +381,7 @@ def offset_and_add(sums, wgts, diff, record):
         wgts[i] += 1
 
 def get_longest_overlap(target, begin, records):
-    """Find the record in the *records* dict that has the longest
+    """Find the record in the *records* set that has the longest
     overlap with the *target* by considering annual anomalies.  *target*
     is a sequence of monthly values starting in the year *begin*.
 
@@ -398,10 +400,12 @@ def get_longest_overlap(target, begin, records):
     overlap = 0
     diff = None
     # :todo: the records are consulted in an essentially arbitrary
-    # order (chosen by the implementation of items()), but the order
+    # order (which depends on the implementation), but the order
     # may affect the result.  Tie breaks go to the last record consulted.
-    for rec_id, record in records.items():
-        assert record.first_year == begin
+    # For exact compatiblity with previous versions, we create a
+    # temporary dict.
+    t = dict((record.uid, record) for record in records)
+    for record in t.values():
         common = [(rec_anom,anom)
           for rec_anom, anom in zip(record.ann_anoms, anoms)
           if valid(rec_anom) and valid(anom)]
@@ -415,27 +419,22 @@ def get_longest_overlap(target, begin, records):
             diff = S / len(common)
     return best_record, diff, overlap
 
-def make_record_dict(records, ids):
-    """Build and return a fresh dictionary for a set of records.
-    For each of the keys in *ids*, the corresponding entry in the
-    *records* dictionary is consulted, and a new dictionary is made.
+def records_begin_end(records):
+    """*records* is a set of records.
 
-    (*record_dict*, *year_min*, *year_max*) is returned, where
-    *record_dict* contains all the new dictionaries made; *year_min* and
-    *year_max* are the minimum and maximum years with data, across all
-    the records consulted.
+    (*year_min*, *year_max*) is returned, where *year_min* and
+    *year_max* are the minimum and maximum years with data, across
+    all the records consulted.
 
     This function asserts that all the records have the same first year
     (which will be *year_min*)
     """
 
-    record_dict = {}
-    record_dict = dict((rec_id, records[rec_id]) for rec_id in ids)
-    first_years = set(record.first_year for record in record_dict.values())
+    first_years = set(record.first_year for record in records)
     assert 1 == len(first_years)
     y_min = list(first_years)[0]
-    y_max = max(record.last_year for record in record_dict.values())
-    return record_dict, y_min, y_max
+    y_max = max(record.last_year for record in records)
+    return y_min, y_max
 
 def fresh_arrays(record, years):
     """Make and return a fresh pair of arrays: (*sums*, *wgts*).

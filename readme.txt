@@ -1,7 +1,7 @@
 CLEAR CLIMATE CODE GISTEMP README FOR RELEASE 0.5.1
 
-Nick Barnes, Clear Climate Code
-David Jones, Clear Climate Code
+Nick Barnes, Climate Code Foundation
+David Jones, Climate Code Foundation
 
 $Date$
 
@@ -21,17 +21,21 @@ CONTENTS
 
 1. INTRODUCTION
 
-This is release 0.5.1 of the Clear Climate Code GISTEMP project
+This is release 0.6.0 of the Clear Climate Code GISTEMP project
 (ccc-gistemp).
 
 Clear Climate Code have reimplemented GISTEMP (the GISS surface
 temperature analysis system), to make it clearer.  Work continues
 towards making it more clear and more accessible.
 
-ccc-gistemp release 0.5.1 is a release of ccc-gistemp version 0.5.
-The purpose of version 0.5 is to increase clarity by:
-  - clarifying and documenting Step 2;
-  - consolidating general code clarification.
+ccc-gistemp release 0.6.0 is a release of ccc-gistemp version 0.6.
+The purpose of version 0.6 is to make ccc-gistemp more useful by:
+  - allowing more flexible choices of input data.  For example: GHCN v3;
+    USHCN only; ocean only.
+  - allowing a land mask to be used in the step where land and ocean
+    data are combined.
+
+In addition there are various bug fixes and improvements to clarity.
 
 Changes since earlier releases are described in more detail in
 release-notes.txt.
@@ -187,6 +191,7 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
+2010-10-22 DRJ Updated to prepare for 0.6.0
 2010-07-21 DRJ Updated to prepare for 0.5.1.
 2010-07-19 DRJ Updated to prepare for 0.5.0.
 2010-07-13 DRJ Added note about PyPy.
@@ -208,8 +213,8 @@ Most recent changes first:
 
 C. COPYRIGHT AND LICENSE
 
-This document is copyright (C) 2009, 2010 Ravenbrook Limited.  All
-rights reserved.
+This document is copyright (C) 2009, 2010 Ravenbrook Limited; and (C)
+2010 Climate Code Foundation.  All rights reserved.
 
 Redistribution and use of this document in any form, with or without
 modification, is permitted provided that redistributions of this

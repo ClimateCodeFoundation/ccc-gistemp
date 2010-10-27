@@ -61,7 +61,7 @@ class Station(object):
     def __repr__(self):
         return "Station(%r)" % self.values
 
-def read_stations(path, format='v2'):
+def read_stations(path=None, file=None, format='v2'):
     """Read station metadata from file, return it as a dictionary.
 
     The input file is nearly in the same format as the
@@ -114,6 +114,14 @@ def read_stations(path, format='v2'):
     """
 
     assert format in ('v2', 'v3')
+    if path:
+        try:
+            file = open(path)
+        except IOError:
+            warnings.warn("Could not load %s GHCN metadata file: %s" %
+              (format, path))
+            return {}
+    assert file
 
     # With the beta GHCN V3 metadata, several fields are blank for some
     # stations.  When processed as ints, these will get converted to
@@ -178,14 +186,10 @@ def read_stations(path, format='v2'):
         fields = v3fields
 
     result = {}
-    try:
-        for line in open(path):
-            d = dict((field, convert(line[a:b]))
-                      for a, b, field, convert in fields)
-            result[d['uid']] = Station(**d)
-    except IOError:
-        warnings.warn("Could not load %s GHCN metadata file: %s" %
-          (format, path))
+    for line in file:
+        d = dict((field, convert(line[a:b]))
+                  for a, b, field, convert in fields)
+        result[d['uid']] = Station(**d)
 
     return result
 

@@ -207,13 +207,15 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     ybottom = math.floor((lowest-0.05)*config.yscale)
     ytop = math.ceil((highest+0.05)*config.yscale)
     plotheight = ytop - ybottom
-    legendh = config.fontsize*len(datadict)
+    legendh = config.fontsize*(len(datadict)+1)
+    lborder = 125
+    rborder = config.fontsize*2
 
     out.write("""<svg width='%dpx' height='%dpx'
       xmlns="http://www.w3.org/2000/svg"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       version="1.1">\n""" %
-      (plotwidth+130, plotheight+100+legendh))
+      (plotwidth+lborder+rborder, plotheight+100+legendh))
 
     # Style
     out.write("""<defs>
@@ -231,8 +233,8 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
         out.write("    g.%s { stroke: %s }\n" % (cssidescaped, colour))
     out.write("  </style>\n</defs>\n")
 
-    # push chart down and right to give a bit of a border
-    out.write("<g transform='translate(125,80)'>\n")
+    # Push chart down and right to give a bit of a border.
+    out.write("<g transform='translate(%.1f,80)'>\n" % lborder)
 
     # In this section 0,0 is at top left of chart, and +ve y is down.
     if title:

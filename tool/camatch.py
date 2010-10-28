@@ -236,15 +236,21 @@ def locdist(a, b):
     rad = math.acos(dot)
     return math.degrees(rad)
 
+def keep403(input):
+    for row in input:
+        if row.startswith('403'):
+            yield row
+
 def main(argv=None):
     import sys
     if argv is None:
         argv = sys.argv
     # :todo: replace '403.v2' (which is a grepped selection of v2.mean),
     # with the real v2.mean location
-    match(cameta=open('ca.json'), cadata=v2asdict(open('ca.v2')),
+    match(cameta=open('input/ca.json'),
+      cadata=v2asdict(open('input/ca.v2.mean')),
       ghcnmeta=open('input/v2.inv'),
-      ghcndata=v2asdict(open('403.v2')))
+      ghcndata=v2asdict(keep403(open('input/v2.mean'))))
 
 if __name__ == '__main__':
     main()

@@ -46,8 +46,12 @@ def match(cameta, cadata, ghcnmeta, ghcndata):
         else:
             if sep < 0.015:
                 locnear += 1
-        print match.type, match.ghcnst.uid, match.cast['id11'], \
-          "%.2f" % sep, match.cast['WMO Identifier']
+        castid = cast['id11']
+        overlap,q,id12 = match_quality(cadata[castid][castid+'0'],
+            ghcndata[ghcnst.uid])
+        wmo = match.cast['WMO Identifier'] or 'nowmo'
+        print match.type, wmo, castid, id12, \
+          "%.2f" % sep, "%4d" % overlap, q
 
     print "dropped stations", dropcount
     print "kept stations", len(cadict)
@@ -55,9 +59,60 @@ def match(cameta, cadata, ghcnmeta, ghcndata):
     print "WMO match", wmomatch, "(of those) not near:", wmofar
     print "LOCATION near", locnear
 
+def match_quality(reference, candidate):
+    """See how closely the temperature data in *reference* matches the
+    temperature data in *candidate*.  *reference* is a single dict
+    corresponding to one series; *candidate* is a dict that contains
+    multiple ("duplicate") series."""
+
+    ref = as_monthly(reference)
+    def scores():
+        for id12,record in candidate.items():
+            rec = as_monthly(record)
+            overlap, q = score(ref, rec)
+            yield overlap, q, id12
+    def keyscore(t):
+        """Takes a tuple *t* (yielded by scores(), above) and converts it
+        to a key for comparison.  For long overlaps, we want to score by
+        closeness of match (q), for short overlaps, we simply use the
+        length of overlap."""
+
+        l,q,id12 = t
+        l = min(120, l)
+        return l,-q,id12
+    return max(scores(), key=keyscore)
+
+def score(ref, cand):
+    """Score how close the two series are."""
+    overlap = set(ref) & set(cand)
+    if not overlap:
+        return 0, 9e9
+    s = sum((ref[k] - cand[k])**2 for k in overlap)
+    q = math.sqrt(s / len(overlap))
+    return len(overlap), q
+
+def as_monthly(d):
+    """Let *d* be a dict of temperature data such that d[year] is a
+    string corresponding to the 12 months of data.  Return a new dict
+    *r* where r['YYYY-MM'] gives the value for that month."""
+
+    r = {}
+    for year,row in d.items():
+        for i in range(12):
+            s = row[i*5:(i+1)*5]
+            if s == '-9999':
+                continue
+            x = float(s)*0.1
+            m = i+1
+            key = "%s-%02d" % (year, m)
+            r[key] = x
+    return r
+
+
+
 def itermatches(cadict, ghcndict):
     """Iterate over all the stations in cadict, yielding a match object
-    for each one.  match.type is either 'wmo' or 'near'; match.cast
+    for each one.  match.type is either 'wmo' or 'loc'; match.cast
     gives the station (metadata) from cadict; match.ghcnst gives the
     station from ghcndict."""
 
@@ -79,7 +134,7 @@ def itermatches(cadict, ghcndict):
                 result.type = 'wmo'
                 yield result
                 continue
-        result.type = 'near'
+        result.type = 'loc'
         nearest = min(ghcndict.values(),
           key=lambda s: locdist((lat,lon), (s.lat, s.lon)))
         result.ghcnst = nearest

@@ -52,13 +52,6 @@ def tenths_to_float(t):
 def as_tenths(v):
     return int(math.floor(v * 10 + 0.5))
 
-# Load GHCN V2 metadata, if present.
-v2inv = os.path.join('input', 'v2.inv')
-try:
-    v2meta = code.giss_data.read_stations(v2inv, format='v2')
-except IOError:
-    v2meta = None
-
 
 # TODO: Probably should be a generator.
 def internal_to_external(series, scale=0.1):
@@ -940,6 +933,24 @@ def ghcn3_input_file():
     dats = glob.glob(os.path.join(dir, '*.dat'))
     return dats[0]
 
+_v2meta = None
+def v2meta():
+    """Return the GHCN v2 metadata.  Loading it (from the modified
+    version of the file supplied by GISS) if necessary.
+    """
+
+    # It's important that this file be opened lazily, and not at module
+    # load time (if "input/" hasn't been populated yet, it won't be
+    # found).
+    # See http://code.google.com/p/ccc-gistemp/issues/detail?id=88
+
+    global _v2meta
+
+    v2inv = os.path.join('input', 'v2.inv')
+    if not _v2meta:
+        _v2meta = code.giss_data.read_stations(v2inv, format='v2')
+    return _v2meta
+
 
 # Each of the stepN_input functions below produces an iterator that
 # yields that data for that step feeding from data files.
@@ -953,9 +964,9 @@ def step0_input():
     ushcn_map = read_USHCN_stations('input/ushcn2.tbl',
       'input/ushcnV2_cmb.tbl')
     input.ushcn = read_USHCN_converted(ushcn_input_file(),
-      ushcn_map, meta=v2meta)
+      ushcn_map, meta=v2meta())
     input.ghcn = V2MeanReader("input/v2.mean",
-        meta=v2meta,
+        meta=v2meta(),
         year_min=code.giss_data.BASE_YEAR)
     ghcn3file = ghcn3_input_file()
     if ghcn3file:
@@ -965,11 +976,11 @@ def step0_input():
           year_min=code.giss_data.BASE_YEAR)
     input.scar = itertools.chain(
         read_antarctic("input/antarc1.txt", "input/antarc1.list", '8',
-          meta=v2meta, year_min=code.giss_data.BASE_YEAR),
+          meta=v2meta(), year_min=code.giss_data.BASE_YEAR),
         read_antarctic("input/antarc3.txt", "input/antarc3.list", '9',
-          meta=v2meta, year_min=code.giss_data.BASE_YEAR),
+          meta=v2meta(), year_min=code.giss_data.BASE_YEAR),
         read_australia("input/antarc2.txt", "input/antarc2.list", '7',
-          meta=v2meta, year_min=code.giss_data.BASE_YEAR))
+          meta=v2meta(), year_min=code.giss_data.BASE_YEAR))
     input.hohenpeissenberg = read_hohenpeissenberg(
             "input/t_hohenpeissenberg_200306.txt_as_received_July17_2003")
 
@@ -985,7 +996,7 @@ def step0_output(data):
 
 def step1_input():
     return V2MeanReader("work/v2.mean_comb",
-        meta=v2meta,
+        meta=v2meta(),
         year_min=code.giss_data.BASE_YEAR)
 
 def step1_output(data):
@@ -997,7 +1008,7 @@ def step1_output(data):
     out.close()
 
 def step2_input():
-    return V2MeanReader("work/v2.step1.out", meta=v2meta)
+    return V2MeanReader("work/v2.step1.out", meta=v2meta())
 
 def step2_output(data):
     out = V2MeanWriter(path="work/v2.step2.out")
@@ -1008,7 +1019,7 @@ def step2_output(data):
     out.close()
 
 def step3_input():
-    return V2MeanReader("work/v2.step2.out", meta=v2meta)
+    return V2MeanReader("work/v2.step2.out", meta=v2meta())
 
 STEP3_OUT = os.path.join('result', 'SBBX1880.Ts.GHCN.CL.PA.1200')
 

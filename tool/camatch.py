@@ -20,12 +20,13 @@ class Struct:
 
 wmocount = 0
 
-def match(cameta, cadata, ghcnmeta, ghcndata):
-    """Analyse and match scraped Canada stations with GHCN stations."""
+def match(cameta, cadata, ghcnmeta, ghcndata, table):
+    """Analyse and match scraped Canada stations with GHCN stations.
+    A renaming table is written to *table*.
+    """
 
     cadict = cametaasdict(cameta)
-    # 403 is the GHCN prefix for Canada, see v2.country.codes
-    ghcndict = ghcnmetaasdict(ghcnmeta, prefix='403')
+    ghcndict = ghcnmetaasdict(ghcnmeta)
 
     drop_short(cadict, cadata)
 
@@ -39,6 +40,7 @@ def match(cameta, cadata, ghcnmeta, ghcndata):
         ghcnst = match.ghcnst
         sep = locdist((cast['Latitude'], cast['Longitude']),
                       (ghcnst.lat, ghcnst.lon))
+        match.sep = sep
         if match.type == 'wmo':
             wmomatch += 1
             if sep > 0.015:
@@ -49,9 +51,14 @@ def match(cameta, cadata, ghcnmeta, ghcndata):
         castid = cast['id11']
         overlap,q,id12 = match_quality(cadata[castid][castid+'0'],
             ghcndata[ghcnst.uid])
+        match.q = q
         wmo = match.cast['WMO Identifier'] or 'nowmo'
         print match.type, wmo, castid, id12, \
           "%.2f" % sep, "%4d" % overlap, q
+        if match.type == 'wmo' or match.q + match.sep < 1:
+            newid = ghcnst.uid+'9'
+            assert newid not in ghcndata[ghcnst.uid]
+            table.write("%s %s\n" % (castid, newid))
 
     print "dropped stations", dropcount
     print "kept stations", len(cadict)
@@ -148,16 +155,15 @@ def drop_short(cadict, cadata):
     for key,station in cadict.items():
         id11 = station['id11']
         if id11 not in cadata:
-            print "NODATA", id11
-            drops.append(key)
+            drops.append((key, 0))
             continue
         # Assumes that the scraped data has one duplicate per station.
         data = cadata[id11][id11+'0']
         if len(data) < 20:
-            print "SHORT", id11, "YEARS", len(data)
-            drops.append(key)
-    for station in drops:
+            drops.append((key, len(data)))
+    for station,_ in drops:
         del cadict[station]
+    print drops
     dropcount = len(drops)
 
 def v2asdict(inp):
@@ -182,20 +188,11 @@ def cametaasdict(meta):
             yield item['Climate Identifier'], item
     return dict(itermeta())
 
-def ghcnmetaasdict(ghcnmeta, prefix=None):
+def ghcnmetaasdict(ghcnmeta):
     """Take an open file descriptor on the 'v2.inv' file and return a
     dictionary."""
 
     stations = giss_data.read_stations(file=ghcnmeta, format='v2')
-    if prefix:
-        keeps = dict((id11,station)
-          for id11,station in stations.items()
-          if id11.startswith(prefix))
-        stations = keeps
-    # Additionally index stations by location.
-    new = ((iso6709(station.lat, station.lon),station)
-      for station in stations.values())
-    stations.update(new)
     return stations
 
 def iso6709(lat, lon):
@@ -236,9 +233,9 @@ def locdist(a, b):
     rad = math.acos(dot)
     return math.degrees(rad)
 
-def keep403(input):
+def keep403a431(input):
     for row in input:
-        if row.startswith('403'):
+        if row[:3] in ('403','431'):
             yield row
 
 def main(argv=None):
@@ -250,7 +247,8 @@ def main(argv=None):
     match(cameta=open('input/ca.json'),
       cadata=v2asdict(open('input/ca.v2.mean')),
       ghcnmeta=open('input/v2.inv'),
-      ghcndata=v2asdict(keep403(open('input/v2.mean'))))
+      ghcndata=v2asdict(keep403a431(open('input/v2.mean'))),
+      table=open('input/ca.tbl', 'w'))
 
 if __name__ == '__main__':
     main()

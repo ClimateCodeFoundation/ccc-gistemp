@@ -207,12 +207,13 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     ybottom = math.floor((lowest-0.05)*config.yscale)
     ytop = math.ceil((highest+0.05)*config.yscale)
     plotheight = ytop - ybottom
+    legendh = config.fontsize*len(datadict)
 
     out.write("""<svg width='%dpx' height='%dpx'
       xmlns="http://www.w3.org/2000/svg"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       version="1.1">\n""" %
-      (plotwidth+100, plotheight+100))
+      (plotwidth+130, plotheight+100+legendh))
 
     # Style
     out.write("""<defs>
@@ -221,17 +222,17 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     path { stroke-width: 0.1; fill: none }
     path.singleton { stroke-width: 0.2; stroke-linecap: round }
     g#axes path { stroke-width:1; fill:none; stroke: #888 }
-    g#axes text { fill: black; font-family: Verdana }
-    g#title text { fill: black; font-family: Verdana }
+    g#legend path { stroke-width:1; fill:none }
+    text { fill: black; font-family: Verdana }
 """ % ('display: none', '')[config.debug])
     assert len(datadict) <= len(colour_list)
     for id12,colour in zip(datadict, colour_list):
         cssidescaped = cssidescape('record' + id12)
-        out.write("    g#%s { stroke: %s }\n" % (cssidescaped, colour))
+        out.write("    g.%s { stroke: %s }\n" % (cssidescaped, colour))
     out.write("  </style>\n</defs>\n")
 
     # push chart down and right to give a bit of a border
-    out.write("<g transform='translate(80,80)'>\n")
+    out.write("<g transform='translate(125,80)'>\n")
 
     # In this section 0,0 is at top left of chart, and +ve y is down.
     if title:
@@ -243,11 +244,30 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     # Transform so that (0,0) on chart is lower left
     out.write("<g transform='translate(0, %.1f)'>\n" % plotheight)
     # In this section 0,0 should coincide with bottom left of chart, but
-    # oriented as per SVG default.  +ve y is down.
+    # oriented as per SVG default.  +ve y is down.  We are 1-1 with SVG
+    # pixels.
+    # Use yscale and xscale to scale to/and from data coordinates.
 
-    # Start of "axes" group.  In this group we are 1-1 with SVG pixels;
-    # (0,0) is at plot lower left, and +ve is down.  Use yscale and
-    # xscale to scale to/and from data coordinates.
+    # Amount by which tick shoots out at the bottom.
+    overshoot = 16
+
+    # Colour legend.
+    out.write("<g id='legend'>\n")
+    # (and range indicators for each series)
+    # Start of the top line of text for the legend.
+    yleg = overshoot+config.fontsize
+    for i,(id12,(data,begin)) in enumerate(sorted(datadict.items())):
+        length = len(data)//K
+        y = yleg + config.fontsize*i
+        out.write("  <text alignment-baseline='middle'"
+          " text-anchor='end' x='0' y='%d'>%s</text>\n" %
+          (y, id12))
+        out.write("  <g class='record%s'><path d='M%.1f %dl%.1f 0' /></g>\n" %
+          (id12, (begin-minyear)*config.xscale, y, length*config.xscale))
+    # End of legend group
+    out.write("</g>\n")
+
+    # Start of "axes" group.
     out.write("<g id='axes'>\n")
     w = limyear - minyear
     # Ticks on the horizontal axis.
@@ -255,17 +275,16 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     # Where we want ticks, in years offset from the earliest year.
     # We have ticks every decade.
     tickat = range(s, w+1, 10)
-    # Amount by which tick shoots out at the bottom.
-    overshoot = 16
     out.write("  <path d='" +
       ''.join(map(lambda x: 'M%d %.1fl0 %.1f' %
       (x*config.xscale, overshoot, -(plotheight+overshoot)), tickat)) +
       "' />\n")
-    # Labels.
+    # Horizontal labels.
     for x in tickat:
         out.write("  <text text-anchor='middle'"
           " font-size='%.1f' x='%d' y='%d'>%d</text>\n" %
           (config.fontsize, x*config.xscale, overshoot, minyear+x))
+    # Vertical axis.
     out.write("  <g id='vaxis' font-size='%.1f' text-anchor='end'>" %
       config.fontsize)
     # Ticks on the vertical axis.
@@ -310,7 +329,7 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
       stroke='pink' fill='none' opacity='0.30' />\n""" % databox)
 
     for id12,series in datadict.items():
-        out.write("<g id='record%s'>\n" % id12)
+        out.write("<g class='record%s'>\n" % id12)
         for segment in aplot(series, K):
             out.write(aspath(segment)+'\n')
         out.write("</g>\n")

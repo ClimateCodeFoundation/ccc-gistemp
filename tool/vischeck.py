@@ -35,6 +35,9 @@ down (negative offset); its units are the same as in the data files
 (centikelvin usually).
 """
 
+import itertools
+import math
+
 class Error(Exception):
     """Some sort of problem."""
 
@@ -108,8 +111,6 @@ def asgooglechartURL(seq, options={}):
     height). The default is (600, 500).
     """
 
-    import itertools
-
     # default options
     default_options = dict(offset=0,
                            size=(600,500),
@@ -120,8 +121,10 @@ def asgooglechartURL(seq, options={}):
 
     prefix = 'http://chart.apis.google.com/chart'
 
-    # Read all data because we need to compute min and max years
+    # Read all data because we need to compute min and max years, and
+    # min and max data values.
     data = [list(s) for s in seq]
+    ymin,ymax = reasonable_yscale(data)
 
     yearmin = min(map(lambda p:p[0], itertools.chain(*data)))
     yearmax = max(map(lambda p:p[0], itertools.chain(*data)))
@@ -141,6 +144,7 @@ def asgooglechartURL(seq, options={}):
     trendfrags = [t.urlfrag for t in trends]
     slopes = [[t.b_full, t.b_short] for t in trends]
     coefficients = [[t.r2_full, t.r2_short] for t in trends]
+
     # Arrange the series for the "chd=" parameter of the URL.
     # In an X-Y chart (cht=lxy) each series as drawn consists of a
     # sequence of xs and a sequence of ys.  In order we have...
@@ -154,26 +158,29 @@ def asgooglechartURL(seq, options={}):
     #   ...
     ds = ['-999|' + chartsingle(l) for l in data] + trendfrags
 
-    vaxis = '||-0.5|+0.0|+0.5|'
+    vaxis = vaxis_labels(ymin,ymax)
     chxl = 'chxl=0:'+xaxis+'|1:'+vaxis+'|2:'+vaxis
     chxt = 'chxt=x,y,r'
     chd='chd=t:' + '|'.join(ds)
     chs='chs=' + 'x'.join(map(str, options['size']))
     # Choose scale, and deal with offset if we have to.
+    # The scales are in the same order as the series (see above).  Each
+    # series is associated with 4 scale values: xmin,xmax,ymin,ymax.
     offset = options['offset']
-    scale = [-100,100]*6
+    scale = [-100,100,ymin,ymax] * 3
     if offset and len(seq) > 1:
         scale *= len(seq)
         for i in range(len(seq)):
+            off = i*offset
             # Y range of actual data series
-            scale[4*i+2] -= i*offset
-            scale[4*i+3] -= i*offset
+            scale[4*i+2] -= off
+            scale[4*i+3] -= off
             # Y range of first trend
-            scale[4*len(seq) + 8*i + 2] -= offset
-            scale[4*len(seq) + 8*i + 3] -= offset
+            scale[4*len(seq) + 8*i + 2] -= off
+            scale[4*len(seq) + 8*i + 3] -= off
             # Y range of second trend
-            scale[4*len(seq) + 8*i + 6] -= offset
-            scale[4*len(seq) + 8*i + 7] -= offset
+            scale[4*len(seq) + 8*i + 6] -= off
+            scale[4*len(seq) + 8*i + 7] -= off
     chds = 'chds=' + ','.join(map(str, scale))
     # red, black, blue, magenta for the underlying graphs
     colours = options['colour']
@@ -203,6 +210,39 @@ def pad(data, yearmin, yearmax):
     return (zip(range(yearmin, t0), nonelots) +
       data +
       zip(range(t1+1, yearmax+1), nonelots))
+
+def reasonable_yscale(data):
+    """Examine the data and return a reasonable y scale as a min and max
+    value."""
+
+    tick = 50
+    # Ensures subsequent divisions are in floating point.
+    tick = float(tick)
+
+    allvalues = [v for _,v in itertools.chain(*data) if v is not None]
+    datamin = min(allvalues)
+    datamax = max(allvalues)
+    ymin = int(tick * math.floor(datamin/tick))
+    ymax = int(tick * math.ceil(datamax/tick))
+    ymin = min(-100,ymin)
+    ymax = max(-100,ymax)
+    return ymin,ymax
+
+def vaxis_labels(ymin,ymax):
+    """Return a reasonable vaxis label string for the google chart.
+    Assumes that the data is in centikelvin."""
+
+    # Spacing of ticks, native units.
+    tick = 50
+
+    assert ymin % tick == 0
+    assert ymax % tick == 0
+    l = ["%+.1f" % (v*0.01) for v in range(ymin,ymax+1,tick)]
+    # Set first and last label to be blank.
+    l[0] = '';
+    l[-1] = '';
+
+    return '|'.join([''] + l)
 
 def slope_markers(slopes, coefficients, colours):
     """Create the markers to denote slopes / trends."""

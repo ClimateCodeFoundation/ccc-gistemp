@@ -167,9 +167,8 @@ def asgooglechartURL(seq, options={}):
     # The scales are in the same order as the series (see above).  Each
     # series is associated with 4 scale values: xmin,xmax,ymin,ymax.
     offset = options['offset']
-    scale = [-100,100,ymin,ymax] * 3
+    scale = [-100,100,ymin,ymax] * (3 * len(seq))
     if offset and len(seq) > 1:
-        scale *= len(seq)
         for i in range(len(seq)):
             off = i*offset
             # Y range of actual data series

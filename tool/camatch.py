@@ -58,7 +58,7 @@ def match(cameta, cadata, ghcnmeta, ghcndata, table):
         if match.type == 'wmo' or match.q + match.sep < 1:
             newid = ghcnst.uid+'9'
             assert newid not in ghcndata[ghcnst.uid]
-            table.write("%s %s\n" % (castid, newid))
+            table.write("%s %s\n" % (castid+'0', newid))
 
     print "dropped stations", dropcount
     print "kept stations", len(cadict)

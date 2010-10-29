@@ -116,11 +116,15 @@ def adjust_USHCN(ushcn_records, ghcn_records):
         print count_ushcn_only, "USHCN records had no GHCN counterpart."
 
 
-def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg):
+def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg_dict):
     """Replace Hohenpeissenberg data from 1880 to 2002 in the GHCN
     dataset with the priv. comm. data."""
     print "Correct the GHCN Hohenpeissenberg record."
 
+    # We expect the hohenpeissenberg_dict to contain a single record.
+    # The assignment will raise an exception if this assumption fails.
+    (key,hohenpeissenberg), = hohenpeissenberg_dict.items()
+    del hohenpeissenberg_dict[key]
     cut = hohenpeissenberg.last_year + 1
 
     for record in ghcn_records.itervalues():
@@ -171,27 +175,27 @@ def asdict(records):
 
 def step0(input):
     """An iterator for Step 0.  Produces a stream of
-    `giss_data.Series` instances.  *input* should be an object that has
-    'ushcn', 'ghcn', 'scar', 'hohenpeissenbreg' properties, each one
-    being a data source (typically, this input object is made by the
-    tool.giss_io.step0_input() function).
+    `giss_data.Series` instances.  *input* should be an instance that
+    has an open() method.  input.open(x) is called for each data source x.
+    (typically, this input object is made by the tool.giss_io.step0_input()
+    function).
 
     """
 
+    sources = parameters.data_sources.split()
     # Read each data input into dictionary form.
     data = {}
-    for source in ['ghcn', 'ushcn', 'scar', 'v3']:
-        if source in parameters.data_sources:
-            print "Load %s records" % source.upper()
-            data[source] = asdict(getattr(input, source))
+    for source in sources:
+        print "Load %s records" % source.upper()
+        data[source] = asdict(input.open(source))
 
     # If we're using GHCN (and we usually are) then we...
-    if 'ghcn' in parameters.data_sources:
+    if 'ghcn' in sources:
         # ... adjust the Hohenpeissenberg data;
-        if 'hohenpeissenberg' in parameters.data_sources:
-            correct_Hohenpeissenberg(data['ghcn'], input.hohenpeissenberg)
+        if 'hohenpeissenberg' in sources:
+            correct_Hohenpeissenberg(data['ghcn'], data['hohenpeissenberg'])
         # ... adjust the USHCN data;
-        if 'ushcn' in parameters.data_sources:
+        if 'ushcn' in sources:
             adjust_USHCN(data['ushcn'], data['ghcn'])
         # ... optionally exclude contiguous US stations.
         if not parameters.retain_contiguous_US:
@@ -199,8 +203,8 @@ def step0(input):
 
     # Join all data sources together.
     records = {}
-    for source in ['ghcn', 'ushcn', 'scar', 'v3']:
-        records.update(data.get(source, {}))
+    for d in data.values():
+        records.update(d)
 
     # We sort here - as does GISTEMP - so that all the records for a
     # given 11-digit station ID are grouped together, ready for

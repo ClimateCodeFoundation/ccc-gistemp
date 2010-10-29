@@ -895,7 +895,7 @@ def read_hohenpeissenberg(path):
             temps = map(read_float, data[1:13])
             assert len(temps) == 12
             record.add_year(year, temps)
-    return record
+    yield record
 
 
 def read_float(s):
@@ -928,7 +928,7 @@ def ghcn3_input_file():
     dirs = filter(os.path.isdir, glob.glob('input/ghcnm*'))
     dirs.sort(key=lambda x: x[:8], reverse=True)
     if not dirs:
-        return None
+        raise IOError('Cannot find GHCN v3 input file.')
     dir = dirs[0]
     dats = glob.glob(os.path.join(dir, '*.dat'))
     return dats[0]
@@ -951,38 +951,49 @@ def v2meta():
         _v2meta = code.giss_data.read_stations(v2inv, format='v2')
     return _v2meta
 
+class Input:
+    """Generally one instance is created: the result of
+    step0_input()."""
 
+    def open(self_, source):
+        """Open the source (specified as a string), and return an
+        iterator."""
+
+        if source == 'ushcn':
+            ushcn_map = read_USHCN_stations('input/ushcn2.tbl',
+              'input/ushcnV2_cmb.tbl')
+            return read_USHCN_converted(ushcn_input_file(),
+              ushcn_map, meta=v2meta())
+        if source == 'ghcn.v3':
+            ghcn3file = ghcn3_input_file()
+            invfile = ghcn3file.replace('.dat', '.inv')
+            return GHCNV3Reader(open(ghcn3file),
+              meta=code.giss_data.read_stations(invfile, format='v3'),
+              year_min=code.giss_data.BASE_YEAR)
+        if source == 'ghcn':
+            return V2MeanReader("input/v2.mean",
+                meta=v2meta(),
+                year_min=code.giss_data.BASE_YEAR)
+        if source == 'scar':
+            return itertools.chain(
+                read_antarctic("input/antarc1.txt", "input/antarc1.list", '8',
+                  meta=v2meta(), year_min=code.giss_data.BASE_YEAR),
+                read_antarctic("input/antarc3.txt", "input/antarc3.list", '9',
+                  meta=v2meta(), year_min=code.giss_data.BASE_YEAR),
+                read_australia("input/antarc2.txt", "input/antarc2.list", '7',
+                  meta=v2meta(), year_min=code.giss_data.BASE_YEAR))
+        if source == 'hohenpeissenberg':
+            return read_hohenpeissenberg(
+              "input/t_hohenpeissenberg_200306.txt_as_received_July17_2003")
+        raise Exception("Cannot open source %r" % source)
+            
 # Each of the stepN_input functions below produces an iterator that
 # yields that data for that step feeding from data files.
 # Each of the stepN_output functions below is effectively a "tee" that
 # writes the data to a file; they each take a data object (an
 # iterator), write each item to a file, and yield each item.
 def step0_input():
-    class Struct:
-        pass
-    input = Struct()
-    ushcn_map = read_USHCN_stations('input/ushcn2.tbl',
-      'input/ushcnV2_cmb.tbl')
-    input.ushcn = read_USHCN_converted(ushcn_input_file(),
-      ushcn_map, meta=v2meta())
-    input.ghcn = V2MeanReader("input/v2.mean",
-        meta=v2meta(),
-        year_min=code.giss_data.BASE_YEAR)
-    ghcn3file = ghcn3_input_file()
-    if ghcn3file:
-        invfile = ghcn3file.replace('.dat', '.inv')
-        input.v3 = GHCNV3Reader(open(ghcn3file),
-          meta=code.giss_data.read_stations(invfile, format='v3'),
-          year_min=code.giss_data.BASE_YEAR)
-    input.scar = itertools.chain(
-        read_antarctic("input/antarc1.txt", "input/antarc1.list", '8',
-          meta=v2meta(), year_min=code.giss_data.BASE_YEAR),
-        read_antarctic("input/antarc3.txt", "input/antarc3.list", '9',
-          meta=v2meta(), year_min=code.giss_data.BASE_YEAR),
-        read_australia("input/antarc2.txt", "input/antarc2.list", '7',
-          meta=v2meta(), year_min=code.giss_data.BASE_YEAR))
-    input.hohenpeissenberg = read_hohenpeissenberg(
-            "input/t_hohenpeissenberg_200306.txt_as_received_July17_2003")
+    input = Input()
 
     return input
 

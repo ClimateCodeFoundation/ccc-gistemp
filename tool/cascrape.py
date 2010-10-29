@@ -69,11 +69,13 @@ def formatmetav2(meta):
         meta[key] = float(meta[key])
     invrow = (
       "%(id11)s "
-      "%(Station Name)-30s "
+      "%(Station Name)-30.30s "
       "%(Latitude)6.2f "
       "%(Longitude)7.2f "
       "%(Elevation)4.0f "
-      "-999            -9 -9         \n"
+      "-999            -9 -9UNKNOWN         "
+      "      "
+      "\n"
       ) % meta
     return invrow
 

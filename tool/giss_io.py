@@ -897,6 +897,67 @@ def read_hohenpeissenberg(path):
             record.add_year(year, temps)
     yield record
 
+def read_generic(name):
+    """Reads a "generic" source.  *name* should be a prefix, generally
+    ending in '.v2', example: "ca.v2".  In the input directory the data
+    file "foo.v2.mean" will be opened (where *name* is "foo.v2") and
+    records from it will be yielded.  If the file "foo.v2.inv" is
+    present it will be used as metadata (as well as the normal v2.inv
+    file, meaning that any records in "foo.v2.mean" that have GHCN
+    identifiers do not need new metadata).  If the file "foo.tbl" is
+    present, it will be used to rename the station identifiers.
+    """
+
+    f = open(os.path.join('input', name+'.mean'))
+
+    # Read the metadata from the v2.inv file, then merge in foo.v2.inv
+    # file if present.
+    meta = v2meta()
+    try:
+        m = open(os.path.join('input', name+'.inv'))
+        print "  Reading metadata from %s" % m.name
+    except:
+        m = None
+    if m:
+        extrameta = code.giss_data.read_stations(file=m, format='v2')
+        meta.update(extrameta)
+
+    # Read the data.
+    stations = V2MeanReader(file=f, meta=meta,
+        year_min=code.giss_data.BASE_YEAR)
+
+    # Convert IDs if a .tbl file is present.
+    try:
+        tbl = open(os.path.join('input', name.replace('v2', 'tbl')))
+        print "  Translating IDs using %s" % tbl.name
+    except:
+        tbl = None
+    if tbl:
+        return convert_generic_id(stations, tbl, meta)
+
+    return stations
+
+def convert_generic_id(stream, tblfile, meta=None):
+    """Convert identifiers of the records in *stream* using the contents
+    of the table *tblfile*.  *tblfile* should have one line,
+    "oldid newid", for each identifier mapping.  If a record's
+    identifier does not appear in the table, it will be passed through
+    unchanged.  Any record that gets a new identifier will have its
+    '.station' member set to the metadata entry from the *meta* dict (if
+    it is specified.
+    """
+
+    table = dict(row.split() for row in tblfile)
+    meta = meta or {}
+
+    for record in stream:
+        if record.uid in table:
+            record.uid = table[record.uid]
+            id11 = record.uid[:11]
+            if id11 in meta:
+                record.station = meta[id11]
+        yield record
+
 
 def read_float(s):
     """Returns the float converted from the argument string.
@@ -985,6 +1046,10 @@ class Input:
         if source == 'hohenpeissenberg':
             return read_hohenpeissenberg(
               "input/t_hohenpeissenberg_200306.txt_as_received_July17_2003")
+        if source.endswith('.v2'):
+            # A "generic" source.  "ca.v2" will look for ca.v2.mean,
+            # ca.v2.inv, ca.tbl (all in the input directory).
+            return read_generic(source)
         raise Exception("Cannot open source %r" % source)
             
 # Each of the stepN_input functions below produces an iterator that

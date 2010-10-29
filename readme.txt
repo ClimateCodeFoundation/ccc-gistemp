@@ -28,7 +28,7 @@ Clear Climate Code have reimplemented GISTEMP (the GISS surface
 temperature analysis system), to make it clearer.  Work continues
 towards making it more clear and more accessible.
 
-ccc-gistemp release 0.6.0 is a release of ccc-gistemp version 0.6.
+ccc-gistemp release 0.6.1 is a release of ccc-gistemp version 0.6.
 The purpose of version 0.6 is to make ccc-gistemp more useful by:
   - allowing more flexible choices of input data.  For example: GHCN v3;
     USHCN only; ocean only.
@@ -76,7 +76,7 @@ not work).
 
 3. INSTALLATION
 
-Unpack ccc-gistemp-0.5.1.tar.gz.
+Unpack ccc-gistemp-0.6.1.tar.gz.
 
 
 4. INPUT DATA
@@ -191,7 +191,8 @@ B. DOCUMENT HISTORY
 
 Most recent changes first:
 
-2010-10-22 DRJ Updated to prepare for 0.6.0
+2010-10-29 DRJ Updated to prepare for 0.6.1.
+2010-10-22 DRJ Updated to prepare for 0.6.0.
 2010-07-21 DRJ Updated to prepare for 0.5.1.
 2010-07-19 DRJ Updated to prepare for 0.5.0.
 2010-07-13 DRJ Added note about PyPy.

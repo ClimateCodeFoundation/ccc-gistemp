@@ -147,7 +147,7 @@ def read_stations(path=None, file=None, format='v2'):
         (58,  62,  'elevation',        int),
         (62,  67,  'grid_elevation',   int),
         (67,  68,  'pop',              str),
-        (68,  73,  'ipop',             int),
+        (68,  73,  'ipop',             blank_int),
         (73,  75,  'topo',             str),
         (75,  77,  'stveg',            str),
         (77,  79,  'stloc',            str),
@@ -157,7 +157,7 @@ def read_stations(path=None, file=None, format='v2'):
         (84,  100, 'grveg',            str),
         (100, 101, 'GHCN_brightness',  str),
         (101, 102, 'US_brightness',    str),
-        (102, 106, 'global_brightness',int),
+        (102, 106, 'global_brightness',blank_int),
     )
     # See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README.pdf for format
     # of metadata file.

@@ -46,15 +46,15 @@ class Fatal(Exception):
         self.msg = msg
 
 def asann_values_only(f):
-    """Wrapper for `vischeck.asann` which yields only values.
+    """Wrapper for `vischeck.anomalies` which yields only values.
 
     Any tuple that contains ``None`` is simply discarded.
 
     :Param f:
-        Input file as required by `vischeck.asann`.
+        Input file as required by `vischeck.anomalies`.
 
     """
-    for el in vischeck.asann(f):
+    for el in vischeck.anomalies(f):
         if None not in el:
             yield el
 
@@ -95,7 +95,8 @@ def box_series(f):
                 yield(((box, year + i / 12, i % 12), data[i]))
         box += 1
 
-# This is derived from the similar function vischeck.asann.
+# This is derived from the similar function vischeck.asann (now called
+# vischeck.anomalies).
 def asmon(f, values_only=False):
     """Convert the text file *f* into a sequence of monthly anomalies.
     An input file is expected to be one of the NH.*, SH.*, or GLB.*

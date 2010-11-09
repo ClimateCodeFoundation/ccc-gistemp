@@ -426,7 +426,7 @@ def GHCNV3Reader(inp, meta=None, year_min=None, scale=None):
     specified in the file (normally for monthly means this is "TAVG" and
     the scale implied by that is 0.01 (degrees C)).
 
-    See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README.pdf for format
+    See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README for format
     of this file.
     """
 

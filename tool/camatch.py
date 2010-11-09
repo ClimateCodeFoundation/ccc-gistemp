@@ -242,8 +242,6 @@ def main(argv=None):
     import sys
     if argv is None:
         argv = sys.argv
-    # :todo: replace '403.v2' (which is a grepped selection of v2.mean),
-    # with the real v2.mean location
     match(cameta=open('input/ca.json'),
       cadata=v2asdict(open('input/ca.v2.mean')),
       ghcnmeta=open('input/v2.inv'),

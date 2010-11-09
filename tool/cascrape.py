@@ -31,17 +31,16 @@ def gather(scraper, v2out, v2inv, jsoninv, log):
     while 1:
         url = api + '?' + urllib.urlencode(dict(name=name,
             format='json', limit=limit, offset=offset))
-        # We terminate when the JSON request returns no results, which
-        # we detect using this flag.
-        gotnone = True
         result = json.load(urllib.urlopen(url))
+        # We terminate when the JSON request returns no results.
+        if not result:
+            break
         for item in result:
-            gotnone = False
             count += 1
             log.write('\r%d records' % count)
             log.flush()
             if 'meta' in item:
-                meta.append(json.loads(item['meta']))
+                meta.append(item)
                 continue
             # Make a row in GHCN v2 format.  Add a '0' to make a
             # 12-character record identifier.
@@ -49,9 +48,7 @@ def gather(scraper, v2out, v2inv, jsoninv, log):
             assert 11 == len(id11)
             row = "%s%s%s\n" % (id11+'0', item['year'], item['tmean'])
             rows.append(row)
-        if gotnone:
-            break
-        offset += 500
+        offset += limit
         # Just a sanity check
         assert offset < 1e5
     log.write('\n')
@@ -69,7 +66,7 @@ def formatmetav2(meta):
         meta[key] = float(meta[key])
     invrow = (
       "%(id11)s "
-      "%(Station Name)-30.30s "
+      "%(Station_Name)-30.30s "
       "%(Latitude)6.2f "
       "%(Longitude)7.2f "
       "%(Elevation)4.0f "

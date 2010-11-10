@@ -115,11 +115,11 @@ def extractdate(inp, cells, date):
     the binary subbox file *inp* extract the values corresponding to the
     date box by box.
     """
-    import giss_io
+    import io
 
     year,month = map(int, date.split('-'))
 
-    records = iter(giss_io.SubboxReader(inp))
+    records = iter(io.SubboxReader(inp))
     meta = records.next()
     base_year = meta.yrbeg
     # Index of required month in the record series.

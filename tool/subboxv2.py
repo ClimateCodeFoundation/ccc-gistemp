@@ -9,7 +9,7 @@
 import extend_path
 
 # Clear Climate Code
-import giss_io
+import io
 
 def convert(inp, out):
     """Convert a file inp from subbox to V2 mean format."""
@@ -17,9 +17,9 @@ def convert(inp, out):
     # Clear Climate Code
     from code import eqarea
 
-    v2 = giss_io.V2MeanWriter(file=out, scale=0.01)
+    v2 = io.V2MeanWriter(file=out, scale=0.01)
 
-    subbox = iter(giss_io.SubboxReader(inp))
+    subbox = iter(io.SubboxReader(inp))
     # First record is metadata, which we ignore.
     subbox.next()
     for record in subbox:

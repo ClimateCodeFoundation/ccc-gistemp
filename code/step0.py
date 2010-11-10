@@ -177,7 +177,7 @@ def step0(input):
     """An iterator for Step 0.  Produces a stream of
     `giss_data.Series` instances.  *input* should be an instance that
     has an open() method.  input.open(x) is called for each data source x.
-    (typically, this input object is made by the tool.giss_io.step0_input()
+    (typically, this input object is made by the tool.io.step0_input()
     function).
 
     """

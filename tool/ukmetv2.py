@@ -24,7 +24,7 @@ assert sys.version_info[:2] >= (2,5)
 # Clear Climate Code
 import extend_path
 from code.giss_data import MISSING
-import giss_io
+import io
 
 PAGE = """http://www.metoffice.gov.uk/climate/uk/stationdata/"""
 
@@ -82,9 +82,9 @@ def scrapeit(prefix):
     """
 
     out = Struct()
-    out.mean = giss_io.V2MeanWriter(path=prefix + '.v2.mean')
-    out.min = giss_io.V2MeanWriter(path=prefix + '.v2.min')
-    out.max = giss_io.V2MeanWriter(path=prefix + '.v2.max')
+    out.mean = io.V2MeanWriter(path=prefix + '.v2.mean')
+    out.min = io.V2MeanWriter(path=prefix + '.v2.min')
+    out.max = io.V2MeanWriter(path=prefix + '.v2.max')
     out.inv = open(prefix + '.v2.inv', 'w')
 
     for url in geturls():

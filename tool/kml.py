@@ -20,7 +20,7 @@ those bounds.
 # Clear Climate Code
 import extend_path
 # Clear Climate Code
-from giss_io import MISSING
+from io import MISSING
 
 
 # Images for the icons that denote the "urban flag" in the v2.mean file;
@@ -151,7 +151,7 @@ def station_annual_anomalies(data):
     series.  All the data series start in 1880."""
 
     from code import series
-    from giss_io import V2MeanReader
+    from io import V2MeanReader
 
     return ((record.uid, series.monthly_annual(record.series)[1])
       for record in V2MeanReader(data, year_min=1880))

@@ -2,9 +2,11 @@
 # $URL$
 # $Rev$
 #
-# giss_io.py
+# io.py
 #
 # Paul Ollis and David Jones, 2010-03-10
+#
+# (was previously called giss_io.py)
 
 """Readers and writers for datafiles used by NASA GISS GISTEMP.
 

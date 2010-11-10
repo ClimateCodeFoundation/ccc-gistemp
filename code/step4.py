@@ -13,7 +13,7 @@ import itertools
 
 from giss_data import MISSING, valid, invalid
 import parameters
-from tool import giss_io
+from tool import io
 
 
 IYRBEG = 1880    # first year
@@ -24,7 +24,7 @@ def merge_ocean(ocean, sst, dates):
     Returns a new boxed iterator.
     """
 
-    clim = giss_io.step4_load_clim()
+    clim = io.step4_load_clim()
 
     first_new_year = dates[0][0]
     last_new_year = dates[-1][0]

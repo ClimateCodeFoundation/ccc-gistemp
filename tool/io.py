@@ -188,7 +188,7 @@ class SubboxWriter(object):
         self.f.close()
 
 
-# Obsolescent.
+# Obsolescent.  And not tested.
 class StationRecordWriter(object):
     """Writes station records into a binary format that is the
     traditional output of Step 2 (but more recent versions of
@@ -198,8 +198,8 @@ class StationRecordWriter(object):
     program STEP3/to.SBBXgrid.f from the GISTEMP sources, where a
     comment says "READS NCAR FILES".  NCAR is the National Center
     for Atmospheric Research (as US government agency).
-
     """
+
     def __init__(self, rawfile, bos='>'):
         self.bos = bos
         self.f = fort.File(rawfile, bos=self.bos)
@@ -219,17 +219,17 @@ class StationRecordWriter(object):
         else:
             r = self.buf_record
             s = r.station
-            if parameters.use_global_brightness:
-                if s.global_brightness > 35:
+            if 'global_light' in parameters.rural_designator:
+                if s.global_light > 35:
                     b = '3'
-                elif s.global_brightness > 10:
+                elif s.global_light > 10:
                     b = '2'
                 else:
                     b = '1'
             else:
-                b = s.US_brightness
+                b = s.us_light
             compound_name = "%s%c%c%c%3s" % (
-                      s.name, b, s.pop, s.GHCN_brightness,
+                      s.name, b, s.popcls, s.popcss,
                       s.uid[:3])
 
             # The 11-digit station identifier with the 3-digit country
@@ -240,7 +240,7 @@ class StationRecordWriter(object):
             fmt = "%di" % len(r.series)
             data = struct.pack(self.bos + fmt, *internal_to_external(r.series))
             data += struct.pack(self.bos + "iiii36sii", as_tenths(s.lat),
-                    as_tenths(s.lon), int(short_id), s.elevation,
+                    as_tenths(s.lon), int(short_id), s.stelev,
                     compound_name, rel_first_month, rel_last_month)
 
         self.f.writeline(data)
@@ -399,7 +399,7 @@ class StationTsWriter(object):
         station = record.station
         self.f.write(' %4d%5d%s%4s%-36s\n' % (
                 as_tenths(station.lat), as_tenths(station.lon),
-                record.uid, station.elevation, station.name))
+                record.uid, station.stelev, station.name))
 
         data = internal_to_external(record.series)
         for y, offset in enumerate(range(0, len(record), 12)):

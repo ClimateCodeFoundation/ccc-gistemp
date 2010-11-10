@@ -87,30 +87,36 @@ def read_stations(path=None, file=None, format='v2'):
         The latitude, in degrees (two decimal places).
        lon                 -98.20               -87.90
         The longitude, in degrees (two decimal places).
-    1  elevs               274                  205
+    1  stelev              274                  205
         The station elevation in metres.
-    2  elevg               287                  197
+    2  grelev              287                  197
         The grid elevation in metres (value taken from gridded dataset).
-    3  pop                 R                    U
-        'R' for rural,  'S' for semi-urban, 'U' for urban
-    4  ipop                -9                   6216
-        Population of town in thousands
+    3  popcls              R                    U
+        'R' for rural,  'S' for semi-urban, 'U' for urban.
+    4  popsiz              -9                   6216
+        Population of town in thousands.
     5  topo                FL                   FL
-        The topography
+        The topography.
     6  stveg               xx                   xx
     7  stloc               no                   no
-    8  iloc                -9                   -9
+        Whether the station is near a lake (LA) or ocean (OC).
+    8  ocndis              -9                   -9
     9  airstn              x                    A
-    10 itowndis            -9                   1
+    10 towndis             -9                   1
        grveg               COOL FIELD/WOODS     COOL CROPS
         An indication of vegetation, from a gridded dataset. For example,
         'TROPICAL DRY FOR'.
-    G  GHCN_brightness     A                    C
-    U  US_brightness       1                    3
-        Brighness indication for US stations, or ' ' for non-US
-        stations.  '1' is dark, '3' is bright.
-    11 global_brightness   0                    125
-        A global brightness index, range 0-186 (at least)
+    G  popcss              A                    C
+        Population class based on satellite lights (GHCN value).
+    U  us_light            1                    3
+        Urban/Rural flag based on satellite lights for US stations
+        (' ' for non-US stations).  '1' is dark, '3' is bright.
+    11 global_light        0                    125
+	Global satellite nighttime light value.  Range 0-186 (at
+	least).
+
+    The last two fields (us_light and global_light) are specific to the
+    version of the v2.inv file supplied by GISS with GISTEMP.
     """
 
     assert format in ('v2', 'v3')
@@ -134,9 +140,18 @@ def read_stations(path=None, file=None, format='v2'):
             return None
         return int(s)
 
-    # GISTEMP only uses some of the fields: uid, lat, lon, pop (for
-    # old-school rural/urban designation), US_brightness (for old-school
-    # rural/urban designation in the US), global_brightness (for
+    # Fields are named after the designators used in the GHCN v3
+    # documentation (even for the GHCN v2 fields, which have slightly
+    # different names in the GHCN v2 documentation), except for:
+    # uid (GHCN: ID), lat (GHCN: latitude), lon (GHCN: longitude),
+    # us_light (GISTEMP specific field for nighttime satellite
+    # brightness over the US, see Hansen et al 2001), global_light
+    # (GISTEMP specific field for global nighttime satellite
+    # brightness).
+    # 
+    # GISTEMP only uses some of the fields: uid, lat, lon, popcls (for
+    # old-school rural/urban designation), us_light (for old-school
+    # rural/urban designation in the US), global_light (for
     # 2010-style rural/urban designation).
 
     v2fields = (
@@ -144,37 +159,37 @@ def read_stations(path=None, file=None, format='v2'):
         (12,  42,  'name',             str),
         (43,  49,  'lat',              float),
         (50,  57,  'lon',              float),
-        (58,  62,  'elevation',        int),
-        (62,  67,  'grid_elevation',   int),
-        (67,  68,  'pop',              str),
-        (68,  73,  'ipop',             blank_int),
+        (58,  62,  'stelev',           int),
+        (62,  67,  'grelev',           int),
+        (67,  68,  'popcls',           str),
+        (68,  73,  'popsiz',           blank_int),
         (73,  75,  'topo',             str),
         (75,  77,  'stveg',            str),
         (77,  79,  'stloc',            str),
-        (79,  81,  'iloc',             str),    #int?
+        (79,  81,  'ocndis',           str),    #int?
         (81,  82,  'airstn',           str),
-        (82,  84,  'itowndis',         str),    #int?
+        (82,  84,  'towndis',          str),    #int?
         (84,  100, 'grveg',            str),
-        (100, 101, 'GHCN_brightness',  str),
-        (101, 102, 'US_brightness',    str),
-        (102, 106, 'global_brightness',blank_int),
+        (100, 101, 'popcss',           str),
+        (101, 102, 'us_light',         str),
+        (102, 106, 'global_light',     blank_int),
     )
-    # See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README.pdf for format
+    # See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README for format
     # of metadata file.
     v3fields = (
         (0,    11, 'uid',               str),
         (12,   20, 'lat',               float),
         (21,   30, 'lon',               float),
-        (31,   37, 'elevation',         float),
+        (31,   37, 'stelev',            float),
         (38,   68, 'name',              str),
-        (69,   73, 'grid_elevation',    blank_int),
-        (73,   74, 'pop',               str),
+        (69,   73, 'grelev',            blank_int),
+        (73,   74, 'popcls',            str),
         (75,   79, 'popsiz',            blank_int),
         (79,   81, 'topo',              str),
         (81,   83, 'stveg',             str),
         (83,   85, 'stloc',             str),
         (85,   87, 'ocndis',            blank_int),
-        (87,   88, 'aistn',             str),
+        (87,   88, 'airstn',            str),
         (88,   90, 'towndis',           blank_int),
         (90,  106, 'grveg',             str),
         (106, 107, 'popcss',            str),

@@ -212,13 +212,23 @@ def annual_anomaly(record):
 
 
 def is_rural(station):
-    """Test whether the station described by *station* is rural.
-    """
-    if parameters.use_global_brightness:
-        return station.global_brightness <= parameters.max_rural_brightness
-    if parameters.rural_us_special and station.US_brightness != ' ':
-        return station.US_brightness == '1'
-    return station.pop == 'R'
+    """Test whether the station described by *station* is rural,
+    according to the specification of parameters.rural_designator."""
+
+    # Process the list of fields, ignoring any blank ones.
+    for field in parameters.rural_designator.split(','):
+        value = getattr(station, field)
+        if str(value).strip() == '':
+            continue
+        break
+    # Interpet the chosen field for rural indicator.
+    if field == 'global_light':
+        return value <= parameters.max_rural_brightness
+    if field == 'us_light':
+        return value == '1'
+    if field == 'popcls':
+        return value == 'R'
+    assert 0,"Unknown field used in parameters.rural_designator: %s" % field
 
 class Struct(object):
     pass

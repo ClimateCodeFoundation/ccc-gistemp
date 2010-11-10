@@ -67,26 +67,29 @@ station_drop_minimum_months = 20
 with at least this many valid data values, otherwise it is dropped
 immediately prior to the peri-urban adjustment step."""
 
-use_global_brightness = True
-"""If this is true, the global brightness field from station metadata
-is used to identify rural stations (global brightness at most
-max_rural_brightness).  This brightness field was introduced by GISS in
-2010 and is particular to the v2.inv file obtained from GISS.
-If this is false, the GHCN population index ('RSU') is used; except
-(when *rural_us_special* is true) that for the US brightness field
-when present (the US and some neighbouring stations).
-"""
+rural_designator = "global_light"
+"""Specifies which station metadata fields are used to determine whether
+a station is rural or not.  Only certain fields may be specified:
+'global_light' (global satellite nighttime radiance value); 'popcls'
+(GHCN population class); 'us_light' (class derived from satellite nighttime
+radiance covering the US and some neighbouring stations).
 
-rural_us_special = False
-"""When *use_global_brightness* is false, this flag determines whether
-to treat the US specially (see *use_global_brightness*).  Traditionally,
-prior to 2010, this flag would have been true and
-*use_global_brightness* would have been false.
+The value of this field may be a comma separated sequence, in which case
+the fields are consulted in the order specified until one is found that
+is not blank (the only field for which this is useful is the 'us_light'
+field, and the only intended use of this feature is to emulate a
+previous version of GISTEMP).
+
+Previous versions of GISTEMP can be "emulated" as follows:
+"popcls" GISTEMP 1999 to 2001
+"us_light,popcls" GISTEMP 2001 to 2010
+"global_light" GISTEMP 2010 onwards
 """
 
 max_rural_brightness = 10
-"""(when use_global_brightness is true) the maximum brightness value for
-a station to be considered rural."""
+"""The maximum brightness value for a station to be considered rural,
+when 'global_light' is the field used in determing whether a station
+is rural or not (see *rural_designator*)."""
 
 urban_adjustment_min_years = 20
 """When trying to calculate an urban station adjustment, at least this

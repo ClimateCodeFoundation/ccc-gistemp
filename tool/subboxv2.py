@@ -17,7 +17,7 @@ def convert(inp, out):
     # Clear Climate Code
     from code import eqarea
 
-    v2 = io.V2MeanWriter(file=out, scale=0.01)
+    v2 = io.GHCNV2Writer(file=out, scale=0.01)
 
     subbox = iter(io.SubboxReader(inp))
     # First record is metadata, which we ignore.

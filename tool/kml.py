@@ -151,10 +151,10 @@ def station_annual_anomalies(data):
     series.  All the data series start in 1880."""
 
     from code import series
-    from io import V2MeanReader
+    from io import GHCNV2Reader
 
     return ((record.uid, series.monthly_annual(record.series)[1])
-      for record in V2MeanReader(data, year_min=1880))
+      for record in GHCNV2Reader(data, year_min=1880))
 
 def chart_anom(anom):
     """Generate a (Google Chart API) URL for a chart of annual

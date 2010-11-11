@@ -49,7 +49,7 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
         output.write('%s\n' % r[n*w+80:])
 
     if 'v2' == format:
-        v2out = io.V2MeanWriter(file=output, scale=0.01)
+        v2out = io.GHCNV2Writer(file=output, scale=0.01)
 
     # m: time frames per year
     if info[2] == 6:

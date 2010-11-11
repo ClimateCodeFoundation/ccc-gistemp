@@ -82,9 +82,9 @@ def scrapeit(prefix):
     """
 
     out = Struct()
-    out.mean = io.V2MeanWriter(path=prefix + '.v2.mean')
-    out.min = io.V2MeanWriter(path=prefix + '.v2.min')
-    out.max = io.V2MeanWriter(path=prefix + '.v2.max')
+    out.mean = io.GHCNV2Writer(path=prefix + '.v2.mean')
+    out.min = io.GHCNV2Writer(path=prefix + '.v2.min')
+    out.max = io.GHCNV2Writer(path=prefix + '.v2.max')
     out.inv = open(prefix + '.v2.inv', 'w')
 
     for url in geturls():

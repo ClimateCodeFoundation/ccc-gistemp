@@ -22,6 +22,11 @@ Wiljens data for Hohenpeissenberg; 'scar' is the READER data from
 Scientific Committee on Antarctic Research.
 """
 
+work_file_format = "v2"
+"""The format of the intermediate files written to the 'work' directory:
+'v2' for GHCN v2, 'v3' for GHCN v3.
+"""
+
 USHCN_offset_start_year = 1980
 """The first year of the period considered when calculating the
 offsets between GHCN and USHCN records, to apply to a USHCN

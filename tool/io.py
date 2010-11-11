@@ -30,7 +30,7 @@ import struct
 import extend_path
 import fort
 import code.giss_data
-import code.read_config
+from code import parameters
 
 
 #: Integer code used to indicate missing data.
@@ -488,8 +488,59 @@ def GHCNV3Reader(inp, meta=None, year_min=None, scale=None):
         if len(record) != 0:
             yield record
 
+class GHCNV3Writer(object):
+    """Write a file in GHCN v3 format. See also GHCNV3Reader.  The
+    format is documented in
+    ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README .  If the records
+    have an 'element' property, then that is used for the 'element'
+    field in the GHCN V3 file, otherwise 'TAVG' is used.
+    """
 
-def V2MeanReader(path=None, file=None, meta=None, year_min=None):
+    def __init__(self, path=None, file=None, scale=0.01, **k):
+        if path is not None:
+            self.f = open(path, "w")
+        else:
+            self.f = file
+        self.scale = scale
+
+    def to_text(self, t):
+        if t == MISSING:
+            return "-9999"
+        else:
+            return "%5d" % t
+
+    def write(self, record):
+        """Write an entire record out."""
+        for year in range(record.first_year, record.last_year + 1):
+            if not record.has_data_for_year(year):
+                continue
+            element = getattr(record, 'element', 'TAVG')
+            self.writeyear(record.uid, element, year, record.get_a_year(year))
+
+    def writeyear(self, uid, element, year, temps):
+        """Write a single year's worth of data out.  *temps* should
+        contain 12 monthly values."""
+
+        if len(uid) > 11:
+            assert len(uid) == 12
+            sflag = uid[11]
+        else:
+            sflag = ' '
+        id11 = "%-11.11s" % uid
+        assert len(element) == 4
+
+        tstrings = [self.to_text(t)
+                   for t in internal_to_external(temps, scale=self.scale)]
+        flags = ['  ' + sflag] * 12
+
+        self.f.write('%s%04d%s%s\n' % (uid, year, element,
+          ''.join(t+flag for t,flag in zip(tstrings,flags))))
+
+    def close(self):
+        self.f.close()
+
+
+def GHCNV2Reader(path=None, file=None, meta=None, year_min=None):
     """Reads a file in GHCN v2.mean format and yields each station.
 
     If a *meta* dict is supplied then the Series instance will have its
@@ -554,8 +605,8 @@ def V2MeanReader(path=None, file=None, meta=None, year_min=None):
     f.close()
 
 
-class V2MeanWriter(object):
-    """Write a file in GHCN v2.mean format. See also V2MeanReader."""
+class GHCNV2Writer(object):
+    """Write a file in GHCN v2.mean format. See also GHCNV2Reader."""
 
     def __init__(self, path=None, file=None, scale=0.1, **k):
         if path is not None:
@@ -925,7 +976,7 @@ def read_generic(name):
         meta.update(extrameta)
 
     # Read the data.
-    stations = V2MeanReader(file=f, meta=meta,
+    stations = GHCNV2Reader(file=f, meta=meta,
         year_min=code.giss_data.BASE_YEAR)
 
     # Convert IDs if a .tbl file is present.
@@ -1034,7 +1085,7 @@ class Input:
               meta=code.giss_data.read_stations(invfile, format='v3'),
               year_min=code.giss_data.BASE_YEAR)
         if source == 'ghcn':
-            return V2MeanReader("input/v2.mean",
+            return GHCNV2Reader("input/v2.mean",
                 meta=v2meta(),
                 year_min=code.giss_data.BASE_YEAR)
         if source == 'scar':
@@ -1064,57 +1115,65 @@ def step0_input():
 
     return input
 
-def step0_output(data):
-    out = V2MeanWriter(path="work/v2.mean_comb")
-    for thing in data:
-        out.write(thing)
-        yield thing
-    print "Step0: closing output file"
-    out.close()
+def choose_writer():
+    """Choose a record writer function, according to
+    parameters.work_file_format, and return (function,filext) pair."""
+
+    format = parameters.work_file_format
+
+    if format == 'v2':
+        writer = GHCNV2Writer
+    elif format == 'v3':
+        writer = GHCNV3Writer
+    return writer,format
+
+def generic_output_step(n):
+    """Return a generic output routine for step *n*."""
+
+    def output(data):
+        writer,ext = choose_writer()
+        path = os.path.join('work', 'step%d.%s' % (n, ext))
+        out = writer(path=path)
+        for thing in data:
+            out.write(thing)
+            yield thing
+        print "Step %d: closing output file." % n
+    return output
+
+step0_output = generic_output_step(0)
 
 def step1_input():
-    return V2MeanReader("work/v2.mean_comb",
+    return GHCNV2Reader("work/step0.v2",
         meta=v2meta(),
         year_min=code.giss_data.BASE_YEAR)
 
-def step1_output(data):
-    out = V2MeanWriter(path="work/v2.step1.out")
-    for thing in data:
-        out.write(thing)
-        yield thing
-    print "Step1: closing output file"
-    out.close()
+step1_output = generic_output_step(1)
 
 def step2_input():
-    return V2MeanReader("work/v2.step1.out", meta=v2meta())
+    return GHCNV2Reader("work/step1.v2", meta=v2meta())
 
-def step2_output(data):
-    out = V2MeanWriter(path="work/v2.step2.out")
-    for thing in data:
-        out.write(thing)
-        yield thing
-    print "Step2: closing output file"
-    out.close()
+step2_output = generic_output_step(2)
 
 def step3_input():
-    return V2MeanReader("work/v2.step2.out", meta=v2meta())
+    return GHCNV2Reader("work/step2.v2", meta=v2meta())
 
 STEP3_OUT = os.path.join('result', 'SBBX1880.Ts.GHCN.CL.PA.1200')
 
 def step3_output(data):
     out = SubboxWriter(open(STEP3_OUT, 'wb'),
       trimmed=False)
-    v2out = V2MeanWriter(path='work/v2.step3.out', scale=0.01)
+    writer,ext = choose_writer()
+    textout = writer(path=('work/step3.%s' % ext), scale=0.01)
     gotmeta = False
     for thing in data:
         out.write(thing)
         if gotmeta:
-            v2out.write(thing)
+            textout.write(thing)
         gotmeta = True
         yield thing
     print "Step3: closing output file"
     out.close()
-    v2out.close()
+    textout.close()
 
 def step3c_input():
     """Use the output from the ordinary Step 3."""

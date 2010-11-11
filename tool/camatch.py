@@ -13,7 +13,7 @@ import math
 
 # Clear Climate Code
 import extend_path
-from code import giss_data
+import io
 
 class Struct:
     pass
@@ -192,7 +192,7 @@ def ghcnmetaasdict(ghcnmeta):
     """Take an open file descriptor on the 'v2.inv' file and return a
     dictionary."""
 
-    stations = giss_data.read_stations(file=ghcnmeta, format='v2')
+    stations = io.station_meta(file=ghcnmeta, format='v2')
     return stations
 
 def iso6709(lat, lon):

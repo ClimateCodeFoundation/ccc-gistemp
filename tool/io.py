@@ -527,8 +527,14 @@ class GHCNV3Writer(object):
         contain 12 monthly values."""
 
         if len(uid) > 11:
+            # Convert GHCN v2 style identifier into 11-digit v3
+            # identifier; use 12th digit for the source flag.
             assert len(uid) == 12
             sflag = uid[11]
+        elif len(uid) == 6:
+            # Assume it's a 6 digit identifier from USHCN.
+            uid = '42500' + uid
+            sflag = 'U'
         else:
             sflag = ' '
         id11 = "%-11.11s" % uid
@@ -816,19 +822,21 @@ def read_antarc_station_ids(path, discriminator):
     return dict
 
 
-def convert_USHCN_id(record_stream, stations, meta=None):
-    """Convert all the records in *record_stream* from having (6-digit)
-    USHCN identifiers to having 12-digit GHCN identifiers (using the
-    *stations* dictionary).  If *meta* (a dictionary) is specified then
-    station metadata is added to each record (if it has a 11-digit GHCN
-    station ID that is in the meta dictionary)."""
+def convert_USHCN_id(record_stream, stations, meta={}):
+    """Convert records in *record_stream* from having (6-digit)
+    USHCN identifiers to having (12-digit) GHCN identifiers.  Any record
+    that has a key in the *stations* dictionary will have its identifier
+    ('uid' property) changed to the corresponding value; it will also
+    have station metadata added if it's new identifier is in the *meta*
+    dictionary."""
 
     for record in record_stream:
-        id12 = stations[int(record.uid)]
-        record.uid = id12
-        id11 = id12[:11]
-        if meta and id11 in meta:
-            record.station = meta[id11]
+        id12 = stations.get(int(record.uid))
+        if id12:
+            record.uid = id12
+            id11 = id12[:11]
+            if id11 in meta:
+                record.station = meta[id11]
         yield record
 
 def convert_F_to_C(record_stream):
@@ -951,6 +959,29 @@ def read_USHCN_stations(ushcn_v1_station_path, ushcn_v2_station_path):
         (v2_station,_,v1_station,_) = line.split()
         stations[int(v2_station)] = stations[int(v1_station)]
     return stations
+
+def USHCNV2meta(path):
+    """Reads the station metadata from the USHCN v2 file, typically 
+    'ushcn-v2-stations.txt', and returns it as a dict."""
+
+    file = open(path)
+
+    fields = dict(
+      uid=(0,6,str),
+      lat=(7,15,float),
+      lon=(16,25,float),
+      stelev=(26,32,float),
+      us_state=(33,35,str),
+      name=(36,66,str),
+      )
+
+    meta = {}
+    for row in file:
+        d = dict((field, convert(row[i:j]))
+          for field,(i,j,convert) in fields.items())
+        meta[d[uid]] = code.giss_data.Station(**d)
+
+    return meta
 
 
 def read_hohenpeissenberg(path):
@@ -1087,6 +1118,16 @@ def v2meta():
         _v2meta = code.giss_data.read_stations(v2inv, format='v2')
     return _v2meta
 
+def magic_meta(path):
+    """Return the metadata in the file at *path*.  Magically knows
+    whether metadata is in GHCN v2 format, or USHCN v2 format (from the
+    name)."""
+
+    if path == 'v2.inv' or path == '':
+        return v2meta()
+    else:
+        return USHCNV2meta(path)
+
 class Input:
     """Generally one instance is created: the result of
     step0_input()."""
@@ -1096,10 +1137,14 @@ class Input:
         iterator."""
 
         if source == 'ushcn':
-            ushcn_map = read_USHCN_stations('input/ushcn2.tbl',
-              'input/ushcnV2_cmb.tbl')
+            if parameters.USHCN_convert_id:
+                ushcn_map = read_USHCN_stations('input/ushcn2.tbl',
+                  'input/ushcnV2_cmb.tbl')
+            else:
+                ushcn_map = {}
+            ushcn_meta = magic_meta(parameters.USHCN_meta)
             return read_USHCN_converted(ushcn_input_file(),
-              ushcn_map, meta=v2meta())
+              ushcn_map, meta=ushcn_meta)
         if source == 'ghcn.v3':
             ghcn3file = ghcn3_input_file()
             invfile = ghcn3file.replace('.dat', '.inv')

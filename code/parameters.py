@@ -27,6 +27,17 @@ work_file_format = "v2"
 'v2' for GHCN v2, 'v3' for GHCN v3.
 """
 
+USHCN_convert_id = True
+"""Whether to convert USHCN station identifiers to GHCN station
+identifiers (using tables supplied by GISS).  In the usual analysis,
+this must be True."""
+
+USHCN_meta = ''
+"""Specifies what file to use for USHCN metadata (latitude, longitude).
+If empty then the GHCN v2.inv file is used (and this will only work when
+USHCN_convert_id is True).  Specify "ushcn-v2-stations.txt" and place
+that file in the input/ directory to use the USHCN metadata."""
+
 USHCN_offset_start_year = 1980
 """The first year of the period considered when calculating the
 offsets between GHCN and USHCN records, to apply to a USHCN

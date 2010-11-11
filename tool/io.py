@@ -409,7 +409,7 @@ class StationTsWriter(object):
     def close(self):
         self.f.close()
 
-def GHCNV3Reader(inp, meta=None, year_min=None, scale=None):
+def GHCNV3Reader(path=None, file=None, meta=None, year_min=None, scale=None):
     """Reads a file in GHCN V3 .dat format and yields each station
     record (as a giss_data.Series instance).  For now, this treats
     all the data for a station as a single record (contrast with GHCN V2
@@ -431,6 +431,11 @@ def GHCNV3Reader(inp, meta=None, year_min=None, scale=None):
     See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README for format
     of this file.
     """
+
+    if path:
+        inp = open(path)
+    else:
+        inp = file
 
     def id11(l):
         """Extract the 11-digit station identifier."""
@@ -533,7 +538,7 @@ class GHCNV3Writer(object):
                    for t in internal_to_external(temps, scale=self.scale)]
         flags = ['  ' + sflag] * 12
 
-        self.f.write('%s%04d%s%s\n' % (uid, year, element,
+        self.f.write('%s%04d%s%s\n' % (id11, year, element,
           ''.join(t+flag for t,flag in zip(tstrings,flags))))
 
     def close(self):
@@ -856,10 +861,9 @@ def read_USHCN(path):
         return l[0:6]
 
     noted_element = False
-    def note_element(line):
+    def note_element(element):
         """Print the meteorological element we are reading."""
         # See ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/readme.txt
-        element = line[6]
         assert element in '1234'
         element = {'1':'mean maximum temperature',
                    '2':'mean minimum temperature',
@@ -868,17 +872,22 @@ def read_USHCN(path):
                   }[element]
         print "(Reading %s)" % element
 
+    prev_element = None
     for id,lines in itertools.groupby(open_or_uncompress(path), id6):
         record = code.giss_data.Series(uid=id,
           first_year=code.giss_data.BASE_YEAR)
+        lines = list(lines)
+        elements = set(line[6] for line in lines)
+        assert len(elements) == 1, "Multiple elements for station %s." % id
+        element = elements.pop()
+        record.element = USHCN_element_as_GHCN(element)
+        if element != prev_element:
+            note_element(element)
+            prev_element = element
+        # '1', '2', '3' indicate (max, min, average) temperatures.
+        assert element in '123'
         for line in lines:
-            if not noted_element:
-                note_element(line)
-                noted_element = True
-            # '1', '2', '3' indicate (max, min, average) temperatures.
-            assert line[6] in '123'
             year = int(line[7:11])
-
             temps = []
             valid = False
             for m in range(0,12):
@@ -895,6 +904,19 @@ def read_USHCN(path):
             if valid: # some valid data found
                 record.add_year(year, temps)
         yield record
+
+def USHCN_element_as_GHCN(element):
+    """Convert a USHCN v2 element code to its GHCN v3 counterpart."""
+
+    # According to ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README only
+    # the TAVG code is used in GHCN v3 currently (the product is in
+    # beta).
+    return {
+      '1': 'tmax',
+      '2': 'tmin',
+      '3': 'TAVG',
+      '4': 'pcpt',
+    }[element]
 
 def read_USHCN_converted(path, stations, meta=None):
     """Read the USHCN data in the file *path*, converting each record to
@@ -1081,7 +1103,7 @@ class Input:
         if source == 'ghcn.v3':
             ghcn3file = ghcn3_input_file()
             invfile = ghcn3file.replace('.dat', '.inv')
-            return GHCNV3Reader(open(ghcn3file),
+            return GHCNV3Reader(file=open(ghcn3file),
               meta=code.giss_data.read_stations(invfile, format='v3'),
               year_min=code.giss_data.BASE_YEAR)
         if source == 'ghcn':

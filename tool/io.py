@@ -854,11 +854,12 @@ def convert_F_to_C(record_stream):
           map(convert_datum, record.series))
         yield record
 
-def read_USHCN(path):
+def read_USHCN(path, meta={}):
     """Open the USHCN V2 file *path* and yield a series of temperature
     records.  Each record is in degrees Fahrenheit (the unit used in the
     USHCN files), and will have its `uid` attribute set to its USHCN
-    identifier.
+    identifier.  Any station metadata from the *meta* dict (keyed by
+    station identifier) will be attached to the 'station' property.
 
     Data marked as missing (-9999 in the USHCN file) or flagged with 'E'
     or 'Q' will be replaced with MISSING.
@@ -894,6 +895,8 @@ def read_USHCN(path):
             prev_element = element
         # '1', '2', '3' indicate (max, min, average) temperatures.
         assert element in '123'
+        if id in meta:
+            record.station = meta[id]
         for line in lines:
             year = int(line[7:11])
             temps = []
@@ -932,7 +935,7 @@ def read_USHCN_converted(path, stations, meta=None):
     12-digit GHCN identifiers specified in the *stations* dict.
     """
 
-    ushcn = read_USHCN(path)
+    ushcn = read_USHCN(path, meta)
     celsius = convert_F_to_C(ushcn)
     ghcn_ids = convert_USHCN_id(celsius, stations, meta)
     return ghcn_ids
@@ -964,7 +967,7 @@ def USHCNV2meta(path):
     """Reads the station metadata from the USHCN v2 file, typically 
     'ushcn-v2-stations.txt', and returns it as a dict."""
 
-    file = open(path)
+    file = open(os.path.join('input', path))
 
     fields = dict(
       uid=(0,6,str),
@@ -979,7 +982,7 @@ def USHCNV2meta(path):
     for row in file:
         d = dict((field, convert(row[i:j]))
           for field,(i,j,convert) in fields.items())
-        meta[d[uid]] = code.giss_data.Station(**d)
+        meta[d['uid']] = code.giss_data.Station(**d)
 
     return meta
 

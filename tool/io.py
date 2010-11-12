@@ -24,6 +24,7 @@ import math
 import os
 import re
 import struct
+import warnings
 
 
 # Clear Climate Code
@@ -1132,6 +1133,26 @@ def station_metadata(path=None, file=None, format='v2'):
 
     return result
 
+def augmented_station_metadata(path=None, file=None, format='v2'):
+    """Reads station metadata just like augmented_station_metadata() but
+    additionally augments records with metadata obtained from another 
+    file, specified by parameters.augment_metadata.
+    """
+
+    meta = station_metadata(path=path, file=file, format=format)
+    augments = parameters.augment_metadata
+    if augments:
+        path,columns = augments.split('=')
+        columns = columns.split(',')
+        assert 'uid' in columns
+        for row in open(path):
+            row = row.strip().split(',')
+            d = dict(zip(columns,row))
+            uid = d['uid']
+            if uid in meta:
+                meta[uid].__dict__.update(d)
+    return meta
+
 
 def read_hohenpeissenberg(path):
     """Reads the Hohenpeissenberg data from
@@ -1174,7 +1195,7 @@ def read_generic(name):
     except:
         m = None
     if m:
-        extrameta = station_metadata(file=m, format='v2')
+        extrameta = augmented_station_metadata(file=m, format='v2')
         meta.update(extrameta)
 
     # Read the data.
@@ -1264,7 +1285,7 @@ def v2meta():
 
     v2inv = os.path.join('input', 'v2.inv')
     if not _v2meta:
-        _v2meta = station_metadata(v2inv, format='v2')
+        _v2meta = augmented_station_metadata(v2inv, format='v2')
     return _v2meta
 
 def magic_meta(path):
@@ -1276,7 +1297,7 @@ def magic_meta(path):
         return v2meta()
     else:
         path = os.path.join('input', path)
-        return station_metadata(path, format='ushcnv2')
+        return augmented_station_metadata(path, format='ushcnv2')
 
 class Input:
     """Generally one instance is created: the result of
@@ -1299,7 +1320,7 @@ class Input:
             ghcn3file = ghcn3_input_file()
             invfile = ghcn3file.replace('.dat', '.inv')
             return GHCNV3Reader(file=open(ghcn3file),
-              meta=station_metadata(invfile, format='v3'),
+              meta=augmented_station_metadata(invfile, format='v3'),
               year_min=code.giss_data.BASE_YEAR)
         if source == 'ghcn':
             return GHCNV2Reader("input/v2.mean",

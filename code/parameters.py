@@ -22,6 +22,18 @@ Wiljens data for Hohenpeissenberg; 'scar' is the READER data from
 Scientific Committee on Antarctic Research.
 """
 
+augment_metadata = ''
+"""(In the usual analysis this parameter is empty) This parameter enables
+additional metadata fields to be read from a file.  The format is
+"name=colA,colB,colC" (with an arbitrary number of comma separated
+columuns).  The file called *name* is opened; each row is a comma
+separated sequence of field values, with the fields being 'colA',
+'colB', and so on.  There must be exactly one column called 'uid'.
+If a station with the same uid appears in the ordinary metadata
+(usually sourced from the v2.inv file) then the extra fields are
+associated with the station.
+"""
+
 work_file_format = "v2"
 """The format of the intermediate files written to the 'work' directory:
 'v2' for GHCN v2, 'v3' for GHCN v3.

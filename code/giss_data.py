@@ -48,18 +48,17 @@ _v2_sources = None
 
 
 class Station(object):
-    """A monitoring station's information.
+    """A station's metadata.
 
-    This holds the information about a single monitoring station. Not
+    This holds the information about a single (weather monitoring) station. Not
     all the attributes are used by the CCC code.  For a list of
-    attributes and documentation, see the read_stations() function.
+    attributes and documentation, see the io.station_metadata() function.
     """
     def __init__(self, **values):
         self.__dict__.update(values)
-        self.values = dict(values)
 
     def __repr__(self):
-        return "Station(%r)" % self.values
+        return "Station(%r)" % self.__dict__
 
 def get_last_year():
     """Get the latest year of the data.

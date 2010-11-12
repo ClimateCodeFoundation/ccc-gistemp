@@ -2,18 +2,17 @@
 # $URL$
 # $Rev$
 #
-# io.py
+# gio.py
 #
 # Paul Ollis and David Jones, 2010-03-10
 #
-# (was previously called giss_io.py)
+# (was previously called giss_io.py, then io.py)
 
-"""Readers and writers for datafiles used by NASA GISS GISTEMP.
+"""GISTEMP Input/Output.  Readers and writers for datafiles used by NASA
+GISS GISTEMP.
 
 Some of these file formats are peculiar to GISS, others are defined and
 used by other bodies (such as NOAA's v2.mean format).
-
-This is just a stepping stone.
 """
 __docformat__ = "restructuredtext"
 

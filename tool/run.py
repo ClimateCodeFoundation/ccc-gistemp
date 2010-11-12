@@ -26,7 +26,7 @@ import sys
 
 # Clear Climate Code
 import extend_path
-import io
+import gio
 
 class Fatal(Exception):
     pass
@@ -54,30 +54,30 @@ def mkdir(path):
 def run_step0(data):
     from code import step0
     if data is None:
-        data = io.step0_input()
+        data = gio.step0_input()
     result = step0.step0(data)
-    return io.step0_output(result)
+    return gio.step0_output(result)
 
 def run_step1(data):
     from code import step1
     if data is None:
-        data = io.step1_input()
+        data = gio.step1_input()
     result = step1.step1(data)
-    return io.step1_output(result)
+    return gio.step1_output(result)
 
 def run_step2(data):
     from code import step2
     if data is None:
-        data = io.step2_input()
+        data = gio.step2_input()
     result = step2.step2(data)
-    return io.step2_output(result)
+    return gio.step2_output(result)
 
 def run_step3(data):
     from code import step3
     if data is None:
-        data = io.step3_input()
+        data = gio.step3_input()
     result = step3.step3(data)
-    return io.step3_output(result)
+    return gio.step3_output(result)
 
 def run_step3c(data):
     """An alternative to Step 3 that reads (copies) the output file
@@ -85,24 +85,24 @@ def run_step3c(data):
     by Step 3 without re-running it."""
     if data:
         raise Fatal("Expect to run 3c first in pipeline.")
-    return io.step3c_input()
+    return gio.step3c_input()
 
 def run_step4(data):
     from code import step4
     # Unlike earlier steps, Step 4 always gets input data, ocean
     # temperatures, from disk; data from earlier stages is land data and
     # is zipped up.
-    data = io.step4_input(data) 
+    data = gio.step4_input(data) 
     result = step4.step4(data)
-    return io.step4_output(result)
+    return gio.step4_output(result)
 
 def run_step5(data):
     from code import step5
     # Step 5 takes a land mask as optional input, this is all handled in
     # the step5_input() function.
-    data = io.step5_input(data)
+    data = gio.step5_input(data)
     result = step5.step5(data)
-    io.step5_output(result)
+    gio.step5_output(result)
     return vischeck(result)
 
 def vischeck(data):

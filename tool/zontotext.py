@@ -13,7 +13,7 @@ import sys
 
 # Clear Climate Code
 import fort
-import io
+import gio
 
 # Not sure what these constants are; cribbed from zonav.f.
 # They boil down to the fact that the ZON.* file contains 14 records.
@@ -49,7 +49,7 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
         output.write('%s\n' % r[n*w+80:])
 
     if 'v2' == format:
-        v2out = io.GHCNV2Writer(file=output, scale=0.01)
+        v2out = gio.GHCNV2Writer(file=output, scale=0.01)
 
     # m: time frames per year
     if info[2] == 6:

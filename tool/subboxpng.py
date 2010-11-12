@@ -115,11 +115,11 @@ def extractdate(inp, cells, date):
     the binary subbox file *inp* extract the values corresponding to the
     date box by box.
     """
-    import io
+    import gio
 
     year,month = map(int, date.split('-'))
 
-    records = iter(io.SubboxReader(inp))
+    records = iter(gio.SubboxReader(inp))
     meta = records.next()
     base_year = meta.yrbeg
     # Index of required month in the record series.

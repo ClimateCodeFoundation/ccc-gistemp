@@ -13,7 +13,7 @@ import math
 
 # Clear Climate Code
 import extend_path
-import io
+import gio
 
 class Struct:
     pass
@@ -192,7 +192,7 @@ def ghcnmetaasdict(ghcnmeta):
     """Take an open file descriptor on the 'v2.inv' file and return a
     dictionary."""
 
-    stations = io.station_meta(file=ghcnmeta, format='v2')
+    stations = gio.station_meta(file=ghcnmeta, format='v2')
     return stations
 
 def iso6709(lat, lon):

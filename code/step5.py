@@ -20,7 +20,7 @@ import eqarea
 import giss_data
 import parameters
 import series
-from tool import io
+from tool import gio
 from giss_data import valid, invalid, MISSING
 
 # http://www.python.org/doc/2.3.5/lib/itertools-functions.html
@@ -425,7 +425,7 @@ def step5(data):
 
     This step takes input provided by steps 3 and 4 (zipped together).
 
-    The usual generator of the *data* argument is io.step5_input()
+    The usual generator of the *data* argument is gio.step5_input()
     and this allows for various missing and/or synthesized inputs,
     allowing just-land, just-ocean, override-weights.
 
@@ -436,8 +436,8 @@ def step5(data):
 
     """
     subboxes = ensure_weight(data)
-    subboxes = io.step5_mask_output(subboxes)
+    subboxes = gio.step5_mask_output(subboxes)
     boxed = SBBXtoBX(subboxes)
-    boxed = io.step5_bx_output(boxed)
+    boxed = gio.step5_bx_output(boxed)
     zoned_averages = zonav(boxed)
     return annzon(zoned_averages)

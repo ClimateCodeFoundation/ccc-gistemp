@@ -9,7 +9,7 @@
 import extend_path
 
 # Clear Climate Code
-import io
+import gio
 
 def convert(inp, out):
     """Convert a file inp from subbox to V2 mean format."""
@@ -17,9 +17,9 @@ def convert(inp, out):
     # Clear Climate Code
     from code import eqarea
 
-    v2 = io.GHCNV2Writer(file=out, scale=0.01)
+    v2 = gio.GHCNV2Writer(file=out, scale=0.01)
 
-    subbox = iter(io.SubboxReader(inp))
+    subbox = iter(gio.SubboxReader(inp))
     # First record is metadata, which we ignore.
     subbox.next()
     for record in subbox:

@@ -27,7 +27,15 @@ Step 1: A feature of GHCN (a major data source) is that a single
 station can have multiple overlapping records (from different original
 sources).  These are reconciled where possible, by offsetting
 overlapping records by their average difference, and combining them
-into one record.
+into one record.  Two stations (Lihue and St Helena) are adjusted to
+remove a step change in the record.  Under the control of a
+configuration file, various stations and periods of station records are
+discarded (as being unfit for subsequent analysis).  Hansen et al 1999
+documents the QC procedures that lead to discarding station data; it
+also documents the Lihue and St Helena adjustment; and it documents the
+method by which multiple records at the same location are combined.
+Some of the discarded stations in the US are documented in Hansen
+et al 2001.
 
 Step 2: Urban Adjustment.  (short records are discarded). Stations
 identified as urban (usually using values obtained from satellite
@@ -68,7 +76,7 @@ combined into a single record.  Large regional averages (hemispheres,
 tropics, northern- and southern-extratropics) are computed by
 combining zones in various combinations, each zone weighted according
 to the zone's area.  Zonal averaging is documented in Hansen and
-Lebedeff 1987 and Hansen and Lebedeff 2006 (each of which describes
+Lebedeff 1987 and Hansen et al 2006 (each of which describes
 an alternate scheme, the latter is what is currently implemented,
 but relictual code exists for the former).
 
@@ -102,4 +110,5 @@ Hansen et al 2006 http://pubs.giss.nasa.gov/abstracts/2006/Hansen_etal_1.html
 
 HISTORY
 
+2010-11-19 DRJ  Updated Step 1, and fixed reference.
 2010-11-19 DRJ  Created (from e-mail).

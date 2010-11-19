@@ -62,10 +62,13 @@ input/
   data.  Its format is novel to ccc-gistemp and is in the same format as
   the file work/step5mask that is produced by Step 5.
 
-  There is an experimental facility to use GHCN V3 data (see
-  ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README.pdf).  If a GHCN V3
-  monthly temperature data file is unpacked in the input directory, then
-  ccc-gistemp should find it and use it.  Specifically, if there are any
-  directories in "input/" that begin with "ghcnm" then the one whose
-  last 8 digits (ISO 8601 date) are last will be used.
+  Experimental GHCN v3 Facility
+
+  (GHCN v3 is a beta product, see http://www.ncdc.noaa.gov/ghcnm/)
+  If a GHCN v3 monthly temperature data file is unpacked in the
+  input directory, then ccc-gistemp should find it and use it when
+  'v3' is specified as a data source (see 'data_sources' in
+  code/parameters.py').  Specifically, if there are any directories
+  in "input/" that begin with "ghcnm" then the one whose last 8
+  digits (ISO 8601 date) are last will be used.
 

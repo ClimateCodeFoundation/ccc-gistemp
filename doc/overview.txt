@@ -1,0 +1,105 @@
+$URL$
+$Rev$
+
+David Jones, Climate Code Foundation, 2010-11-19
+
+Overview of ccc-gistemp
+
+[todo: add more introductory notes here.  Along the lines of
+"ccc-gistemp is a replication of GISTEMP, a reconstruction of global
+historical temperature anomalies..."]
+
+
+The GISTEMP algorithm (and hence ccc-gistemp) is organised as a series
+of steps.  Data flows through the steps in a pipeline.  Early steps
+deal with station records, later steps grid the data before final
+large area averages are computed.  The steps are:
+
+Step 0: Assimilates input data from various sources (usually GHCN,
+USHCN, SCAR READER, and a single priv. comm. record for
+Hohenpeissenberg).  Each USHCN record is adjusted so that its recent
+seasonal cycle matches the recent seasonal cycle for the corresponding
+GHCN record.  GHCN data for Hohenpeissenberg is replaced with priv.
+comm. data.  As far as I know this is not documented in the
+literature.
+
+Step 1: A feature of GHCN (a major data source) is that a single
+station can have multiple overlapping records (from different original
+sources).  These are reconciled where possible, by offsetting
+overlapping records by their average difference, and combining them
+into one record.
+
+Step 2: Urban Adjustment.  (short records are discarded). Stations
+identified as urban (usually using values obtained from satellite
+measurements of nighttime brightness) have their trend adjusted to
+match the trend of a composite record made from nearby rural stations.
+At least 2/3 of the adjusted period must have 3 rural stations
+contributing to the composite record.  Periods and stations that do
+not have sufficient support from rural stations are dropped.  The
+composite rural record is made from rural stations with 500 km, or
+1000 km if necessary to meet the sufficient stations requirement.
+This step is documented in Hansen et al 1999, and Hansen et al 2001.
+
+Step 3: Gridding.  A grid of cells is selected (8000 equal area cells
+covering the globe, see note below), and for each cell a composite
+series is computed from station records within 1200 km of the cell
+centre.  Each contributing record is weighted according to its
+distance from the cell centre, linearly decreasing to 0 at a distance
+of 1200 km.  This step is documented in Hansen and Lebedeff 1987
+(probably the key GISTEMP paper).
+
+Step 4: Sea Surface Temperatures.  Gridded sea surface temperatures
+are read from a file prepared by GISS and possible revised with recent
+monthly updates.
+
+Step 5: Ocean merging.  Ocean (Sea Surface Temperatures) and Land
+(Near Surface Air Temperatures) are "merged".  A cell that has both
+ocean and land records selects either the ocean or the land record:
+the land record is discarded unless the ocean record is short or
+the land record has a contributing land station within 100 km (in
+which case the ocean record is discarded).  This part is documented
+in Hansen et al 1996.
+
+Zonal Averages.  Each hemisphere is divided into 4 zones by splitting
+at the latitudes that have sines of 0.4, 0.7, 0.9 (and 0 and 1);
+the latitudes of the zone boundaries are approximately 23.6, 44.4,
+and 64.2 degrees.  For each zone all the cells in that zone are
+combined into a single record.  Large regional averages (hemispheres,
+tropics, northern- and southern-extratropics) are computed by
+combining zones in various combinations, each zone weighted according
+to the zone's area.  Zonal averaging is documented in Hansen and
+Lebedeff 1987 and Hansen and Lebedeff 2006 (each of which describes
+an alternate scheme, the latter is what is currently implemented,
+but relictual code exists for the former).
+
+Global Average.  A global series is computed by combining
+northern- and southern-hemisphere series, weighted equally.
+
+Annual series are computed from their monthly counterparts.
+
+Step 6: various visualisations are produced (only some of which we do).
+
+
+A note on gridding
+
+The grid used (in step 3 and subsequently) divides the globe into
+8000 equal area cells.  It is based on the zonal scheme outlined
+in Step 5 above.  There are 4 zones per hemisphere, and the choice
+of sines means that the zones have areas in the ratio 4:3:2:1.  Each
+zone is divided by longitude into a number of boxes proportional to the
+area of the zone: 16, 12, 8, 4.  Thus there are 80 boxes, all having the
+same area.  Each box is divided into 100 (10 by 10) cells each having equal
+area.
+
+
+REFERENCES
+
+Hansen and Lebedeff 1987 http://pubs.giss.nasa.gov/abstracts/1987/Hansen_Lebedeff.html
+Hansen et al 1996 http://pubs.giss.nasa.gov/abstracts/1996/Hansen_etal_1.html
+Hansen et al 1999 http://pubs.giss.nasa.gov/abstracts/1999/Hansen_etal.html
+Hansen et al 2001 http://pubs.giss.nasa.gov/abstracts/2001/Hansen_etal.html
+Hansen et al 2006 http://pubs.giss.nasa.gov/abstracts/2006/Hansen_etal_1.html
+
+HISTORY
+
+2010-11-19 DRJ  Created (from e-mail).

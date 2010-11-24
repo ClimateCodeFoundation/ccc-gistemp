@@ -52,7 +52,7 @@ def match(cameta, cadata, ghcnmeta, ghcndata, table):
         overlap,q,id12 = match_quality(cadata[castid][castid+'0'],
             ghcndata[ghcnst.uid])
         match.q = q
-        wmo = match.cast['WMO Identifier'] or 'nowmo'
+        wmo = blah_get(match.cast, 'WMO Identifier') or 'nowmo'
         print match.type, wmo, castid, id12, \
           "%.2f" % sep, "%4d" % overlap, q
         if match.type == 'wmo' or match.q + match.sep < 1:
@@ -128,7 +128,7 @@ def itermatches(cadict, ghcndict):
     for cast in cadict.values():
         result = Struct()
         result.cast = cast
-        wmo = cast['WMO Identifier']
+        wmo = blah_get(cast, 'WMO Identifier')
         lat = cast['Latitude']
         lon = cast['Longitude']
         caloc = iso6709(lat, lon)
@@ -183,17 +183,31 @@ def cametaasdict(meta):
     def itermeta():
         for row in meta:
             item = json.loads(row)
+            # Convert some key keys into floating point.
             for key in ['Latitude', 'Longitude', 'Elevation']:
                 item[key] = float(item[key])
-            yield item['Climate Identifier'], item
+            id = blah_get(item, 'Climate Identifier')
+            yield id, item
     return dict(itermeta())
+
 
 def ghcnmetaasdict(ghcnmeta):
     """Take an open file descriptor on the 'v2.inv' file and return a
     dictionary."""
 
-    stations = gio.station_meta(file=ghcnmeta, format='v2')
+    stations = gio.station_metadata(file=ghcnmeta, format='v2')
     return stations
+
+def blah_get(target, key):
+    """Look up *key* in the dictionary *target*, trying variants of the
+    key with spaces replaced with '_'.  Raises exception if a value is
+    not found at any of the variants.
+    """
+
+    l = [key, key.replace(' ', '_')]
+    # Sort any valid keys to the beginning of the list.
+    l.sort(key=lambda k: k in target, reverse=True)
+    return target[l[0]]
 
 def iso6709(lat, lon):
     """Return the lat,lon pair as a string in ISO 6709 format."""

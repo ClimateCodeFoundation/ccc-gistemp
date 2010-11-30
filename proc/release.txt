@@ -1,0 +1,31 @@
+$URL$
+$Rev$
+
+ccc-gistemp Release Procedure
+
+David Jones, Climate Code Foundation, 2010-11-30
+
+INTRODUCTION
+
+This is the documented procedure for maing a release of ccc-gistemp
+
+The intended readership is developers that need to make a relelase.
+
+This document is not finished.
+
+
+STEPS
+
+issues
+release notes
+readme
+
+svn export
+
+tar gz
+upload
+download
+test
+
+HISTORY
+

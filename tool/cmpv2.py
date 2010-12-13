@@ -31,6 +31,7 @@ def compare(path1, path2, out):
     common = uid[0] & uid[1]
     stationdict = [dict((st.uid,st) for st in l) for l in station]
     note_diff_years(out, common, stationdict, [path1, path2])
+    note_diff_months(out, common, stationdict, [path1, path2])
 
 def note_diff_years(out, uids, station, path):
     """For the collection of uids in *uids*, note which stations in the
@@ -40,27 +41,51 @@ def note_diff_years(out, uids, station, path):
     for uid in uids:
         pair = [d[uid] for d in station]
         year = [station_years(st) for st in pair]
-        if year[0] != year[1]:
-            count += 1
-            if count > 10:
-                print >> out, "... and more"
-                return
-            d = year[0] - year[1]
-            if d:
-                print >> out, "Years only in %s %s (%d)" % (
-                  uid, path[0], len(d))
-                note10(out, map(str, d))
-            e = year[1] - year[0]
-            if e:
-                print >> out, "Years only in %s %s (%d)" % (
-                  uid, path[1], len(e))
-                note10(out, map(str, e))
+        count = note_diffs(out, uid, year[0], year[1], path, "Years", count)
+        if count > 10:
+            return
+
+def note_diffs(out, uid, a, b, path, noun, count):
+    """Note differences in two sets of *noun*."""
+    if a != b:
+        count += 1
+        if count > 10:
+            print >> out, "... and more"
+            return count
+        d = a - b
+        if d:
+            print >> out, "%s only in %s %s (%d)" % (
+              noun, uid, path[0], len(d))
+            note10(out, map(str, d))
+        e = b - a
+        if e:
+            print >> out, "%s only in %s %s (%d)" % (
+              noun, uid, path[1], len(e))
+            note10(out, map(str, e))
+    return count
 
 def station_years(station):
     """Return a collection of the years for which the station has
     data."""
 
-    return set(y//12 for y in station.asdict())
+    return set(y//100 for y in station.asdict())
+
+def note_diff_months(out, uids, station, path):
+    """Arguments same as *note_diff_years*; notes which stations have
+    different months (assuming that periods of different years have
+    already been noted).
+    """
+
+    count = 0
+    for uid in uids:
+        pair = [d[uid] for d in station]
+        year = [station_years(st) for st in pair]
+        common_years = set(year[0]) & set(year[1])
+        month = [set(k for k in st.asdict() if k//100 in common_years)
+          for st in pair]
+        count = note_diffs(out, uid, month[0], month[1], path, "Months", count)
+        if count > 10:
+            return
         
 
 def note10(out, s):

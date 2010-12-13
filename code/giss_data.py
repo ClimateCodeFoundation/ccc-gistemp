@@ -329,15 +329,17 @@ class Series(object):
 
     def asdict(self):
         """Return the series as a dict that maps from integer keys
-        to floating point values.  The key is a month index, counting
-        from 0 for a notional January year 0 (so 1880 April is
-        1880*12+3).
+        to floating point values.  The key is an integer of the Y*100+M
+        where Y is the year and M is the month (from 1 to 12), thus the
+        integer key when printed as a decimal has the ISO 8601 form:
+        YYYYMM.
         
         The result may or may not be shared with internals of this
         object."""
 
-        first_index = self.first_year * 12
-        return dict((first_index + i, v) for i,v in enumerate(self._series)
+        first_index = self.first_year * 100 + 1
+        return dict((first_index + (i//12*100 + i%12), v)
+          for i,v in enumerate(self._series)
           if v != MISSING)
 
     def first_valid_year(self):

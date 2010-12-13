@@ -327,6 +327,19 @@ class Series(object):
             self._good_count = len(self._series) - bad_count
         return self._good_count
 
+    def asdict(self):
+        """Return the series as a dict that maps from integer keys
+        to floating point values.  The key is a month index, counting
+        from 0 for a notional January year 0 (so 1880 April is
+        1880*12+3).
+        
+        The result may or may not be shared with internals of this
+        object."""
+
+        first_index = self.first_year * 12
+        return dict((first_index + i, v) for i,v in enumerate(self._series)
+          if v != MISSING)
+
     def first_valid_year(self):
         """The first calendar year with any valid data."""
         index = (i for i,x in enumerate(self.series) if x != MISSING)

@@ -65,7 +65,7 @@ other Unix-like operating systems.
 A network connection is required to download the input files (which
 need only be done once), and to display an optional graph from the
 results.  If you use a proxy to access the internet then Python requires
-that the "http_proxy" environment variable it set.  The proxy will need
+that the "http_proxy" environment variable is set.  The proxy will need
 to handle both HTTP and FTP requests (this seems to cause some trouble,
 see "INPUT DATA" below for downloading data by hand).
 

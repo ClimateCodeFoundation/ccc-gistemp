@@ -80,7 +80,8 @@ def topng(inp, date=None):
     # For colour images each row of *a* is of the form:
     # [(R,G,B), (R,G,B), ...] we want to flatten it to:
     # [R,G,B,R,G,B,...]
-    a = [list(itertools.chain(*row)) for row in a]
+    if not isgrey:
+        a = [list(itertools.chain(*row)) for row in a]
 
     try:
         outpath = inp.name + '.png'

@@ -80,6 +80,8 @@ def trend(data):
             sy += y
             sxy += x * y
             n += 1
+    if n < 2:
+        return None,None,None
     # Make n a float. This contaminates all the subsequent divisions, making
     # them floating point divisions with floating point answers, which
     # is what we want.
@@ -142,8 +144,6 @@ def asgooglechartURL(seq, options={}):
     # (short and long)); get one for each data series.
     trends = [trendlines(l) for l in data]
     trendfrags = [t.urlfrag for t in trends]
-    slopes = [[t.b_full, t.b_short] for t in trends]
-    coefficients = [[t.r2_full, t.r2_short] for t in trends]
 
     # Arrange the series for the "chd=" parameter of the URL.
     # In an X-Y chart (cht=lxy) each series as drawn consists of a
@@ -185,7 +185,7 @@ def asgooglechartURL(seq, options={}):
     colours = options['colour']
     colours = colours[:len(data)]
 
-    chm = 'chm=' + '|'.join(slope_markers(slopes, coefficients, colours))
+    chm = 'chm=' + '|'.join(slope_markers(trends, colours))
 
     # Replicate each colour by three (for the chart and its two trend
     # lines).
@@ -219,12 +219,13 @@ def reasonable_yscale(data):
     tick = float(tick)
 
     allvalues = [v for _,v in itertools.chain(*data) if v is not None]
-    datamin = min(allvalues)
-    datamax = max(allvalues)
+    # Add values to the data to: ensure that a min and max can be
+    # computed (otherwise empty list fails); and, to enforce a Y-axis
+    # that covers at least -1 to +1.
+    datamin = min(allvalues + [-100])
+    datamax = max(allvalues + [+100])
     ymin = int(tick * math.floor(datamin/tick))
     ymax = int(tick * math.ceil(datamax/tick))
-    ymin = min(-100,ymin)
-    ymax = max(-100,ymax)
     return ymin,ymax
 
 def vaxis_labels(ymin,ymax):
@@ -243,22 +244,28 @@ def vaxis_labels(ymin,ymax):
 
     return '|'.join([''] + l)
 
-def slope_markers(slopes, coefficients, colours):
-    """Create the markers to denote slopes / trends."""
+def slope_markers(trends, colours):
+    """Create the markers to denote slopes / trends.  *trends* is a list
+    of trend objects as returned by *trendlines*.  Returns a list."""
 
     import itertools
     import urllib
 
-    l = [u'Trend in \N{DEGREE SIGN}C/century (R\N{SUPERSCRIPT TWO})'.encode('utf-8')] + [
-      format_slope(['full','30-year'], s, c)
-      for s, c in zip(slopes, coefficients)]
-    colours = ['000000'] + colours
+    l = [u'Trend in \N{DEGREE SIGN}C/century (R\N{SUPERSCRIPT TWO})'.encode('utf-8')]
+    rowcolours = ['000000']
+    for t,c in zip(trends,colours):
+        if t.b_full is None:
+            continue
+        s = format_slope(['full','30-year'], [t.b_full, t.b_short],
+          [t.r2_full, t.r2_short])
+        l.append(s)
+        rowcolours.append(c)
     return [
       urllib.quote_plus('@t%s,%s,0,%.2f:%.2f,12' % (
         text,
         colour,
         0.4, 0.2 - 0.05*row)) for text, colour, row in
-        zip(l, colours, itertools.count())]
+        zip(l, rowcolours, itertools.count())]
 
 def format_slope(texts, slopes, coefficients):
     """Return a string for the slopes and coefficients."""
@@ -270,38 +277,47 @@ class Struct:
 
 def trendlines(data):
     """Return a a triple of (url,slopelong,slopeshort) for
-    the full and 30-year trend lines (url is a fragment)."""
+    the full and 30-year trend lines (url is a fragment).
+    """
+
+    result = Struct()
     # full trend
     (a,b,r2) = trend(data)
-    yearmin = data[0][0]
-    yearmax = data[-1][0]
-    full_left_y = int(round(a + yearmin * b))
-    full_right_y = int(round(a + yearmax * b))
-    # thirty-year trend
-    # Find most recent 30 years of _valid_ data
-    valid_count = 0
-    last_valid = -9999 # largest index with valid data
-    for i,(x,y) in reversed(list(enumerate(data))):
-        if y is None:
-            continue
-        last_valid = max(last_valid, i)
-        valid_count += 1
-        if valid_count >= 30:
-            break
-    (a_30,b_30,r2_30) = trend(data[i:])
-    left_y = int(round(a_30 + (yearmin+i) * b_30))
-    left_x = -100 + 200*float(i)/(yearmax-yearmin)
-    right_y = int(round(a_30 + (yearmin+last_valid) * b_30))
-    right_x = -100 + 200*float(last_valid)/(yearmax-yearmin)
-    result = Struct()
-    result.urlfrag = ("-100,100|%d,%d|%.0f,%.0f|%d,%d" %
-        (full_left_y, full_right_y,
-        left_x, right_x,
-        left_y, right_y))
-    result.b_full = b
-    result.b_short = b_30
-    result.r2_full = r2
-    result.r2_short = r2_30
+    if a is not None:
+        yearmin = data[0][0]
+        yearmax = data[-1][0]
+        full_left_y = int(round(a + yearmin * b))
+        full_right_y = int(round(a + yearmax * b))
+        # thirty-year trend
+        # Find most recent 30 years of _valid_ data
+        valid_count = 0
+        last_valid = -9999 # largest index with valid data
+        for i,(x,y) in reversed(list(enumerate(data))):
+            if y is None:
+                continue
+            last_valid = max(last_valid, i)
+            valid_count += 1
+            if valid_count >= 30:
+                break
+        (a_30,b_30,r2_30) = trend(data[i:])
+        left_y = int(round(a_30 + (yearmin+i) * b_30))
+        left_x = -100 + 200*float(i)/(yearmax-yearmin)
+        right_y = int(round(a_30 + (yearmin+last_valid) * b_30))
+        right_x = -100 + 200*float(last_valid)/(yearmax-yearmin)
+        result.urlfrag = ("-100,100|%d,%d|%.0f,%.0f|%d,%d" %
+            (full_left_y, full_right_y,
+            left_x, right_x,
+            left_y, right_y))
+        result.b_full = b
+        result.b_short = b_30
+        result.r2_full = r2
+        result.r2_short = r2_30
+    else:
+        result.b_full = None
+        result.b_short = None
+        result.r2_full = None
+        result.r2_short = None
+        result.urlfrag = "-999|-999|-999|-999"
     return result
 
 def chartsingle(l):

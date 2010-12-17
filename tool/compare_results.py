@@ -92,7 +92,7 @@ def box_series(f):
         data = struct.unpack('%s%df' % (bos, nmonths), l[:4 * nmonths])
         for i in xrange(nmonths):
             if data[i] != missing:
-                yield(((box, year + i / 12, i % 12), data[i]))
+                yield(((box, year + i // 12, i % 12), data[i]))
         box += 1
 
 # This is derived from the similar function vischeck.asann (now called
@@ -338,7 +338,7 @@ def compare(dirs, labels, o):
             lambda k, v: "%04d-%02d: %g" % (k[0], k[1] + 1, v))
 
     # Box series
-    fs = map(lambda d: open(os.path.join(d, box_file), 'r'), dirs)
+    fs = map(lambda d: open(os.path.join(d, box_file), 'rb'), dirs)
     boxes = map(list, map(box_series, fs))
     diffs = list(difference(boxes))
     box_table = {}
@@ -373,17 +373,27 @@ def compare(dirs, labels, o):
     box = 0
     for band in range(8):
         print >>o, '<tr>'
-        boxes_in_band = 18 - 2 * (abs(7 - 2*band)) # silly hack to get 4,8,12,16,16,12,8,4
+        # Silly hack to get 4,8,12,16,16,12,8,4 :
+        boxes_in_band = 18 - 2 * (abs(7 - 2*band))
         box_span = 48 / boxes_in_band
         for i in range(boxes_in_band):
-            std_dev = box_table[box][3]
-            if std_dev == 0 or max_std_dev == 0:
-                gb_level = 0xff
+            if box in box_table:
+                std_dev = box_table[box][3]
+                if std_dev == 0 or max_std_dev == 0:
+                    gb_level = 0xff
+                else:
+                    gb_level = 0xff - int(0x80 * std_dev / max_std_dev)
+                color = "#ff%02x%02x" % (gb_level, gb_level)
+                box_content = "%d%%<br>%.2g" % (
+                  100 * (box_table[box][0]/box_table[box][1]),
+                  box_table[box][3])
             else:
-                gb_level = 0xff - int(0x80 * std_dev / max_std_dev)
-            color = "#ff%02x%02x" % (gb_level, gb_level)
-            print >>o, '<td align="center" colspan="%d" bgcolor = "%s">' % (box_span, color)
-            print >>o, '%d%%<br/>%.2g</td>' % (100 * box_table[box][0]/box_table[box][1], box_table[box][3])
+                # box missing
+                color = "#cccccc"
+                box_content = "N/A"
+            print >>o, '<td align="center" colspan="%d" bgcolor = "%s">' % (
+              box_span, color)
+            print >>o, '%s</td>' % box_content
             box += 1
         print >>o, '</tr>'
     print >>o, '</table>'

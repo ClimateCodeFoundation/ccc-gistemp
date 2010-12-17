@@ -322,7 +322,11 @@ def drop_strange(data):
                         MISSING] * nmonths
 
             else: # remove a single month
-                series[(year-begin)*12 + x-1] = MISSING
+                # It can happen that the datum-to-be-removed is outside
+                # the date range for this record (if we are using new
+                # config files, and old data).  So we check.
+                if begin <= year <= end:
+                    series[(year-begin)*12 + x-1] = MISSING
         else:
             record.set_series(begin * 12 + 1, series)
             yield record

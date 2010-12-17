@@ -358,7 +358,11 @@ def chartit(fs, options={}, out=sys.stdout):
         return anomalies(f, **k)
 
     url = asgooglechartURL(map(anom, fs), options)
-    print >>out, url
+    if 'download' in options:
+        img = urllib.urlopen(*url.split('?'))
+        out.write(img.read())
+    else:
+        print >>out, url
 
 def main(argv=None):
     import getopt
@@ -371,7 +375,7 @@ def main(argv=None):
     options={}
     try:
         opt,arg = getopt.getopt(argv[1:], 'x:o:',
-          ['offset=', 'size=', 'colour='])
+          ['offset=', 'size=', 'colour=', 'download'])
     except getopt.GetoptError, e:
         print >> sys.stderr, e.msg
         print >> sys.stderr, __doc__
@@ -387,6 +391,8 @@ def main(argv=None):
             options['colour'] = v.split(',')
         if o == '-x':
             options['extract'] = map(int, v.split(','))
+        if o == '--download':
+            options['download'] = True
             
     if len(arg):
         fs = map(urllib.urlopen, arg)

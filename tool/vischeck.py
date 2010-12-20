@@ -41,14 +41,15 @@ import math
 class Error(Exception):
     """Some sort of problem."""
 
-def anomalies(f, extract=(65,72)):
-    """Convert the text file *f* into a sequence of global anomalies.  An
-    input file is expected to be one of the NH.*, SH.*, or GLB.* files
-    that are the results of GISTEMP step 5.  The return value is an
-    iterable over a sequence of pairs (year, datum); when present the
-    datum is an integer, when not present it appears as None.  Normally
-    the data can be interpreted as centi-Kelvin.  *extract* allows a
-    different range of columns to be extracted for the anomaly data.
+def annual_anomalies(f, extract=(65,72)):
+    """Convert the text file *f* into a sequence of annual anomalies.
+    An input file is expected to be one of the NH.*, SH.*, or GLB.*
+    files that are the results of GISTEMP step 5.  The return value
+    is an iterable over a sequence of pairs (year, datum); *datum*
+    is an integer.  Years with invalid (missing) data are absent
+    from the result stream.  Normally the data can be interpreted
+    as centi-Kelvin.  *extract* allows a different range of columns
+    to be extracted for the anomaly data.
     """
 
     import re
@@ -65,7 +66,7 @@ def anomalies(f, extract=(65,72)):
             try:
                 yield (year, int(l[extract[0]:extract[1]]))
             except ValueError:
-                yield (year, None)
+                pass
 
 def trend(data):
     """Computes linear regression parameters (a,b) on the *data*.  The
@@ -355,7 +356,7 @@ def chartit(fs, options={}, out=sys.stdout):
 
     def anom(f):
         """Extract anomalies from file."""
-        return anomalies(f, **k)
+        return annual_anomalies(f, **k)
 
     url = asgooglechartURL(map(anom, fs), options)
     if 'download' in options:

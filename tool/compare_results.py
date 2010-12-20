@@ -45,19 +45,6 @@ class Fatal(Exception):
     def __init__(self, msg):
         self.msg = msg
 
-def asann_values_only(f):
-    """Wrapper for `vischeck.anomalies` which yields only values.
-
-    Any tuple that contains ``None`` is simply discarded.
-
-    :Param f:
-        Input file as required by `vischeck.anomalies`.
-
-    """
-    for el in vischeck.anomalies(f):
-        if None not in el:
-            yield el
-
 def box_series(f):
     """Convert the Fortran data file *f* into a sequence of monthly
     anomalies for the geographical boxes. The file must be a BX.* file
@@ -95,8 +82,7 @@ def box_series(f):
                 yield(((box, year + i // 12, i % 12), data[i]))
         box += 1
 
-# This is derived from the similar function vischeck.asann (now called
-# vischeck.anomalies).
+# This is derived from the similar function vischeck.annual_anomalies.
 def asmon(f):
     """Convert the text file *f* into a sequence of monthly anomalies.
     An input file is expected to be one of the NH.*, SH.*, or GLB.*
@@ -121,7 +107,7 @@ def asmon(f):
                 try:
                     yield(((year, month), int(l[col:col+5])))
                 except ValueError:
-                    # Ignore months will invalid data.
+                    # Ignore months with invalid data.
                     pass
 
 def stats(seq):
@@ -312,7 +298,7 @@ def compare_regions(dirs, labels, o):
     ]:
         # Annual series
         fs = map(lambda d: open(os.path.join(d, anomaly_file % code), 'r'), dirs)
-        anns = map(list, map(asann_values_only, fs))
+        anns = map(list, map(vischeck.annual_anomalies, fs))
         url = vischeck.asgooglechartURL(anns)
         print >>o, '<h2>%s annual temperature anomaly</h2>' % region.capitalize()
         print >>o, '<p>%s in red, %s in black.</p>' % tuple(labels) 

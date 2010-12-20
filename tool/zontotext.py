@@ -75,6 +75,7 @@ def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
 
     # Number of records following header.
     N = dict(zones=14, boxes=80)[content]
+    i = None
     for i,r in enumerate(f):
         data = struct.unpack(descriptor, r)
         suffix = data[-1]
@@ -103,6 +104,8 @@ def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
                       (['AR','WT'][idx],
                       year,
                       ' '.join(map(repr, temps))))
+    if i is None:
+        raise Error('No records found in file %r.' % inp.name)
     if i < N-1:
         raise Error('Unexpected end of file.')
     if i >= N:

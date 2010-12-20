@@ -3,32 +3,32 @@
 # $Rev$
 #
 # zontotext.py
-#
-# Converts ZON.* file to plain text.
 # 
-# Nick Barnes, David Jones.  Ravenbrook Limited.
+# Nick Barnes, David Jones.  Climate Code Foundation.
+
+"""
+Converts (fortran binary) ZON.* file to GHCN v2 format (which is a plain
+text format).  Can also convert BX.* files.
+"""
+
 
 import struct
 import sys
 
 # Clear Climate Code
+import extend_path
+from code import eqarea
 import fort
 import gio
-
-# Not sure what these constants are; cribbed from zonav.f.
-# They boil down to the fact that the ZON.* file contains 14 records.
-# 
-
-jbm = 8 # bands 90-64-44-24-0-24-44-64-90
-nzs = 3 # zones 90-24-24-90
-jzm = jbm + nzs + 3 # NH, SH, global
 
 class Error(Exception):
     """Some problem."""
 
-def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
+def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
   bos='>', format='v2'):
-    """Convert zonal monthly averages to text format.
+    """Convert monthly averages to text format; *inp* is the input file
+    and should be either a binary zone file (ZON.*) or a binary box file
+    (BX.*).
     
     If metaonly is True then only the zonal metadata is output, the
     time series are not.
@@ -37,17 +37,22 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
     # The width of a standard word according to Python's struct module...
     w = len(struct.pack('=I', 0))
 
-    f = fort.File(file, bos=bos)
+    f = fort.File(inp, bos=bos)
     r = f.readline()
 
     # Number of words in header, preceding title.
     n = 8
     info = struct.unpack(bos + ('%di' % n), r[:n*w])
+    title = r[n*w:]
+    if 'zones' in title.lower():
+        content = 'zones'
+    else:
+        content = 'boxes'
+
     if 'v2' != format:
         output.write(repr(info))
         output.write('\n%s\n' % r[n*w:n*w+80])
         output.write('%s\n' % r[n*w+80:])
-
     if 'v2' == format:
         v2out = gio.GHCNV2Writer(file=output, scale=0.01)
 
@@ -62,18 +67,24 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
     last_year = first_year + years - 1
 
     # Each line contains N ar values and N weight (area?) values,
-    # followed by an 80-character title string.
-    descriptor = bos + '%df80s' % (months*2)
+    # followed by...
+    #  - (for zones) an 80-character title string.
+    #  - (for boxes) 5 words.
+    rest = dict(zones=80, boxes=5*w)[content]
+    descriptor = bos + '%df%ds' % (months*2, rest)
 
-    for i in range(jzm):
-        r = f.readline()
-        if r is None:
-            raise Error('Unexpected end of file.')
+    # Number of records following header.
+    N = dict(zones=14, boxes=80)[content]
+    for i,r in enumerate(f):
         data = struct.unpack(descriptor, r)
-        title = data[-1]
+        suffix = data[-1]
         if format == 'v2':
-            title = v2title(title)
+            if 'zones' == content:
+                title = id11fromzone(suffix)
+            else:
+                title = id11frombox(suffix, bos=bos)
         else:
+            title = suffix
             output.write(title + '\n')
         if metaonly:
             continue
@@ -92,8 +103,12 @@ def totext(file, output=sys.stdout, log=sys.stderr, metaonly=False,
                       (['AR','WT'][idx],
                       year,
                       ' '.join(map(repr, temps))))
+    if i < N-1:
+        raise Error('Unexpected end of file.')
+    if i >= N:
+        raise Error('Too many records.')
 
-def v2title(s):
+def id11fromzone(s):
     """Convert a title as it appears in the ZON file into an 11
     character V2 Mean style station identifier.
 
@@ -129,6 +144,19 @@ def v2title(s):
         x = x.replace('n', '+')
         return x[-1] + x[:4]
     return 'Z' + ''.join(cvt(b) for b in bound)
+
+def id11frombox(s, bos):
+    """Convert a record suffix (5 words) as it appears in the BX file
+    into an 11 character V2 Mean style station identifier.
+
+    The returned strings will be of the form BOX@+NN+EEE where "+NN" and
+    "+EEE" gives the lat/lon of the box centre.
+    """
+
+    d = struct.unpack("%s5i" % bos, s)
+    box = d[1:5]
+    centre = eqarea.centre(box)
+    return "BOX@%+03.0f%+04.0f" % centre
 
 def main(argv=None):
     import getopt

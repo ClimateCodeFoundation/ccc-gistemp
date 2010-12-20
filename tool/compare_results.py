@@ -97,14 +97,15 @@ def box_series(f):
 
 # This is derived from the similar function vischeck.asann (now called
 # vischeck.anomalies).
-def asmon(f, values_only=False):
+def asmon(f):
     """Convert the text file *f* into a sequence of monthly anomalies.
     An input file is expected to be one of the NH.*, SH.*, or GLB.*
     files that are the results of GISTEMP step 5.  The return value is
     an iterable over a sequence of pairs ((year, month), datum) with
-    month running from 0 to 11; when present the datum is an integer,
-    when not present it appears as None.  Normally the data can be
-    interpreted as centi-Kelvin.
+    month running from 0 to 11; the datum is an integer; months without
+    a valid datum are absent from the result stream.
+
+    Normally the data can be interpreted as centi-Kelvin.
     """
 
     # Proceed by assuming that a line contains data if and only if it
@@ -116,12 +117,12 @@ def asmon(f, values_only=False):
     for l in f:
         if re.match(r'\d{4}', l):
             year = int(l[:4])
-            for month in range(12):
+            for month,col in enumerate(xrange(5,65,5)):
                 try:
-                    yield(((year, month), int(l[(month + 1) * 5:(month + 2) * 5])))
+                    yield(((year, month), int(l[col:col+5])))
                 except ValueError:
-                    if not values_only:
-                        yield(((year, month), None))
+                    # Ignore months will invalid data.
+                    pass
 
 def stats(seq):
     """Return the zero count, length, mean, and standard deviation of
@@ -278,9 +279,6 @@ def compare(dirs, labels, o):
     escape = xml.sax.saxutils.escape
     labels = map(escape, labels)
 
-    # Version of ``asmon`` that avoids yielding ``None``.
-    asmon_values_only = lambda f: asmon(f, values_only=True)
-
     title = "Comparison of %s and %s" % tuple(dirs)
     print >>o, """<!doctype HTML>
 <html>
@@ -324,7 +322,7 @@ def compare(dirs, labels, o):
 
         # Monthly series
         fs = map(lambda d: open(os.path.join(d, anomaly_file % code), 'r'), dirs)
-        mons = map(asmon_values_only, fs)
+        mons = map(asmon, fs)
         diffs = list(difference(mons, 0.01))
         d = map(lambda a: a[1], diffs)
         print >>o, '<h3>%s monthly residue distribution</h3>' % region.capitalize()

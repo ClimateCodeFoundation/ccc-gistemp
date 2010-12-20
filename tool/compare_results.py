@@ -254,10 +254,11 @@ def differences_url(anns):
 
     return 'http://chart.apis.google.com/chart?' + '&'.join(chart)
 
-def top(diffs, n, o, title, fmt = str):
+def top(diffs, n, o, title, fmt=str):
     """Output a list of the top at-most-*n* largest differences (in
     magnitude) from the list *diffs* to the stream *o*, using *fmt* to
-    format the results.  Does not output any zeroes."""
+    format the results.  Does not output any zeroes.
+    """
     topn = sorted(diffs, key = lambda a: abs(a[1]), reverse = True)[:n]
     if topn[0][1] != 0:
         print >>o, '<h3>%s</h3>' % title
@@ -268,6 +269,9 @@ def top(diffs, n, o, title, fmt = str):
         print >>o, "<li>" + fmt(k, v)
     print >>o, "</ol>"
 
+# XML-encode meta-characters &,<,>
+escape = xml.sax.saxutils.escape
+
 def compare(dirs, labels, o):
     """Compare results from the two directories in the sequence *dirs*,
     which are labelled by the two strings in the sequence *labels*. Write a
@@ -275,8 +279,6 @@ def compare(dirs, labels, o):
     assert len(dirs) == 2
     assert len(labels) == 2
 
-    # XML-encode meta-characters &,<,>
-    escape = xml.sax.saxutils.escape
     labels = map(escape, labels)
 
     title = "Comparison of %s and %s" % tuple(dirs)
@@ -290,8 +292,19 @@ def compare(dirs, labels, o):
 <p>Generated: %s</p>
 """ % (title, title, datetime.datetime.now())
 
+    compare_regions(dirs, labels, o)
+    compare_boxes(dirs, labels, o)
+
+    print >>o, "</body>"
+    print >>o, "</html>"
+    o.close()
+
+def compare_regions(dirs, labels, o):
+    """Output onto *o* an HTML fragment for the comparison of the three
+    regions: Global, Northern Hemisphere, Southern Hemisphere.
+    """
+
     anomaly_file = '%s.Ts.ho2.GHCN.CL.PA.txt'
-    box_file = 'BX.Ts.ho2.GHCN.CL.PA.1200'
     for region, code in [
         ('global',              'GLB'), 
         ('northern hemisphere', 'NH'),
@@ -335,7 +348,13 @@ def compare(dirs, labels, o):
         top(diffs, 10, o, 'Largest %s monthly residues' % region,
             lambda k, v: "%04d-%02d: %g" % (k[0], k[1] + 1, v))
 
+
+def compare_boxes(dirs, labels, o):
+    """Output onto *o* an HTML fragment for the comparison of the boxes
+    (from the binary BX.* file).
+    """
     # Box series
+    box_file = 'BX.Ts.ho2.GHCN.CL.PA.1200'
     fs = map(lambda d: open(os.path.join(d, box_file), 'rb'), dirs)
     boxes = map(list, map(box_series, fs))
     diffs = list(difference(boxes))
@@ -395,10 +414,6 @@ def compare(dirs, labels, o):
             box += 1
         print >>o, '</tr>'
     print >>o, '</table>'
-
-    print >>o, "</body>"
-    print >>o, "</html>"
-    o.close()
 
 def main(argv = None):
     if argv is None:

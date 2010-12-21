@@ -108,16 +108,6 @@ def checkit(log):
         else:
             log.write('OK: Fetching missing files looks like it worked\n')
 
-    step1_config = """
-        combine_pieces_helena.in
-        Ts.strange.RSU.list.IN
-        Ts.discont.RS.alter.IN
-        """.split()
-    for name in step1_config:
-        if not config_ok(name):
-            missing_config(name)
-            rc = max(rc, 2)
-
     return rc
 
 def input_ok(name):
@@ -126,9 +116,6 @@ def input_ok(name):
     """
 
     return file_readable('input/' + name)
-
-def config_ok(name):
-    return file_readable('config/' + name)
 
 def file_readable(n):
     """Return True if file name n exists, can be opened for reading, and

@@ -26,16 +26,16 @@ def v2_get_sources():
     return sources
 
 
-def get_helena_dict():
-    """Reads the file config/combine_pieces_helena.in into a dict,
-    mapping a station id to a tuple (ID with duplicate marker, year,
-    month, summand)."""
+def step1_adjust():
+    """Reads the file config/step1_adjust into a dict,
+    mapping a record identifier to a tuple (year, month, summand).
+    By convention the month is 1 for January."""
 
-    helena_ds = {}
-    for line in open('config/combine_pieces_helena.in', 'r'):
+    adjust = {}
+    for line in open('config/step1_adjust', 'r'):
         id, _, year, month, summand = line.split()
-        helena_ds[id] = (int(year), int(month), float(summand))
-    return helena_ds
+        adjust[id] = (int(year), int(month), float(summand))
+    return adjust
 
 
 def get_changes_dict():
@@ -63,16 +63,3 @@ def get_changes_dict():
         dict[id].append(val)
     return dict
 
-
-def get_alter_dict():
-    """Reads the file config/Ts.discont.RS.alter.IN into a dict.  Each
-    line has a 12 digit station ID, a month, a year, and a
-    floating-point temperature delta.  The dict maps the ID to (month,
-    year, delta).
-    """
-
-    dict = {}
-    for line in open('config/Ts.discont.RS.alter.IN'):
-        id, month, year, num = line.split()
-        dict[id] = [int(month), int(year), float(num)]
-    return dict

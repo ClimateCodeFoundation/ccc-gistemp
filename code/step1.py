@@ -263,8 +263,13 @@ def find_quintuples(sums, wgts, record, new_id, log):
 
 def adjust_helena(stream):
     """Modifies records as specified in config/combine_pieces_helena.in,
-    by adding the delta to every datum for that station prior to the
-    specified month.
+    by adding the delta to every datum for that station for the early
+    part of the record up to and including the specified month.  The
+    month is specified (in the file) as 1-based.
+
+    Recently, this adjust the record for Lihue and St Helena; the
+    corresponding GISTEMP code only does St Helena and a different
+    function does Lihue.
     """
     helena_ds = read_config.get_helena_dict()
     for record in stream:
@@ -274,7 +279,7 @@ def adjust_helena(stream):
             this_year, month, summand = helena_ds[id]
             begin = record.first_year
             # Index of month specified by helena_ds
-            M = (this_year - begin)*12 + month
+            M = (this_year - begin)*12 + month-1
             # All valid data up to and including M get adjusted
             for i in range(M+1):
                 datum = series[i]
@@ -330,30 +335,6 @@ def drop_strange(data):
         else:
             record.set_series(begin * 12 + 1, series)
             yield record
-
-
-def alter_discont(data):
-    """Modifies records as specified in config/Ts.discont.RS.alter.IN,
-    by adding the delta to every datum for that station prior to the
-    specified month.  Yes, this is very similar to adjust_helena().
-    """
-
-    alter_dict = read_config.get_alter_dict()
-    for record in data:
-        if alter_dict.has_key(record.uid):
-            series = record.series
-            (a_month, a_year, a_num) = alter_dict[record.uid]
-            begin = record.first_year
-            # Month index of the month in the config file.
-            M = (a_year - begin)*12 + a_month - 1
-            # Every (valid) month up to and not including the month in
-            # question is adjusted.
-            for i in range(M):
-                if valid(series[i]):
-                    series[i] += a_num
-            record.set_series(record.first_month, series)
-
-        yield record
 
 
 def average(sums, counts):
@@ -504,6 +485,6 @@ def step1(record_source):
     helena_adjusted = adjust_helena(records)
     combined_pieces = comb_pieces(helena_adjusted)
     without_strange = drop_strange(combined_pieces)
-    for record in alter_discont(without_strange):
+    for record in without_strange:
         assert record.first_year == BASE_YEAR
         yield record

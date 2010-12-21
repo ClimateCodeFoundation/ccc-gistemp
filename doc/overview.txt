@@ -57,7 +57,7 @@ of 1200 km.  This step is documented in Hansen and Lebedeff 1987
 (probably the key GISTEMP paper).
 
 Step 4: Sea Surface Temperatures.  Gridded sea surface temperatures
-are read from a file prepared by GISS and possible revised with recent
+are read from a file prepared by GISS and possibly revised with recent
 monthly updates.
 
 Step 5: Ocean merging.  Ocean (Sea Surface Temperatures) and Land

@@ -223,7 +223,7 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
             weight = [wt*valid(v) for v in subbox_series]
 
             # For logging, keep a list of stations that contributed
-            contributed = [(record.uid,wt)]
+            contributed = [[record.uid,wt]]
 
             # Add in the remaining stations
             for record,wt in contributors[1:]:
@@ -239,10 +239,10 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                     parameters.gridding_min_overlap)
                 total_good_months += station_months
                 if station_months == 0:
-                    contributed.append((record.uid, 0.0))
+                    contributed.append([record.uid, 0.0])
                     continue
                 total_stations += 1
-                contributed.append((record.uid,wt))
+                contributed.append([record.uid,wt])
 
                 max_weight = max(max_weight, wt)
 
@@ -252,7 +252,8 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                     box=list(subbox), stations=total_stations,
                     station_months=total_good_months,
                     d=radius*(1-max_weight))
-            log.write("%s stations %r\n" % (box_obj.uid, contributed))
+            log.write("%s stations %s\n" % (box_obj.uid,
+              asjson(contributed)))
             yield box_obj
         plural_suffix = 's'
         if n_empty_cells == 1:
@@ -261,6 +262,13 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
           '\rRegion (%+03.0f/%+03.0f S/N %+04.0f/%+04.0f W/E): %d empty cell%s.\n' %
             (tuple(box) + (n_empty_cells,plural_suffix)))
     dribble.write("\n")
+
+def asjson(obj):
+    """Return a string: The JSON representation of the object "obj".
+    This is a peasant's version, not intentended to be fully JSON
+    general."""
+
+    return repr(obj).replace("'", '"')
 
 
 def step3(records, radius=parameters.gridding_radius, year_begin=1880):

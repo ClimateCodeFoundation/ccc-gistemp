@@ -91,19 +91,102 @@ def celldict(f):
 
 
 def blog20110106(arg):
-    """Program for drawing circle for blog post.  The circle required is
-    all points with 1200 km of a particular point on the Earth's
-    surface."""
+    """Generates KML file for blog post.  One of the ccc-gistemp boxes,
+    and the extended box used to do station culling.
+    """
 
     from code import earth
+    import math
+    from code import eqarea
 
-    p = (64.4,-90)
+    p = (64.2,-90)
     d = 1200.0/earth.radius
+    dd = math.degrees(d)
 
-    l = surfcircle(p, d)
-    l.append(l[0])
-    frag = kmlcoord(l)
-    print frag
+    circle = surfcircle(p, d)
+    circle.append(circle[0])
+
+    allboxes = list(eqarea.gridsub())
+    # Let *box* be Boundaries of box in order: S, N, W, E.
+    box,cells = allboxes[6]
+    # Let *cells* be all the cells in that box.
+    # Get the Northwest most cell.
+    nwcell = max(cells, key=lambda x:x[1]-x[2])
+    nwcentre = eqarea.centre(nwcell)
+    s,n,w,e = box
+    # List of coordinates for box 7.
+    box7 = [(n,w), (n,e), (s,e), (s,w)]
+    box7.append(box7[0])
+
+    # "Extended" box.
+    span = e-w
+    ebox = [s-dd, n+dd, w-span/2, e+span/2]
+    s,n,w,e = ebox
+    # List of coordinate for extended box 7.
+    ebox7 = [(n,w), (n,e), (s,e), (s,w)]
+    ebox7.append(ebox7[0])
+
+    circle2 = surfcircle(nwcentre, d)
+    circle2.append(circle2[0])
+
+    print """<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>Station Culling</name>
+""" + kmlpolystyle(color='aa0000ff', id='s0') + """
+""" + kmlpolystyle(color='aaffffff', id='s1') + """
+""" + kmlpolystyle(color='5500ff00', id='s2') + """
+""" + kmlplace("1200 km circle", circle, style="#s0") + """
+""" + kmlplace("circle at %r" % (nwcentre,), circle2, style="#s1") + """
+""" + kmlplace("Culling Box", ebox7, style="#s2") + """
+""" + kmlplace("Box 7", box7, style="#s1") + """
+</Document>
+</kml>"""
+
+def kmlpolystyle(color, id):
+    """A simply Style including a PolyStyle with color."""
+
+    assert 8 == len(color)
+
+    return """<Style id='""" + id + """'>
+    <PolyStyle>
+      <color>""" + color + """</color>
+    </PolyStyle>
+  </Style>
+  """
+
+def kmlplace(name, coords, style=None):
+    """Return a string suitable to be inserted into a kml document as a
+    Placemark element.  *name* is a string; *coords* is a list of (lat,lon)
+    coordinate pairs.  If *style* is specified, it should be the URL of
+    the style element (usually "#something").
+    """
+
+    from xml.sax.saxutils import escape
+
+    name = escape(name)
+    coordstring = kmlcoord(coords)
+
+    if style:
+        styleurl = "<styleUrl>" + escape(style) + "</styleUrl>"
+    else:
+        styleurl = ""
+
+    return """<Placemark>
+  <name>""" + name + """</name>
+""" + styleurl + """
+    <Polygon>
+      <outerBoundaryIs>
+        <LinearRing>
+          <coordinates>
+""" + coordstring + """
+          </coordinates>
+        </LinearRing>
+      </outerBoundaryIs>
+    </Polygon>
+  </Placemark>
+"""
+
 
 def kmlcoord(l):
     """Convert list of (lat,lon) pairs to a list suitable for the

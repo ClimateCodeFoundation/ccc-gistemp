@@ -159,7 +159,12 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
     # Clear Climate Code
     import earth # required for radius.
 
+    # Convert to list because we re-use it for each box (region).
     station_records = list(station_records)
+    # Descending sort by number of good records.
+    # TODO: Switch to using Python's sort method here, although it
+    # will change the results.
+    sort(station_records, lambda x,y: y.good_count - x.good_count)
 
     # A dribble of progress messages.
     dribble = sys.stdout
@@ -172,23 +177,6 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
     for region in regions:
         box, subboxes = region[0], list(region[1])
 
-        # Extend box, by half a box east and west and by arc north
-        # and south.
-        extent = [box[0] - arcdeg,
-                  box[1] + arcdeg,
-                  box[2] - 0.5 * (box[3] - box[2]),
-                  box[3] + 0.5 * (box[3] - box[2])]
-        if box[0] <= -90 or box[1] >= 90:
-            # polar
-            extent[2] = -180.0
-            extent[3] = +180.0
-
-        region_records = list(inbox(station_records, *extent))
-        # Descending sort by number of good records
-        # TODO: Switch to using Python's sort method here, although it
-        # will change the results.
-        sort(region_records, lambda x,y: y.good_count - x.good_count)
-
         # Count how many cells are empty
         n_empty_cells = 0
         for subbox in subboxes:
@@ -198,7 +186,7 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
               centre + (n_empty_cells,)))
             dribble.flush()
             # Determine the contributing stations to this grid cell.
-            contributors = list(incircle(region_records, arc, *centre))
+            contributors = list(incircle(station_records, arc, *centre))
 
             # Combine data.
             subbox_series = [MISSING] * max_months

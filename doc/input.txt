@@ -41,34 +41,34 @@ input/
   ushcnV2_cmb.tbl
   v2.inv
 
-  The "little" files all come from
-  http://data.giss.nasa.gov/gistemp/sources/GISTEMP_sources.tar.gz .
-  If you are downloading by hand then you will need to download that
-  file and unpack it.  The required input files are found in several
-  directories:
+The "little" files all come from
+http://data.giss.nasa.gov/gistemp/sources/GISTEMP_sources.tar.gz .
+If you are downloading by hand then you will need to download that
+file and unpack it.  The required input files are found in several
+directories:
 
-    GISTEMP_sources/STEP0/input_files
-    GISTEMP_sources/STEP1/input_files
-    GISTEMP_sources/STEP4_5/input_files
+  GISTEMP_sources/STEP0/input_files
+  GISTEMP_sources/STEP1/input_files
+  GISTEMP_sources/STEP4_5/input_files
 
-  It is okay, but messy, to copy the entire contents of these
-  subdirectories into input/.
+It is okay, but messy, to copy the entire contents of these
+subdirectories into input/.
 
-  There is one optional file:
+There is one optional file:
 
   step5mask
 
-  If present this file is used in Step 5 to select which cells use land
-  data.  Its format is novel to ccc-gistemp and is in the same format as
-  the file work/step5mask that is produced by Step 5.
+If present this file is used in Step 5 to select which cells use land
+data.  Its format is novel to ccc-gistemp and is in the same format as
+the file work/step5mask that is produced by Step 5.
 
-  Experimental GHCN v3 Facility
+Experimental GHCN v3 Facility
 
-  (GHCN v3 is a beta product, see http://www.ncdc.noaa.gov/ghcnm/)
-  If a GHCN v3 monthly temperature data file is unpacked in the
-  input directory, then ccc-gistemp should find it and use it when
-  'v3' is specified as a data source (see 'data_sources' in
-  code/parameters.py').  Specifically, if there are any directories
-  in "input/" that begin with "ghcnm" then the one whose last 8
-  digits (ISO 8601 date) are last will be used.
+(GHCN v3 is a beta product, see http://www.ncdc.noaa.gov/ghcnm/)
+If a GHCN v3 monthly temperature data file is unpacked in the
+input directory, then ccc-gistemp should find it and use it when
+'v3' is specified as a data source (see 'data_sources' in
+code/parameters.py').  Specifically, if there are any directories
+in "input/" that begin with "ghcnm" then the one whose last 8
+digits (ISO 8601 date) are last will be used.
 

@@ -25,48 +25,6 @@ import itertools
 log = open(os.path.join('log', 'step3.log'), 'w')
 
 
-def inbox(station_records, lats, latn, longw, longe):
-    """An iterator that yields the records for every station within the box
-    bounded by the lines of latitude lats (to the south), latn (to the
-    north), and the meridians at longw (to the west), and longe (to the
-    east).
-
-    In order to accommodate boxes that overlap the meridian at -180
-    it is permissible for either longw to be < -180 or for longe to
-    be > +180.
-
-    For stations exactly on the boundary the
-    "lower-left" rule is used.  Stations are returned if they lie on
-    the southern boundary or the western boundary except for
-    corners; stations lying exactly on a corner are only returned if
-    it is the south-west corner.  Note therefore that to include a
-    station situated exactly at the North Pole a latn value slightly
-    larger than 90 should be used.
-    """
-
-    assert lats <= latn
-    assert longw <= longe
-
-    for record in station_records:
-        st = record.station
-        lat = st.lat
-        lon = st.lon
-
-        # if longitude outside box, try mod 360
-        if lon > longe:
-            lon -= 360
-        elif lon < longw:
-            lon += 360
-
-        if (lats < lat < latn) and (longw < lon < longe):
-            yield record
-        if lats == lat and longw <= lon < longe: # southern edge
-            yield record
-        if longw == lon and lats <= lat < latn: # western edge
-            yield record
-
-
-# :todo: Return (station, weight) pair
 def incircle(iterable, arc, lat, lon):
     """An iterator that filters iterable (the argument) and yields every
     station with a certain distance of the point of interest given by

@@ -17,9 +17,58 @@ import extend_path
 # http://docs.python.org/release/2.6.6/library/json.html
 import json
 import re
+import sys
 
 class Fatal(Exception):
     """An error occurred."""
+
+def whatstations(argv):
+    """[command] [--mask maskfile]  Determines what (land) stations are
+    used for a particular area.
+
+    whatstations --mask maskfile
+
+    Works by examing the log files.
+    """
+
+    # http://docs.python.org/release/2.4.4/lib/module-getopt.html
+    import getopt
+    opts,arg = getopt.getopt(argv[1:], '', ['mask='])
+    option = dict((o[2:],v) for o,v in opts)
+    stations(out=sys.stdout, **option)
+
+def stations(mask, out):
+    """Print to *out* a list of the stations used."""
+
+    log = open('log/step3.log')
+    cells = cellsofmask(open(mask))
+
+    allstations = dict()
+    cellcount = 0
+    for row in log:
+        row = row.split(' ', 2)
+        if row[1] != 'stations':
+            continue
+        stations = json.loads(row[2])
+        if row[0] in cells:
+            for station,weight in stations:
+                if weight:
+                    allstations[station] = max(
+                      allstations.get(station, 0), weight)
+            cellcount += 1
+
+    print >>out, "Cells: %d/%d" % (cellcount, len(cells))
+    print >>out, "Stations: %d" % len(allstations)
+    for station,weight in sorted(allstations.iteritems()):
+        print >>out, station, weight
+
+def cellsofmask(inp):
+    """*inp* is an open mask file.  The returned value is a set of all
+    the cells (identified by their 12-character ID) that have a non-zero
+    value."""
+
+    return set(row[:12] for row in inp if float(row[16:21]))
+
 
 def cellstations(arg):
     """[command] Compares the lists of stations for each cell.  arg[1]

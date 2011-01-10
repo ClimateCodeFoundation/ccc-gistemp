@@ -19,7 +19,7 @@ import struct
 # http://www.python.org/doc/2.3.5/lib/module-sys.html
 import sys
 
-def totext(file, output=sys.stdout):
+def totext(file, bos='@', output=sys.stdout):
     """The file argument should be a binary file opened for reading.  It
     is treated as a Fortran binary file and converted to a text format,
     emitted on the file object output.  Each (binary) record is treated
@@ -42,7 +42,7 @@ def totext(file, output=sys.stdout):
     # replaced.
     fmt = '%%0%dx' % (2*w)
 
-    f = fort.File(file)
+    f = fort.File(file, bos=bos)
     # Iterate over all the records
     for r in f:
         # We unpack as much as the record as we can as a sequence of
@@ -60,12 +60,23 @@ def totext(file, output=sys.stdout):
             sep = ' '
         output.write('\n')
 
-def main():
-    if len(sys.argv[1:]) == 0:
-        totext(sys.stdin)
+def main(argv=None):
+    import getopt
+    import sys
+
+    if argv is None:
+        argv = sys.argv
+
+    opt,arg = getopt.getopt(argv[1:], '', 'bos=')
+    key = {}
+    for o,v in opt:
+        if o == '--bos':
+            key['bos'] = v
+    if not arg:
+        totext(sys.stdin, **key)
     else:
-        for n in sys.argv[1:]:
-            totext(open(n, 'rb'))
+        for n in arg:
+            totext(open(n, 'rb'), **key)
 
 if __name__ == '__main__':
     main()

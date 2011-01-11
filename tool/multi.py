@@ -19,8 +19,85 @@ import json
 import re
 import sys
 
+# Clear Climate Code
+import extend_path
+import gio
+from code.giss_data import valid
+
 class Fatal(Exception):
     """An error occurred."""
+
+def timecount(argv):
+    """[command] [--mask maskfile] Count of stations used over time."""
+
+    # http://docs.python.org/release/2.4.4/lib/module-getopt.html
+    import getopt
+    opts,arg = getopt.getopt(argv[1:], '', ['mask='])
+    option = dict((o[2:],v) for o,v in opts)
+
+    counts(out=sys.stdout, **option)
+
+def counts(mask, out):
+    """Print to out a count for each month of the number of stations
+    used."""
+    
+    log = open('log/step3.log')
+    cells = cellsofmask(open(mask))
+
+    # Dictionary that maps from station (12 char identifier) to
+    # monthset, where *monthset* is a set of the numbers from 0
+    # (January) to 11 (December).
+    stationmonths = dict()
+    for row in log:
+        row = row.split(' ', 2)
+        if row[1] != 'stations':
+            continue
+        stations = json.loads(row[2])
+        if row[0] in cells:
+            for station,weight,months in stations:
+                stationmonths[station] = monthset(months) | stationmonths.get(
+                  station, set())
+
+    monthcount = {}
+    path = 'work/step2.v2'
+    for station in gio.GHCNV2Reader(path=path):
+        if station.uid not in stationmonths:
+            continue
+        for m in stationvalidmonths(station):
+            monthcount[m] = monthcount.get(m, 0) + 1
+    v2monthcount(out, monthcount)
+
+def v2monthcount(out, counts):
+    """Write *counts* to *out* in GHCN V2 format.  *counts* is a dict
+    that maps from *midx* to count, whre *midx* is a 0 based index for
+    the months (year 1 January is 12).
+    """
+
+    ymin = min(counts)//12
+    ymax = max(counts)//12
+    id12 = 'STATIONCOUNT'
+    for y in range(ymin, ymax+1):
+        vs = [counts.get(y*12+m, 0) for m in range(12)]
+        s = ("%5d"*12) % tuple(vs)
+        out.write("%s%04d%s\n" % (id12, y, s))
+
+def monthset(s):
+    """Convert string of form "001111110000" to a set of months.  For
+    each character in the string that is '1', the corresponding index is
+    added to the result set.
+    """
+
+    assert len(s) == 12
+    assert set(s) <= set('01')
+
+    return set(i for i,x in enumerate(s) if x == '1')
+
+def stationvalidmonths(record):
+    """Return the set of months for which the record has valid data.
+    Each month is encoded as a number with january of year 1 being 12."""
+
+    first = record.first_month - 1
+    return set(first+i for i,v in enumerate(record.series) if valid(v))
 
 def whatstations(argv):
     """[command] [--mask maskfile]  Determines what (land) stations are

@@ -168,8 +168,19 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
             max_weight = wt
             weight = [wt*valid(v) for v in subbox_series]
 
-            # For logging, keep a list of stations that contributed
-            contributed = [[record.uid,wt]]
+            # For logging, keep a list of stations that contributed.
+            # Each item in this list is a triple (in list form, so that
+            # it can be converted to JSON easily) of [id12, weight,
+            # months].  *id12* is the 12 character station identifier;
+            # *weight* (a float) is the weight (computed based on
+            # distance) of the station's series; *months* is a 12 digit
+            # string that records whether each of the 12 months is used.
+            # '0' in position *i* indicates that the month was not used,
+            # a '1' indicates that is was used.  January is position 0.
+            l = [any(valid(v) for v in subbox_series[i::12])
+              for i in range(12)]
+            s = ''.join('01'[x] for x in l)
+            contributed = [[record.uid,wt,s]]
 
             # Add in the remaining stations
             for record,wt in contributors[1:]:
@@ -183,12 +194,14 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                     subbox_series, weight, new, wt,
                     record.rel_first_year, record.rel_last_year + 1,
                     parameters.gridding_min_overlap)
-                total_good_months += station_months
-                if station_months == 0:
-                    contributed.append([record.uid, 0.0])
+                n_good_months = sum(station_months)
+                total_good_months += n_good_months
+                if n_good_months == 0:
+                    contributed.append([record.uid, 0.0, '0'*12])
                     continue
                 total_stations += 1
-                contributed.append([record.uid,wt])
+                s = ''.join('01'[bool(x)] for x in station_months)
+                contributed.append([record.uid,wt,s])
 
                 max_weight = max(max_weight, wt)
 

@@ -26,7 +26,8 @@ def combine(average, weight, new, new_weight,
     *new_weight* can be either a constant or an array of weights for
      each datum in *new*.
 
-    The number of month records combined is returned.
+    For each of the 12 months of the year, track is kept of how many
+    new data are combined.  This list of 12 elements is returned.
 
     Each month of the year is considered separately.  For the set of
     times where both *average* and *new* have data the mean difference
@@ -39,7 +40,8 @@ def combine(average, weight, new, new_weight,
 
     new_weight = ensure_array(weight, new_weight)
 
-    months_combined = 0
+    # A count (of combined data) for each month.
+    data_combined = [0] * 12
     for m in range(12):
         sum_new = 0.0    # Sum of data in new
         sum = 0.0        # Sum of data in average
@@ -63,8 +65,8 @@ def combine(average, weight, new, new_weight,
             average[i] = (weight[i]*average[i]
                           + new_weight[i]*(new[i]+bias))/new_month_weight
             weight[i] = new_month_weight
-            months_combined += 1
-    return months_combined
+            data_combined[m] += 1
+    return data_combined
 
 def ensure_array(exemplar, item):
     """Coerces *item* to be an array (linear sequence); if *item* is

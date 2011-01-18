@@ -243,7 +243,10 @@ class Series(object):
             self.source = v2_sources().get(self.uid, "UNKNOWN")
         elif hasattr(self, 'box'):
             # Generally applies to subbox series.
-            self.uid = boxuid(self.box)
+            opt = {}
+            if hasattr(self, 'celltype'):
+                opt['celltype'] = self.celltype
+            self.uid = boxuid(self.box, **opt)
 
     def __repr__(self):
         # A bit ugly, because it tries to do something sensible for both
@@ -508,8 +511,11 @@ class SubboxMetaData(object):
     def __repr__(self):
         return 'SubboxMetadata(%r)' % self.__dict__
 
-def boxuid(box):
-    """Synthesize a uid attribute based on the box's centre."""
+def boxuid(box, celltype='Q'):
+    """Synthesize a uid attribute based on the box's centre.  *box* is a
+    4-tuple of the boxes bounds: (south, north, west, east).  *celltype*
+    is a single letter used as the last character of the result (which
+    is a 12 character string)."""
     import eqarea
     lat,lon = eqarea.centre(box)
-    return "%+05.1f%+06.1fC" % (lat,lon)
+    return "%+05.1f%+06.1f%s" % (lat, lon, celltype)

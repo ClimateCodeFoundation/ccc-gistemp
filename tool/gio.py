@@ -308,7 +308,7 @@ class SubboxReader(object):
     3, and consumed by Step 5.  Step 4 both reads and writes a subbox
     file.
     """
-    def __init__(self, rawfile, bos='>'):
+    def __init__(self, rawfile, bos='>', celltype=None):
         self.bos = bos
         self.f = fort.File(rawfile, bos=self.bos)
         rec = self.f.readline()
@@ -318,6 +318,15 @@ class SubboxReader(object):
         self.meta = code.giss_data.SubboxMetaData(self.mo1, kq, mavg, monm,
                 monm4, yrbeg, missing_flag, precipitation_flag, title)
         assert self.meta.mavg == 6, "Only monthly averages supported"
+        # Choose celltype (which is used as the last letter in the 12
+        # digit cell identifiers found in log files and GHCN V2 format
+        # working files.
+        if celltype is None:
+            if "sea" in title.lower().split():
+                celltype = 'P'
+            else:
+                celltype = 'C'
+        self.celltype = celltype
 
     def info(self):
         """Return a length 8 sequence corresponding to the INFO array
@@ -346,7 +355,8 @@ class SubboxReader(object):
               'stations', 'station_months', 'd'],
               fields[1:8]))
             attr['box'] = fields[1:5]
-            subbox = code.giss_data.Series(series=series, **attr)
+            subbox = code.giss_data.Series(series=series,
+              celltype=self.celltype, **attr)
             yield subbox
 
     def __getattr__(self, name):

@@ -15,7 +15,9 @@ import urllib
 
 def gather(scraper, v2out, v2inv, jsoninv, log):
     """Takes the name of a scraper hosted at ScraperWiki and gathers all
-    its data."""
+    its data (but is only really expected to be used when *scraper* is
+    "canada-climate-data".
+    """
 
     api = "http://api.scraperwiki.com/api/1.0/datastore/getdata"
     name = scraper
@@ -50,7 +52,7 @@ def gather(scraper, v2out, v2inv, jsoninv, log):
             rows.append(row)
         offset += limit
         # Just a sanity check
-        assert offset < 1e5
+        assert offset < 1e6
     log.write('\n')
     v2out.writelines(sorted(rows))
     for m in sorted(meta, key=lambda x: x['id11']):
@@ -62,8 +64,16 @@ def formatmetav2(meta):
     v2.temperature.inv file."""
 
     assert 11 == len(meta['id11'])
-    for key in ['Latitude', 'Longitude', 'Elevation']:
-        meta[key] = float(meta[key])
+    # Take a copy of the *meta* dictionary, so that we can mutate it.
+    d = dict(meta)
+    for key,default in [('Latitude',-99),
+                        ('Longitude',-999),
+                        ('Elevation',-999)]:
+        d[key] = default
+        try:
+            d[key] = float(meta[key])
+        except (ValueError, KeyError):
+            pass
     invrow = (
       "%(id11)s "
       "%(Station_Name)-30.30s "
@@ -73,7 +83,7 @@ def formatmetav2(meta):
       "-999            -9 -9UNKNOWN         "
       "      "
       "\n"
-      ) % meta
+      ) % d
     return invrow
 
 

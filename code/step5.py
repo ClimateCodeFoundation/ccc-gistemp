@@ -60,71 +60,50 @@ def SBBXtoBX(data):
     info[4] = 2 * land_meta.monm + 5
     yield(info, land_meta.title)
 
-    # Number of subboxes within each box.
-    nsubbox = 100
+    # The (80) large boxes.
+    boxes = list(eqarea.grid())
+    # For each box, make a list of contributors (cells that contribute
+    # to the box time series); initially empty.
+    contributordict = dict((box, []) for box in boxes)
+    # Partition the cells into the boxes.
+    for landweight, landcell, oceancell in data:
+        # Simple version only selects either land or ocean.
+        assert landweight in (0,1)
+        if landweight:
+            cell = landcell
+        else:
+            cell = oceancell
+        box = whichbox(boxes, cell.box)
+        contributordict[box].append(cell)
 
-    for box_number,box in enumerate(eqarea.grid()):
-        # List of (*cell*,*weight*) pairs.  Each *cell* is a Station
-        # instance (representing the series for the "station" at a grid
-        # cell).
-        contributors = []
-        # Averages for the land and ocean (one series per subbox)...
-        wgtc = []
-        # Eat the records from land and ocean 100 (nsubbox) at a time.
-        # In other words, all 100 subboxes for the box.
-        landweight,landsub,oceansub = zip(*itertools.islice(data, nsubbox))
-        # Check that we got nsubbox items.  Is this fails, truncated
-        # input files is the likely culprit.
-        assert set([nsubbox]) == set(map(len, [landweight, landsub, oceansub]))
-        for t, l, o in zip(landweight, landsub, oceansub):
-            # Simple version only selects either land or ocean
-            assert t in (0,1)
-            a = [MISSING]*combined_n_months
-            if t:
-                # Use land series for this subbox.
-                assert l.first_year == land_meta.yrbeg
-                contributors.append((l,l.good_count))
-            else:
-                # Use ocean series for this subbox.
-                assert o.first_year == ocean_meta.yrbeg
-                contributors.append((o,o.good_count))
-
-        # GISTEMP sort.
-        # We want to end up with IORDR, the permutation array that
-        # represents the sorted order.  IORDR[0] is the index (into the
-        # *wgtc* array) of the longest record, IORDR[1] the index of the
-        # next longest record, and so on.
+    # For each box, sort and combined the contributing cells, and output
+    # the result (by yielding it).
+    for box in boxes:
+        contributors = contributordict[box]
         # :todo: should probably import from a purpose built module.
         from step3 import sort
-        IORDR = range(nsubbox)
-        sort(IORDR, lambda x,y: contributors[y][1] - contributors[x][1])
+        sort(contributors, lambda x,y: y.good_count - x.good_count)
 
-        # From here to the "for" loop over the cells (below) we are
-        # initialising data for the loop.  Primarily the AVGR and WTR
-        # arrays.
-        nc = IORDR[0]
-
-        best = contributors[nc][0]
-        # Box record in *avgr* and corresponding weights in *wtr*.
-        avgr = [MISSING] * combined_n_months
+        best = contributors[0]
+        box_series = [MISSING] * combined_n_months
         b = 12 * (best.first_year - combined_year_beg)
-        avgr[b:b+len(best)] = best.series
-        wtr = [float(valid(a)) for a in avgr]
-        wtr = [a != MISSING for a in avgr]
+        box_series[b:b+len(best)] = best.series
+        box_weight = [float(valid(a)) for a in box_series]
 
-        l = [any(valid(v) for v in avgr[i::12]) for i in range(12)]
+        # Start the *contributed* list with this cell.
+        l = [any(valid(v) for v in box_series[i::12]) for i in range(12)]
         s = ''.join('01'[x] for x in l)
-        contributed = [[best.uid,1.0,s]]
+        contributed = [[best.uid, 1.0, s]]
 
         # Loop over the remaining cells.
-        for nc in IORDR[1:]:
-            cell,wgtc = contributors[nc]
-            if wgtc >= parameters.subbox_min_valid:
+        for cell in contributors[1:]:
+            if cell.good_count >= parameters.subbox_min_valid:
                 new = [MISSING] * combined_n_months
                 b = 12 * (cell.first_year - combined_year_beg)
                 new[b:b+len(cell)] = cell.series
                 weight = 1.0
-                station_months = series.combine(avgr, wtr, new, weight,
+                station_months = series.combine(box_series, box_weight,
+                    new, weight,
                     0, combined_n_months/12, parameters.box_min_overlap)
                 s = ''.join('01'[bool(x)] for x in station_months)
             else:
@@ -132,24 +111,26 @@ def SBBXtoBX(data):
                 s = '0'*12
             contributed.append([cell.uid, weight, s])
 
-        series.anomalize(avgr, parameters.subbox_reference_period,
+        series.anomalize(box_series, parameters.subbox_reference_period,
                          combined_year_beg)
         uid = giss_data.boxuid(box)
         log.write("%s cells %s\n" % (uid, asjson(contributed)))
-        ngood = sum(valid(a) for a in avgr)
-        yield (avgr, wtr, ngood, box)
-    # We've now consumed all 8000 input boxes and yielded 80 boxes.  We
-    # need to tickle the input to check that it is exhausted and to
-    # cause it to run the final tail of its generator.
-    # We expect the call to .next() to raise StopIteration, which is
-    # just what we want.
-    data.next()
-    # Ordinarily we never reach here.
-    assert 0, "Too many input records"
+        ngood = sum(valid(a) for a in box_series)
+        yield (box_series, box_weight, ngood, box)
 
 # :todo: put somewhere sensible and import from there
 from step3 import asjson
 
+def whichbox(boxes, cell):
+    """Return the box in *boxes* that contains (the centre of the)
+    *cell*.
+    """
+
+    lat,lon = eqarea.centre(cell)
+    for box in boxes:
+        s,n,w,e = box
+        if s <= lat < n and w <= lon < e:
+            return box
 
 def zonav(boxed_data):
     """Zonal Averaging.

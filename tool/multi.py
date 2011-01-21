@@ -147,9 +147,11 @@ def cellsofmask(inp):
     return set(row[:12] for row in inp if float(row[16:21]))
 
 
-def cellstations(arg):
-    """[command] Compares the lists of stations for each cell.  arg[1]
-    and arg[2] should be the names of two different log/step3.log files.
+def cmpcontributors(arg):
+    """[command] Compares the lists of stations for each cell (if using
+    step3.log files); or the lists of cells for each region (if using
+    step5.log files).  arg[1] and arg[2] should be the names of two
+    different log files.
     """
 
     fs = map(open, arg[1:3])
@@ -172,12 +174,8 @@ def cellstations(arg):
         if stationsa != stationsb:
             ina = seta - setb
             inb = setb - seta
-            if ina:
-                print "Cell %s %s only " % (cell, fs[0].name,
-                  ' '.join(sorted(ina)))
-            if inb:
-                print "Cell %s %s only " % (cell, fs[1].name,
-                  ' '.join(sorted(inb)))
+            reportinonelist(cell, fs[0].name, ina, dicta)
+            reportinonelist(cell, fs[1].name, inb, dicta)
             commonstations = seta & setb
             for station in commonstations:
                 if dicta[station] != dictb[station]:
@@ -202,18 +200,43 @@ def cellstations(arg):
 
 def celldict(f):
     """From the (open) step3.log file *f* return a dict that maps
-    from cell identifier (12 characters) to a list of (station,weight)
+    from box identifier (12 characters) to a list of (station,weight)
     pairs.
     """
 
     result = {}
     for row in f:
         row = row.split(' ', 2)
-        if row[1] != 'stations':
+        # The 2nd item is 'stations' for step3.log and 'cells' for
+        # step5.log.
+        if row[1] not in ['stations', 'cells']:
             continue
         stations = json.loads(row[2])
-        result[row[0]] = stations
+        pairs = [(t[0],t[1]) for t in stations]
+        result[row[0]] = pairs
     return result
+
+def reportinonelist(cell, name, culprit, weight):
+    """For the cell and logfile identified by the strings *cell*
+    and *name, print a report of the stations contributing to
+    that cell that appear only in that file (and not in the
+    corresponding cell in the other file).  *culprit* is a
+    sequence of the station identifiers, *weight* is a dict that
+    maps from station identifiers to weight.
+    """
+
+    if not culprit:
+        return
+    # Split culprits into those with zero weight, and those with
+    # non-zero weight
+    zerow = [c for c in culprit if weight[c] == 0]
+    somew = [c for c in culprit if weight[c] != 0]
+    if zerow:
+        print "Cell %s %s only (zero weights): %s " % (cell, name,
+          ' '.join(sorted(zerow)))
+    if somew:
+        print "Cell %s %s only: %s " % (cell, name,
+          ' '.join(sorted(somew)))
 
 
 def blog20110106(arg):

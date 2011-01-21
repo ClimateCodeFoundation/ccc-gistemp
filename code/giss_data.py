@@ -515,7 +515,19 @@ def boxuid(box, celltype='Q'):
     """Synthesize a uid attribute based on the box's centre.  *box* is a
     4-tuple of the boxes bounds: (south, north, west, east).  *celltype*
     is a single letter used as the last character of the result (which
-    is a 12 character string)."""
+    is a 12 character string), when the box is deemed to be a cell.
+    There are 2 sorts of 12 character string returned:
+    +NN.N+EEE.EQ
+    BOX@+NN-EEET
+    The first is used when the width of the box is less than 10
+    degrees; the second otherwise.  This is the distinction of cells
+    versus boxes.
+    """
+
     import eqarea
     lat,lon = eqarea.centre(box)
-    return "%+05.1f%+06.1f%s" % (lat, lon, celltype)
+    _,_,w,e = box
+    if e - w < 10:
+        return "%+05.1f%+06.1f%s" % (lat, lon, celltype)
+    else:
+        return "BOX@%+03.0f%+04.0fT" % (lat, lon)

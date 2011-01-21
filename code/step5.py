@@ -25,6 +25,9 @@ from giss_data import valid, invalid, MISSING
 
 # http://www.python.org/doc/2.3.5/lib/itertools-functions.html
 import itertools
+import os
+
+log = open(os.path.join('log', 'step5.log'), 'w')
 
 def SBBXtoBX(data):
     """Simultaneously combine the land series and the ocean series and
@@ -61,8 +64,11 @@ def SBBXtoBX(data):
     nsubbox = 100
 
     for box_number,box in enumerate(eqarea.grid()):
+        # List of (*cell*,*weight*) pairs.  Each *cell* is a Station
+        # instance (representing the series for the "station" at a grid
+        # cell).
+        contributors = []
         # Averages for the land and ocean (one series per subbox)...
-        avg = []
         wgtc = []
         # Eat the records from land and ocean 100 (nsubbox) at a time.
         # In other words, all 100 subboxes for the box.
@@ -75,14 +81,13 @@ def SBBXtoBX(data):
             assert t in (0,1)
             a = [MISSING]*combined_n_months
             if t:
-                # use land series for this subbox
-                a[land_offset:land_offset+len(l.series)] = l.series
-                wgtc.append(l.good_count)
+                # Use land series for this subbox.
+                assert l.first_year == land_meta.yrbeg
+                contributors.append((l,l.good_count))
             else:
-                # use ocean series for this subbox
-                a[ocean_offset:ocean_offset+len(o.series)] = o.series
-                wgtc.append(o.good_count)
-            avg.append(a)
+                # Use ocean series for this subbox.
+                assert o.first_year == ocean_meta.yrbeg
+                contributors.append((o,o.good_count))
 
         # GISTEMP sort.
         # We want to end up with IORDR, the permutation array that
@@ -92,26 +97,45 @@ def SBBXtoBX(data):
         # :todo: should probably import from a purpose built module.
         from step3 import sort
         IORDR = range(nsubbox)
-        sort(IORDR, lambda x,y: wgtc[y] - wgtc[x])
+        sort(IORDR, lambda x,y: contributors[y][1] - contributors[x][1])
 
         # From here to the "for" loop over the cells (below) we are
         # initialising data for the loop.  Primarily the AVGR and WTR
         # arrays.
         nc = IORDR[0]
 
-        # Weights for the box's record.
-        wtr = [a != MISSING for a in avg[nc]]
-        # Box record
-        avgr = avg[nc][:]
+        best = contributors[nc][0]
+        # Box record in *avgr* and corresponding weights in *wtr*.
+        avgr = [MISSING] * combined_n_months
+        b = 12 * (best.first_year - combined_year_beg)
+        avgr[b:b+len(best)] = best.series
+        wtr = [float(valid(a)) for a in avgr]
+        wtr = [a != MISSING for a in avgr]
+
+        l = [any(valid(v) for v in avgr[i::12]) for i in range(12)]
+        s = ''.join('01'[x] for x in l)
+        contributed = [[best.uid,1.0,s]]
 
         # Loop over the remaining cells.
         for nc in IORDR[1:]:
-            if wgtc[nc] >= parameters.subbox_min_valid:
-                series.combine(avgr, wtr, avg[nc], 1, 0,
-                           combined_n_months/12, parameters.box_min_overlap)
+            cell,wgtc = contributors[nc]
+            if wgtc >= parameters.subbox_min_valid:
+                new = [MISSING] * combined_n_months
+                b = 12 * (cell.first_year - combined_year_beg)
+                new[b:b+len(cell)] = cell.series
+                weight = 1.0
+                station_months = series.combine(avgr, wtr, new, weight,
+                    0, combined_n_months/12, parameters.box_min_overlap)
+                s = ''.join('01'[bool(x)] for x in station_months)
+            else:
+                weight = 0.0
+                s = '0'*12
+            contributed.append([cell.uid, weight, s])
 
         series.anomalize(avgr, parameters.subbox_reference_period,
                          combined_year_beg)
+        uid = giss_data.boxuid(box)
+        log.write("%s cells %s\n" % (uid, asjson(contributed)))
         ngood = sum(valid(a) for a in avgr)
         yield (avgr, wtr, ngood, box)
     # We've now consumed all 8000 input boxes and yielded 80 boxes.  We
@@ -122,6 +146,9 @@ def SBBXtoBX(data):
     data.next()
     # Ordinarily we never reach here.
     assert 0, "Too many input records"
+
+# :todo: put somewhere sensible and import from there
+from step3 import asjson
 
 
 def zonav(boxed_data):

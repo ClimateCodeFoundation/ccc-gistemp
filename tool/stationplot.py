@@ -151,6 +151,7 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     to the beginning of y2 are displayed.
     """
 
+    import itertools
     import struct
 
     def valid(datum):
@@ -227,8 +228,8 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     g#legend path { stroke-width:1; fill:none }
     text { fill: black; font-family: Verdana }
 """ % ('display: none', '')[config.debug])
-    assert len(datadict) <= len(colour_list)
-    for id12,colour in zip(datadict, colour_list):
+    colours = itertools.chain(colour_list, colour_iter())
+    for id12,colour in zip(datadict, colour_iter()):
         cssidescaped = cssidescape('record' + id12)
         out.write("    g.%s { stroke: %s }\n" % (cssidescaped, colour))
     out.write("  </style>\n</defs>\n")
@@ -538,6 +539,43 @@ def asdict(arg, inp, mode, scale=0.1):
             table[id12] = (data,begin)
 
     return table
+
+def colour_iter(background=(255,255,255)):
+    """Generate a random sequence of colours, all different."""
+
+    import random
+
+    def distance(u, v):
+        return sum((p-q)**2 for p,q in zip(u,v))**0.5
+
+    # Internally all colour components are from 0 to 1; so convert
+    # background.
+    background = [c/255.0 for c in background]
+    
+    # Randomly generate colours and check that they are distance *b*
+    # from the background colour and *r* from each other.  If we take
+    # too many tries to find one... Make *r* smaller.
+
+    b = 0.3
+    r = 0.4
+    # Ratio to reduce *r* by
+    s = 0.7
+    # Number of failures before reducing *r*.
+    n = 8
+    # List of all colours generated.
+    l = []
+    # Number of fails.
+    fail = 0
+    while 1:
+        c = [random.random() for _ in range(3)]
+        if (distance(c, background) > b and
+          all(distance(c, x) > r for x in l)):
+            yield "#%02x%02x%02x" % tuple(round(255*x) for x in c)
+        fail += 1
+        if fail > n:
+            fail = 0
+            r *= s
+
 
 def update_config(config, v):
     """*config* is a configuration object used to store parameters.  *v*

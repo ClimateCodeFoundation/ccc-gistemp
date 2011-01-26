@@ -120,7 +120,7 @@ class File:
 
         assert 11 == len(id11)
 
-        for id12 in self.index[id11]:
+        for id12 in self.index.get(id11, []):
             yield (id12, self.get_id12(id12))
 
     def get(self, id):

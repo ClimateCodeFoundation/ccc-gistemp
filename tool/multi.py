@@ -128,7 +128,8 @@ def stations(mask, out):
             continue
         stations = json.loads(row[2])
         if row[0] in cells:
-            for station,weight in stations:
+            for item in stations:
+                station,weight = item[:2]
                 if weight:
                     allstations[station] = max(
                       allstations.get(station, 0), weight)

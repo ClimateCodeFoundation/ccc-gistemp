@@ -318,6 +318,7 @@ class SubboxReader(object):
         self.meta = code.giss_data.SubboxMetaData(self.mo1, kq, mavg, monm,
                 monm4, yrbeg, missing_flag, precipitation_flag, title)
         assert self.meta.mavg == 6, "Only monthly averages supported"
+
         # Choose celltype (which is used as the last letter in the 12
         # digit cell identifiers found in log files and GHCN V2 format
         # working files.
@@ -327,6 +328,13 @@ class SubboxReader(object):
             else:
                 celltype = 'C'
         self.celltype = celltype
+
+        # Synthesize a gridding radius by parsing it out of the title.
+        radiusre = r'CR (\d+) *KM'
+        m = re.search(radiusre, title)
+        if m:
+            radius = int(m.group(1))
+            self.meta.gridding_radius = radius
 
     def info(self):
         """Return a length 8 sequence corresponding to the INFO array
@@ -1623,15 +1631,20 @@ def add_blank(data, required):
             yield this_box, other_box
 
 
-def step5_bx_output(data):
+def step5_bx_output(meta, data):
     """Write box (BX) output file."""
 
     bos = '>'
-    box = open('result/BX.Ts.ho2.GHCN.CL.PA.1200', 'wb')
+    title = meta.title
+    # Usually one of 'land', 'ocean', 'mixed'.
+    mode = meta.mode
+
+    box = open(os.path.join('result', make_filename(meta, 'BX')) , 'wb')
     boxf = fort.File(box, bos=bos)
-    info, title = data.next()
+
+    info = info_from_meta(meta)
+
     boxf.writeline(struct.pack('%s8i' % bos, *info) + title)
-    yield (info, title)
 
     for record in data:
         avgr, wtr, ngood, box = record
@@ -1644,6 +1657,30 @@ def step5_bx_output(data):
         yield record
     print "Step5: Closing box file"
     boxf.close()
+
+def make_filename(meta, kind):
+    """Using the metadata in *meta* make a filename for an output file
+    of type *kind*.  *kind* is usually one of 'ZON' or 'BX'.
+    """
+
+    if hasattr(meta, 'gridding_radius'):
+        radius = ".%.0f" % meta.gridding_radius
+    else:
+        # No gridding radius specified in *meta*; typically, an ocean
+        # file.
+        radius = ''
+
+    return meta.mode + kind + '.Ts.ho2.GHCN.CL.PA' + radius
+
+def info_from_meta(meta):
+    """Take a metadata object (any object with certain fields) and
+    return an 8 element "info" list; the 8 elements form the header of
+    various GISS specific Fortran binary files.
+    """
+
+    return [meta.mo1, meta.kq, meta.mavg, meta.monm,
+            2*meta.monm+5, meta.yrbeg, meta.missing_flag,
+            meta.precipitation_flag]
 
 def step5_mask_output(data):
     """Output the landmask used by Step 5."""
@@ -1701,29 +1738,49 @@ def step5_zone_titles():
     return titles
 
 
-def step5_output(data):
-    """Generate final Step 5 output files."""
+def step5_output(results):
+    """Generate final Step 5 output files.  *results* is a sequence of
+    tuples, each tuples corresponding to the zonal results for
+    an entire analysis (typically 3 analyses: land, ocean, mixed).  The
+    contents of the tuple itself are a bit baroque, see `annzon` for
+    details.
+    """
 
-    (info, data, wt, ann, monmin, title) = data
+    for item in results:
+        step5_output_one(item)
+    return "Step 5 Completed"
+
+def step5_output_one(item):
+    (meta, data, wt, ann, monmin) = item
+    title = meta.title
     XBAD = 9999
     iy1tab = 1880
 
     zone_titles = step5_zone_titles()
 
     titl2 = ' zones:  90->64.2->44.4->23.6->0->-23.6->-44.4->-64.2->-90                      '
-    iyrbeg = info[5]
+    iyrbeg = meta.yrbeg
     jzm = len(ann)
     iyrs = len(ann[0])
     monm = iyrs * 12
     
-    out = ['ZonAnn', 'GLB', 'NH', 'SH']
-    out = [open('result/'+bit+'.Ts.ho2.GHCN.CL.PA.txt', 'w')
-            for bit in out]
+    mode = meta.mode
+    out = open_step5_outputs(mode)
+    if mode == 'mixed':
+        # Check that land and ocean have same range, otherwise, divert
+        # output.
+        if meta.land_month_range != meta.ocean_month_range:
+            # Send output to a set of files starting with "tainted".
+            # Note that the original, "mixed", files will have been
+            # truncated: This stops anyone using their contents.
+            out = open_step5_outputs('tainted')
 
     bos = '>'
 
     # Create and write out the header record of the output files.
-    print >> out[0], ' Annual Temperature Anomalies (.01 C) - ' + title[28:80]
+    # Remove everything up to the first ')' of the title.
+    suffix = re.sub(r'.*?\)', '', title)
+    print >> out[0], ' Annual Temperature Anomalies (.01 C) - ' + suffix
     for f in out[1:]:
         print >> f, title
 
@@ -1846,9 +1903,9 @@ Year  Glob  NHem  SHem    -90N  -24N  -24S    -90N  -64N  -44N  -24N  -EQU  -24S
         print >> outf, banner
 
     # Save monthly means on disk.
-    zono = open('result/ZON.Ts.ho2.GHCN.CL.PA.1200', 'wb')
+    zono = open(os.path.join('result', make_filename(meta, 'ZON')), 'wb')
     zono = fort.File(zono, bos)
-    zono.writeline(struct.pack(bos + '8i', *info) +
+    zono.writeline(struct.pack(bos + '8i', *info_from_meta(meta)) +
                    title + titl2)
 
     fmt_mon = bos + '%df' % monm
@@ -1857,4 +1914,16 @@ Year  Glob  NHem  SHem    -90N  -24N  -24S    -90N  -64N  -44N  -24N  -EQU  -24S
                        struct.pack(fmt_mon, *itertools.chain(*wt[jz])) +
                        zone_titles[jz])
     zono.close()
-    return "Step 5 Completed"
+
+def open_step5_outputs(mode):
+    """Open the Step 5 output files (there are 4) and return a list of
+    the open file objects.  *mode* is a prefix used for the names, it is
+    usually one of 'land', 'ocean', or 'mixed'.
+    """
+
+
+    parts = ['ZonAnn', 'GLB', 'NH', 'SH']
+    files = [open(os.path.join('result',
+                              mode+part+'.Ts.ho2.GHCN.CL.PA.txt'), 'w')
+            for part in parts]
+    return files

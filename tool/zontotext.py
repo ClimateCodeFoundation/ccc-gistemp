@@ -49,10 +49,11 @@ def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
     else:
         content = 'boxes'
 
-    if 'v2' != format:
+    if metaonly or 'v2' != format:
         output.write(repr(info))
-        output.write('\n%s\n' % r[n*w:n*w+80])
-        output.write('%s\n' % r[n*w+80:])
+        output.write('\n' + title + '\n')
+    if metaonly:
+        return
     if 'v2' == format:
         v2out = gio.GHCNV2Writer(file=output, scale=0.01)
 
@@ -87,8 +88,6 @@ def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
         else:
             title = suffix
             output.write(title + '\n')
-        if metaonly:
-            continue
         for idx in range(2):
             if 'v2' == format and idx > 0:
                 # Only output temps, not weights. :todo: fix this.

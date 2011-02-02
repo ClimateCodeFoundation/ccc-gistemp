@@ -192,6 +192,7 @@ def iter_subbox_grid(station_records, max_months, first_year, radius):
                 new[aa - 1:bb] = record.series
                 station_months = series.combine(
                     subbox_series, weight, new, wt,
+                    record.rel_first_year, record.rel_last_year + 1,
                     parameters.gridding_min_overlap)
                 n_good_months = sum(station_months)
                 total_good_months += n_good_months
@@ -249,12 +250,12 @@ def step3(records, radius=parameters.gridding_radius, year_begin=1880):
             precipitation_flag=9999,
             title='GHCN V2 Temperatures (.1 C)')
 
+
     units = '(C)'
     title = "%20.20s ANOM %-4s CR %4dKM %s-present" % (meta.title,
             units, radius, year_begin)
     meta.mo1 = 1
     meta.title = title.ljust(80)
-    meta.gridding_radius = radius
 
     box_source = iter_subbox_grid(records, monm, year_begin, radius)
 

@@ -107,10 +107,6 @@ def clear_cache(func):
 class StationMetaData(object):
     """The metadata for a set of station records.
 
-    The keyword arguments for the constructor are entirely arbitrary.
-    The constructor accepts any keyword arguments and merely acts as a
-    repository.  By convention the keyword arguments are:
-
     :Ivar mo1:
         The number of months covered in the entire data set.
     :Ivar kq:
@@ -351,36 +347,16 @@ class Series(object):
 
     def first_valid_year(self):
         """The first calendar year with any valid data."""
-        return (self.first_valid_month() - 1) // 12
+        index = (i for i,x in enumerate(self.series) if x != MISSING)
+        first = index.next()
+        return first//12 + self.first_year
 
     def last_valid_year(self):
         """The last calendar year with any valid data."""
-        return (self.last_valid_month() - 1) // 12
-
-    def first_valid_month(self):
-        """The first month with any valid data.  Returned as a 1-based
-        index (where January of year 0 is 1).
-        """
-        index = (i for i,x in enumerate(self.series) if x != MISSING)
-        try:
-            first = index.next()
-        except StopIteration:
-            # No valid data.  Return a large number.
-            return 9999*12
-        return first + self.first_month
-
-    def last_valid_month(self):
-        """The last month with any valid data.  Returned as a 1-based
-        index (where January of year 0 is 1).
-        """
         index = (i for i,x in reversed(list(enumerate(self.series)))
           if x != MISSING)
-        try:
-            last = index.next()
-        except StopIteration:
-            # No valid data.  Return a small number.
-            return 1
-        return last + self.first_month
+        last = index.next()
+        return last//12 + self.first_year
 
     def get_monthly_valid_counts(self):
         """Get number of good values for each month.
@@ -535,26 +511,23 @@ class SubboxMetaData(object):
     def __repr__(self):
         return 'SubboxMetadata(%r)' % self.__dict__
 
-def boxuid(box, celltype='QXQ'):
+def boxuid(box, celltype='Q'):
     """Synthesize a uid attribute based on the box's centre.  *box* is a
-    4-tuple of the boxes bounds: (south, north, west, east).
-
+    4-tuple of the boxes bounds: (south, north, west, east).  *celltype*
+    is a single letter used as the last character of the result (which
+    is a 12 character string), when the box is deemed to be a cell.
     There are 2 sorts of 12 character string returned:
     +NN.N+EEE.EQ
-    QXQ@+NN-EEET
+    BOX@+NN-EEET
     The first is used when the width of the box is less than 10
     degrees; the second otherwise.  This is the distinction of cells
     versus boxes.
-
-    *celltype* is used to determine either the last character (1st form,
-    above) or the first 3 characters (2nd form, above).  In the 1st
-    form, the first character of celltype determines the last character.
     """
 
     import eqarea
     lat,lon = eqarea.centre(box)
     _,_,w,e = box
     if e - w < 10:
-        return "%+05.1f%+06.1f%s" % (lat, lon, celltype[0])
+        return "%+05.1f%+06.1f%s" % (lat, lon, celltype)
     else:
-        return "%s@%+03.0f%+04.0fT" % (celltype[:3], lat, lon)
+        return "BOX@%+03.0f%+04.0fT" % (lat, lon)

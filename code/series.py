@@ -14,10 +14,14 @@ Shared series-processing code in the GISTEMP algorithm.
 """
 
 
-def combine(average, weight, new, new_weight, min_overlap):
+def combine(average, weight, new, new_weight,
+            first_year, last_year, min_overlap):
     """Run the GISTEMP combining algorithm.  This combines the data
     in the *new* array into the *average* array.  *new* has weight
     *new_weight*, *average* has weights in the *weight* array.
+
+    Only data for years in *range(first_year, last_year)* are
+    considered and combined.
 
     *new_weight* can be either a constant or an array of weights for
      each datum in *new*.
@@ -42,8 +46,8 @@ def combine(average, weight, new, new_weight, min_overlap):
         sum_new = 0.0    # Sum of data in new
         sum = 0.0        # Sum of data in average
         count = 0    # Number of years where both new and average are valid
-        for a,n in itertools.izip(average[m::12],
-                                  new[m::12]):
+        for a,n in itertools.izip(average[first_year*12+m: last_year*12: 12],
+                                  new[first_year*12+m: last_year*12: 12]):
             if invalid(a) or invalid(n):
                 continue
             count += 1
@@ -54,7 +58,7 @@ def combine(average, weight, new, new_weight, min_overlap):
         bias = (sum-sum_new)/count
 
         # Update period of valid data, averages and weights
-        for i in range(0, len(new), 12):
+        for i in range(first_year*12+m, last_year*12, 12):
             if invalid(new[i]):
                 continue
             new_month_weight = weight[i] + new_weight[i]

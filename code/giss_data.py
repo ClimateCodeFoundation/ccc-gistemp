@@ -305,16 +305,6 @@ class Series(object):
         return (self.last_month - 1) // 12
 
     @property
-    def rel_first_year(self):
-        """The `first_year` relative to `BASE_YEAR`."""
-        return self.first_year - BASE_YEAR
-
-    @property
-    def rel_last_year(self):
-        """The `last_year` relative to `BASE_YEAR`."""
-        return self.last_year - BASE_YEAR
-
-    @property
     def rel_first_month(self):
         """The `first_month` relative to `BASE_YEAR`."""
         return self.first_month - BASE_YEAR * 12

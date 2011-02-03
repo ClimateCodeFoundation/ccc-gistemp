@@ -112,7 +112,7 @@ def vischeck(data):
     log("... running vischeck")
     import vischeck
     vischeck.chartit(
-      [open(os.path.join('result', 'GLB.Ts.ho2.GHCN.CL.PA.txt'))],
+      [open(os.path.join('result', 'mixedGLB.Ts.ho2.GHCN.CL.PA.txt'))],
       out = open(os.path.join('result', 'google-chart.url'), 'w'))
 
     log("See result/google-chart.url")

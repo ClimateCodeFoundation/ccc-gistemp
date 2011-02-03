@@ -130,8 +130,9 @@ input data, but subsequently only write to the work/ log/ and result/
 directories.  Before running tool/run.py, these directories can all be
 deleted (if you wish, for example, to have a clean run).
 
-In 2010 on the sorts of not-very-impressive machines that the developers
-use, a complete run takes about 40 minutes.  If you want this to go much
+In 2011 a complete run takes about 35 minutes on an Amazon EC2 "High-CPU
+Medium Instance" which is a bit faster than the sorts of not-very-impressive
+machines that the developers use.  If you want this to go much
 faster we recommend that you run using PyPy (an alternate implementation
 of Python http://codespeak.net/pypy/dist/pypy/doc/ ).  See this note
 from Paul Ollis:

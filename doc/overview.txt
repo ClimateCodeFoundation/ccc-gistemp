@@ -3,12 +3,37 @@ $Rev$
 
 David Jones, Climate Code Foundation, 2010-11-19
 
+
 Overview of ccc-gistemp
 
-[todo: add more introductory notes here.  Along the lines of
-"ccc-gistemp is a replication of GISTEMP, a reconstruction of global
-historical temperature anomalies..."]
+ccc-gistemp is a software product written in the Python programming
+language.  It is a replication of GISTEMP.  GISTEMP (and hence
+ccc-gistemp) is a reconstruction of global historical temperature
+anomalies, and is described by its author's at NASA on their webpage:
+http://data.giss.nasa.gov/gistemp/ .  ccc-gistemp is a product of the
+Clear Climate Code project and the Climate Code Foundation.  It attempts
+to do exactly the same thing that GISTEMP does, but with an emphasis on
+making the code clear.
 
+Broadly the GISTEMP algorithm takes historical temperature data from
+land-based weather stations as input, and combines these data to
+produce an estimate of temperature change over large regions.  In
+addition, sea surface temperate data (which has already been processed
+to some extent) can be combined with land station data.
+
+This document provides an overview of the algorithm, and in particular
+attemts to link the high level organisation of the algorithm with its
+published description in the scientific literature.
+
+The key GISTEMP paper is Hansen and Lebedeff 1987 which describes the
+basic gridding scheme.  There have been many modifications to the
+algorithm since then, but a recent review of GISTEMP, Hansen et al
+2010, documents most of those parts that are not in the 1987 paper
+(collecting documentation that was previously scattered about many
+different publications).
+
+
+Algorithm
 
 The GISTEMP algorithm (and hence ccc-gistemp) is organised as a series
 of steps.  Data flows through the steps in a pipeline.  Early steps
@@ -19,9 +44,10 @@ Step 0: Assimilates input data from various sources (usually GHCN,
 USHCN, SCAR READER, and a single priv. comm. record for
 Hohenpeissenberg).  Each USHCN record is adjusted so that its recent
 seasonal cycle matches the recent seasonal cycle for the corresponding
-GHCN record.  GHCN data for Hohenpeissenberg is replaced with priv.
-comm. data.  As far as I know this is not documented in the
-literature.
+GHCN record (not documented in the literature).  GHCN data for
+Hohenpeissenberg is replaced with priv.  comm. data (not documented in
+the literature).  Hansen et al 2010 documents the use of SCAR READER
+data.
 
 Step 1: A feature of GHCN (a major data source) is that a single
 station can have multiple overlapping records (from different original
@@ -32,10 +58,10 @@ remove a step change in the record.  Under the control of a
 configuration file, various stations and periods of station records are
 discarded (as being unfit for subsequent analysis).  Hansen et al 1999
 documents the QC procedures that lead to discarding station data; it
-also documents the Lihue and St Helena adjustment; and it documents the
-method by which multiple records at the same location are combined.
-Some of the discarded stations in the US are documented in Hansen
-et al 2001.
+also documents the Lihue and St Helena adjustment (also documented in
+Hansen et al 2010); and it documents the method by which multiple
+records at the same location are combined.  Some of the discarded
+stations in the US are documented in Hansen et al 2001.
 
 Step 2: Urban Adjustment.  (short records are discarded). Stations
 identified as urban (usually using values obtained from satellite
@@ -46,19 +72,23 @@ contributing to the composite record.  Periods and stations that do
 not have sufficient support from rural stations are dropped.  The
 composite rural record is made from rural stations with 500 km, or
 1000 km if necessary to meet the sufficient stations requirement.
-This step is documented in Hansen et al 1999, and Hansen et al 2001.
+This step is documented in Hansen et al 1999 (the basic scheme),
+Hansen et al 2001 (allowing the break point in a two leg fit to vary in
+time), and Hansen et al 2010 (the use of satellite nightlights).
 
 Step 3: Gridding.  A grid of cells is selected (8000 equal area cells
 covering the globe, see note below), and for each cell a composite
 series is computed from station records within 1200 km of the cell
 centre.  Each contributing record is weighted according to its
 distance from the cell centre, linearly decreasing to 0 at a distance
-of 1200 km.  This step is documented in Hansen and Lebedeff 1987
-(probably the key GISTEMP paper).
+of 1200 km.  This step is documented in Hansen and Lebedeff 1987.
 
 Step 4: Sea Surface Temperatures.  Gridded sea surface temperatures
-are read from a file prepared by GISS and possibly revised with recent
-monthly updates.
+are read from a file prepared by GISS using data from other published
+sources and possibly revised with recent monthly updates.  Sea
+surface temperature data are only used if the location is ice free
+all year, data from locations containing sea ice are discarded.
+This step is documented in Hansen et al 2010 (and possibly elsewhere).
 
 Step 5: Ocean merging.  Ocean (Sea Surface Temperatures) and Land
 (Near Surface Air Temperatures) are "merged".  A cell that has both
@@ -66,7 +96,11 @@ ocean and land records selects either the ocean or the land record:
 the land record is discarded unless the ocean record is short or
 the land record has a contributing land station within 100 km (in
 which case the ocean record is discarded).  This part is documented
-in Hansen et al 1996.
+in Hansen et al 1996.  In ccc-gistemp in order to produce three analyses
+for land-only, ocean-only, and combined land--ocean, three maps of cells
+are produced and go forward to the following Zonal and Global Average
+steps: one containing only land data, one containing only ocean data,
+and one containing mixed land and ocean data as described above.
 
 Zonal Averages.  Each hemisphere is divided into 4 zones by splitting
 at the latitudes that have sines of 0.4, 0.7, 0.9 (and 0 and 1);
@@ -107,6 +141,7 @@ Hansen et al 1996 http://pubs.giss.nasa.gov/abstracts/1996/Hansen_etal_1.html
 Hansen et al 1999 http://pubs.giss.nasa.gov/abstracts/1999/Hansen_etal.html
 Hansen et al 2001 http://pubs.giss.nasa.gov/abstracts/2001/Hansen_etal.html
 Hansen et al 2006 http://pubs.giss.nasa.gov/abstracts/2006/Hansen_etal_1.html
+Hansen et al 2010 http://pubs.giss.nasa.gov/cgi-bin/abstract.cgi?id=ha00510u
 
 HISTORY
 

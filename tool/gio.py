@@ -1516,19 +1516,13 @@ def step4_load_clim():
                 clim[long][lat][month] = v
     return clim
 
-def step4_dummy_input():
-    # Dummy metadata first.  step5.py recognises this value.
-    yield None
-    while True:
-        yield 'Step 4 dummy value'
-
 # This is used to extract the end month/year from the title of the SBBX file.
 rTitle = re.compile(r"Monthly Sea Surface Temperature anom \(C\)"
         " Had: 1880-11/1981, oi2: 12/1981- *(\d+)/(\d+)")
 
 def step4_input(land):
     if land is None:
-        land = step4_dummy_input()
+        land = SubboxReader(open(STEP3_OUT, 'rb'))
     ocean = SubboxReader(open('input/SBBX.HadR2', 'rb'))
     m = rTitle.match(ocean.meta.title)
     if m is None:

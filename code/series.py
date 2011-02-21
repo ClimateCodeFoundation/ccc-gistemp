@@ -14,10 +14,10 @@ Shared series-processing code in the GISTEMP algorithm.
 """
 
 
-def combine(average, weight, new, new_weight, min_overlap):
+def combine(composite, weight, new, new_weight, min_overlap):
     """Run the GISTEMP combining algorithm.  This combines the data
-    in the *new* array into the *average* array.  *new* has weight
-    *new_weight*, *average* has weights in the *weight* array.
+    in the *new* array into the *composite* array.  *new* has weight
+    *new_weight*; *composite* has weights in the *weight* array.
 
     *new_weight* can be either a constant or an array of weights for
      each datum in *new*.
@@ -26,12 +26,12 @@ def combine(average, weight, new, new_weight, min_overlap):
     new data are combined.  This list of 12 elements is returned.
 
     Each month of the year is considered separately.  For the set of
-    times where both *average* and *new* have data the mean difference
+    times where both *composite* and *new* have data the mean difference
     (a bias) is computed.  If there are fewer than *min_overlap* years
     in common the data (for that month of the year) are not combined.
     The bias is subtracted from the *new* record and it is point-wise
-    combined into *average* according to the weight *new_weight* and
-    the existing weights for *average*.
+    combined into *composite* according to the weight *new_weight* and
+    the existing weights for *composite*.
     """
 
     new_weight = ensure_array(weight, new_weight)
@@ -40,9 +40,10 @@ def combine(average, weight, new, new_weight, min_overlap):
     data_combined = [0] * 12
     for m in range(12):
         sum_new = 0.0    # Sum of data in new
-        sum = 0.0        # Sum of data in average
-        count = 0    # Number of years where both new and average are valid
-        for a,n in itertools.izip(average[m::12],
+        sum = 0.0        # Sum of data in composite
+        # Number of years where both new and composite are valid.
+        count = 0
+        for a,n in itertools.izip(composite[m::12],
                                   new[m::12]):
             if invalid(a) or invalid(n):
                 continue
@@ -53,12 +54,12 @@ def combine(average, weight, new, new_weight, min_overlap):
             continue
         bias = (sum-sum_new)/count
 
-        # Update period of valid data, averages and weights
+        # Update period of valid data, composite and weights.
         for i in range(m, len(new), 12):
             if invalid(new[i]):
                 continue
             new_month_weight = weight[i] + new_weight[i]
-            average[i] = (weight[i]*average[i]
+            composite[i] = (weight[i]*composite[i]
                           + new_weight[i]*(new[i]+bias))/new_month_weight
             weight[i] = new_month_weight
             data_combined[m] += 1

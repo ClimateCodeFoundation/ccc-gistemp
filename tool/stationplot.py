@@ -126,7 +126,7 @@ def aplot(series, K):
 
     from itertools import groupby
 
-    def enum_month(data):
+    def enum_frac(data):
         """Like enumerate, but decorating each datum with a fractional
         year coordinate."""
 
@@ -135,7 +135,7 @@ def aplot(series, K):
 
     data,first = series
 
-    for isbad,block in groupby(enum_month(data), lambda x: x[1] == BAD):
+    for isbad,block in groupby(enum_frac(data), lambda x: x[1] == BAD):
         if isbad:
             continue
         yield list(block)
@@ -224,8 +224,8 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     out.write("""<defs>
   <style type="text/css">
     .debug { %s }
-    path { stroke-width: 0.1; fill: none }
-    path.singleton { stroke-width: 0.2; stroke-linecap: round }
+    path { stroke-width: 1.4; fill: none }
+    path.singleton { stroke-width: 2.8; stroke-linecap: round }
     g#axes path { stroke-width:1; fill:none; stroke: #888 }
     g#legend path { stroke-width:1; fill:none }
     text { fill: black; font-family: Verdana }
@@ -324,21 +324,24 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     out.write("<g transform='scale(1, -1)'>\n")
     # Transform so that plot lower left is at (0,0):
     out.write("<g transform='translate(0,%.0f)'>\n" % -ybottom)
-    # Transform by (xscale,yscale) so that outside this group we're in (SVG)
-    # pixels.
-    out.write("<g transform='scale(%.2f,%.2f)'>\n" %
-      (config.xscale, config.yscale))
-    # Transform so that databox left ends up at x=0
-    out.write("<g transform='translate(%d,0)'>\n" % (-minyear))
+    xdatabox = (0, ybottom, databox[2]*config.xscale, databox[3]*config.yscale)
     out.write("""<rect class='debug' x='%d' y='%.1f' width='%d' height='%.1f'
-      stroke='pink' fill='none' opacity='0.30' />\n""" % databox)
+      stroke='pink' fill='none' opacity='0.30' />\n""" % xdatabox)
+
+    def scale(points):
+        """Take a sequence of (year,datum) pairs and scale using
+        config.xscale and config.yscale to be in a coordinate system
+        where (minyear,0) is at 0,0 and we're 1 to 1 with SVG pixels.
+        """
+
+        return [((x-minyear)*config.xscale, y*config.yscale) for x,y in points]
 
     for id12,series in datadict.items():
         out.write("<g class='record%s'>\n" % id12)
         for segment in aplot(series, K):
-            out.write(aspath(segment)+'\n')
+            out.write(aspath(scale(segment))+'\n')
         out.write("</g>\n")
-    out.write("</g>\n" * 6)
+    out.write("</g>\n" * 4)
     out.write("</svg>\n")
 
 def cssidescape(identifier):

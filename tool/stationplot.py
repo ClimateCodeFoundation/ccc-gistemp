@@ -18,7 +18,7 @@
 Usage: python stationplot.py [options] station-id
 
 The options are:
-  [-a] [-d v2.mean] [-o file.svg] [-t YYYY,YYYY] [-s 0.01]
+  [-a] [-y] [-d v2.mean] [-o file.svg] [-t YYYY,YYYY] [-s 0.01]
 
 Tool to plot the records for a station.  Stations have an 11-digit
 identifier, and in the GHCN file v2.mean they have a single digit added, the
@@ -30,7 +30,9 @@ associated with that station; a 12-digit indentifier will plot only a
 single record.
 
 Anomalies can be plotted (each datum has the mean for that month
-subtracted from it) by using the -a option.
+subtracted from it) by using the -a option.  The -y option will compute
+monthly anomalies and then average them in blocks of 12 to form yearly
+(annual) anomalies.
 
 The -t option will restrict the time axis so that only records between
 the beginning of the first year and the beginning of the second year are

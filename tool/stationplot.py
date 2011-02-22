@@ -231,7 +231,7 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     text { fill: black; font-family: Verdana }
 """ % ('display: none', '')[config.debug])
     colours = itertools.chain(colour_list, colour_iter())
-    for id12,colour in zip(datadict, colour_iter()):
+    for id12,colour in zip(datadict, colours):
         cssidescaped = cssidescape('record' + id12)
         out.write("    g.%s { stroke: %s }\n" % (cssidescaped, colour))
     out.write("  </style>\n</defs>\n")

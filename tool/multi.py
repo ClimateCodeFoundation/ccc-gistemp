@@ -22,10 +22,48 @@ import sys
 # Clear Climate Code
 import extend_path
 import gio
-from code.giss_data import valid
+from code.giss_data import valid, MISSING
 
 class Fatal(Exception):
     """An error occurred."""
+
+def tabletov2(argv):
+    """[command] Convert GISTEMP table format (GLB.* and so on) to GHCN
+    v2 format.
+    """
+
+    dotabletov2(arg=argv[1:], out=sys.stdout)
+
+def dotabletov2(arg, out):
+    """Open the files named in the list *arg* and write out GHCN v2
+    format to *out*.
+    """
+
+    v2 = gio.GHCNV2Writer(file=out, scale=1)
+    for name in arg:
+        f = open(name)
+        uid = name[:12]
+        for year,monthlies in tablemonthlies(f):
+            v2.writeyear(uid, year, monthlies)
+    v2.close()
+
+def tablemonthlies(f):
+    """Convert GISTEMP table file (GLB.*) to sequence of (year, seq)
+    pairs.  Each *seq* is a list of 12 monthly values.
+    """
+
+    def convert(s):
+        try:
+            return int(s)
+        except:
+            return MISSING
+
+    for row in f:
+        if not re.match(r'\d{4}', row):
+            continue
+        year = int(row[:4])
+        monthlies = [convert(row[i:i+5]) for i in range(5, 65, 5)]
+        yield year,monthlies
 
 def timecount(argv):
     """[command] [--mask maskfile] Count of stations used over time."""

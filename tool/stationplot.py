@@ -18,7 +18,7 @@
 Usage: python stationplot.py [options] station-id
 
 The options are:
-  [-a] [-y] [-d v2.mean] [-o file.svg] [-t YYYY,YYYY] [-s 0.01]
+  [-a] [-y] [-d v2.mean] [-o file.svg] [-t YYYY,YYYY] [-s 0.01] [-c config]
 
 Tool to plot the records for a station.  Stations have an 11-digit
 identifier, and in the GHCN file v2.mean they have a single digit added, the
@@ -45,6 +45,13 @@ The -o option can be used to change where it written ("-o -" specifies stdout).
 
 Normally the input is the GHCN dataset input/v2.mean; the -d option
 specifies an alternate input file ("-d -" specifies stdin).
+
+Normally the input data is expected to be temperatures in units of 0.1 C
+(this is the convention used by GHCN v2).  The -s option can be used to
+specify a different sized unit.
+
+The -c option can be used to set various configuration options.  Best to
+examine the source code for details.
 """
 
 import math
@@ -523,7 +530,9 @@ def asdict(arg, inp, mode, scale=0.1):
     12-digit record identifiers.  The records from `inp` are extracted
     and returned as a dictionary (that maps identifiers to (data,begin)
     pair).  If `mode` is 'anom' then data are converted to monthly
-    anomalies.
+    anomalies; if `mode` is 'annual' then data are converted to annual
+    anomalies (using the GISTEMP algorithm that copes with missing
+    months).
     """
 
     # Clear Climate Code, tool directory

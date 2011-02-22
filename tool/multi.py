@@ -352,7 +352,7 @@ def nature201102(arg):
     from tool import stationplot
 
     stationplot.main(
-      ("stationplot -o nature.svg -c yscale=300;ytick=0.2 -s 0.01 -y -d nature.v2 %s %s" % tuple(labels)).split())
+      ("stationplot -o nature.svg -c yscale=300;ytick=0.2;legend=none -s 0.01 -y -d nature.v2 %s %s" % tuple(labels)).split())
 
 
 def kmlpolystyle(color, id):

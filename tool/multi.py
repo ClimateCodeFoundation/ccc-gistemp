@@ -18,6 +18,7 @@ import extend_path
 import json
 import re
 import sys
+import urllib
 
 # Clear Climate Code
 import extend_path
@@ -34,15 +35,18 @@ def tabletov2(argv):
 
     dotabletov2(arg=argv[1:], out=sys.stdout)
 
-def dotabletov2(arg, out):
+def dotabletov2(arg, out, labels=None):
     """Open the files named in the list *arg* and write out GHCN v2
-    format to *out*.
+    format to *out*.  If *labels* is specified, it should be a list of
+    12 character strings to be used for the station identifiers in the
+    GHCN v2 output file; one element per input file.
     """
 
     v2 = gio.GHCNV2Writer(file=out, scale=1)
-    for name in arg:
-        f = open(name)
-        uid = name[:12]
+    if not labels:
+        labels = [name[:12] for name in arg]
+    for name,uid in zip(arg,labels):
+        f = urllib.urlopen(name)
         for year,monthlies in tablemonthlies(f):
             v2.writeyear(uid, year, monthlies)
     v2.close()
@@ -330,6 +334,26 @@ def blog20110106(arg):
 """ + kmlplace("Box 7", box7, style="#s1") + """
 </Document>
 </kml>"""
+
+def nature201102(arg):
+    """Generate SVG for image as per Nature's request.
+    (expects to find a completed result directory).
+    """
+
+    out = open('nature.v2', 'w')
+    labels=['_ccc-gistemp', 'NASA_GISTEMP']
+
+    print "fetching data..."
+    dotabletov2(['result/mixedGLB.Ts.ho2.GHCN.CL.PA.txt',
+      'http://data.giss.nasa.gov/gistemp/tabledata/GLB.Ts+dSST.txt'], out,
+      labels=labels)
+
+    print "generating SVG..."
+    from tool import stationplot
+
+    stationplot.main(
+      ("stationplot -o nature.svg -c yscale=300;ytick=0.1 -s 0.01 -y -d nature.v2 %s %s" % tuple(labels)).split())
+
 
 def kmlpolystyle(color, id):
     """A simply Style including a PolyStyle with color."""

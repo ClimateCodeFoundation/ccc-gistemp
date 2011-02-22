@@ -79,6 +79,8 @@ config.fontsize = 16
 config.xscale = 6
 # Pixels per degree C.
 config.yscale = 10
+# Ticks on Y axis (in scaled data units, that is, degrees C).
+config.ytick = 5
 
 def derive_config(config):
     """Some configuration parameters are derived from others if they
@@ -300,19 +302,27 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     out.write("  <g id='vaxis' font-size='%.1f' text-anchor='end'>" %
       config.fontsize)
     # Ticks on the vertical axis.
-    # Ticks every 5 degrees C
-    every = 5*config.yscale
+    # Ticks every *ytick* degrees C.
+    every = config.ytick*config.yscale
+    # Works best when *every* is an integer.
+    assert int(every) == every
+    every = int(every)
     s = (-ybottom) % every
     tickat = map(lambda x:x+s, range(0, int(plotheight+1-s), every))
     out.write("  <path d='" +
       ''.join(map(lambda y: 'M0 %.1fl-8 0' % -y, tickat)) +
       "' />\n")
+    # *prec* gives the number of figures after the decimal point for the
+    # y-axis tick label.
+    prec = -int(round(math.log10(config.ytick) - 0.001))
+    prec = max(0, prec)
+    tickfmt = '%%.%df' % prec
     for y in tickat:
         # Note: "%.0f' % 4.999 == '5'
-        out.write("  <text alignment-baseline='middle'"
-          " x='-8' y='%.1f'>%.0f</text>\n" %
+        out.write(("  <text alignment-baseline='middle'"
+          " x='-8' y='%.1f'>" + tickfmt + "</text>\n") %
           (-y, (y+ybottom)/float(config.yscale)))
-    # Vertical label
+    # Vertical label.
     out.write("  <defs><path id='pvlabel' d='M-%d -20l0 -400'/></defs>\n" %
       (3.5*config.fontsize-8))
     if 'temp' in mode:

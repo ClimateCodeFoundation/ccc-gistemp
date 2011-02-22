@@ -75,12 +75,16 @@ class Config:
 config = Config()
 config.debug = False
 config.fontsize = 16
+# Amount by which tick shoots out at the bottom.
+config.overshoot = 16
 # Pixels per year.
 config.xscale = 6
 # Pixels per degree C.
 config.yscale = 10
 # Ticks on Y axis (in scaled data units, that is, degrees C).
 config.ytick = 5
+# Style of legend.  'pianola' or 'none'.
+config.legend = 'pianola'
 
 def derive_config(config):
     """Some configuration parameters are derived from others if they
@@ -181,6 +185,7 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     title = '\n'.join(title)
 
     # Assign number of data items per year.
+    global K # :todo: made not global.
     if 'annual' in mode:
         K = 1
     else:
@@ -219,7 +224,7 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     ybottom = math.floor((lowest-0.05)*config.yscale)
     ytop = math.ceil((highest+0.05)*config.yscale)
     plotheight = ytop - ybottom
-    legendh = config.fontsize*(len(datadict)+1)
+    legendh = legend_height(datadict)
     lborder = 125
     rborder = config.fontsize*2
 
@@ -262,22 +267,9 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     # pixels.
     # Use yscale and xscale to scale to/and from data coordinates.
 
-    # Amount by which tick shoots out at the bottom.
-    overshoot = 16
-
     # Colour legend.
     out.write("<g id='legend'>\n")
-    # (and range indicators for each series)
-    # Start of the top line of text for the legend.
-    yleg = overshoot+config.fontsize
-    for i,(id12,(data,begin)) in enumerate(sorted(datadict.items())):
-        length = len(data)//K
-        y = yleg + config.fontsize*i
-        out.write("  <text alignment-baseline='middle'"
-          " text-anchor='end' x='0' y='%d'>%s</text>\n" %
-          (y, id12))
-        out.write("  <g class='record%s'><path d='M%.1f %dl%.1f 0' /></g>\n" %
-          (id12, (begin-minyear)*config.xscale, y, length*config.xscale))
+    render_legend(datadict, minyear, out)
     # End of legend group
     out.write("</g>\n")
 
@@ -291,13 +283,14 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     tickat = range(s, w+1, 10)
     out.write("  <path d='" +
       ''.join(map(lambda x: 'M%d %.1fl0 %.1f' %
-      (x*config.xscale, overshoot, -(plotheight+overshoot)), tickat)) +
+      (x*config.xscale, config.overshoot, -(plotheight+config.overshoot)),
+      tickat)) +
       "' />\n")
     # Horizontal labels.
     for x in tickat:
         out.write("  <text text-anchor='middle'"
           " font-size='%.1f' x='%d' y='%d'>%d</text>\n" %
-          (config.fontsize, x*config.xscale, overshoot, minyear+x))
+          (config.fontsize, x*config.xscale, config.overshoot, minyear+x))
     # Vertical axis.
     out.write("  <g id='vaxis' font-size='%.1f' text-anchor='end'>" %
       config.fontsize)
@@ -360,6 +353,30 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
         out.write("</g>\n")
     out.write("</g>\n" * 4)
     out.write("</svg>\n")
+
+def legend_height(datadict):
+    """Height of the legend.  Seems to include the x-axis label (?)"""
+
+    if config.legend == 'pianola':
+        return config.fontsize*(len(datadict)+1)
+    else:
+        return config.fontsize
+
+def render_legend(datadict, minyear, out):
+    """Write the SVG for the legend onto the stream *out*."""
+    # Includes range indicators for each series.
+    # Start of the top line of text for the legend.
+
+    if config.legend == 'pianola':
+        yleg = config.overshoot+config.fontsize
+        for i,(id12,(data,begin)) in enumerate(sorted(datadict.items())):
+            length = len(data)//K
+            y = yleg + config.fontsize*i
+            out.write("  <text alignment-baseline='middle'"
+              " text-anchor='end' x='0' y='%d'>%s</text>\n" %
+              (y, id12))
+            out.write("  <g class='record%s'><path d='M%.1f %dl%.1f 0' /></g>\n" %
+              (id12, (begin-minyear)*config.xscale, y, length*config.xscale))
 
 def cssidescape(identifier):
     """Escape an identifier so that it is suitable for use as a CSS
@@ -612,10 +629,12 @@ def update_config(config, v):
         attr,value = binding.split('=')
         attr = attr.strip()
         value = value.strip()
-        try:
-            value = int(value)
-        except ValueError:
-            value = float(value)
+        for convert in [int, float, str]:
+            try:
+                value = convert(value)
+                break
+            except ValueError:
+                pass
         setattr(config, attr, value)
     return config
 

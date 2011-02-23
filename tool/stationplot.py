@@ -315,6 +315,9 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
         out.write(("  <text alignment-baseline='middle'"
           " x='-8' y='%.1f'>" + tickfmt + "</text>\n") %
           (-y, (y+ybottom)/float(config.yscale)))
+    # Horizontal rule at datum==0
+    out.write("  <path d='M0 %.1fl%.1f 0' />\n" % (ybottom, plotwidth))
+
     # Vertical label.
     out.write("  <defs><path id='pvlabel' d='M-%d -20l0 -400'/></defs>\n" %
       (3.5*config.fontsize-8))

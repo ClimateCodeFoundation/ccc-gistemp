@@ -319,14 +319,15 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     out.write("  <path d='M0 %.1fl%.1f 0' />\n" % (ybottom, plotwidth))
 
     # Vertical label.
-    out.write("  <defs><path id='pvlabel' d='M-%d -20l0 -400'/></defs>\n" %
-      (3.5*config.fontsize-8))
+    out.write("  <defs><path id='pvlabel' d='M-%d %.1fl0 -800'/></defs>\n" %
+      (3.5*config.fontsize-8, -plotheight*0.5+400))
+    # :todo: make label configurable.
     if 'temp' in mode:
         value = 'Temperature'
     else:
         value = 'Anomaly'
-    out.write("  <text text-anchor='start'>"
-      "<textPath xlink:href='#pvlabel'>"
+    out.write("  <text text-anchor='middle'>"
+      "<textPath xlink:href='#pvlabel' startOffset='50%%'>"
       u"%s (\N{DEGREE SIGN}C)</textPath></text>\n" % value)
     # End of vertical axis group.
     out.write("</g>\n")

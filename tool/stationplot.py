@@ -18,7 +18,13 @@
 Usage: python stationplot.py [options] station-id
 
 The options are:
-  [-a] [-y] [-d v2.mean] [-o file.svg] [-t YYYY,YYYY] [-s 0.01] [-c config]
+  [-a] [-y]
+  [-c config]
+  [-d v2.mean]
+  [-o file.svg]
+  [--offset +0.2]
+  [-t YYYY,YYYY]
+  [-s 0.01]
 
 Tool to plot the records for a station.  Stations have an 11-digit
 identifier, and in the GHCN file v2.mean they have a single digit added, the
@@ -33,6 +39,12 @@ Anomalies can be plotted (each datum has the mean for that month
 subtracted from it) by using the -a option.  The -y option will compute
 monthly anomalies and then average them in blocks of 12 to form yearly
 (annual) anomalies.
+
+Series can be offset vertically using the --offset option.  Each station
+in the argument list will be progressively offset by the value of the
+argument.  Positive offsets will cause the data on the chart to be
+displaced vertically.  All of the duplicates for a station will be
+offset by the same amount.
 
 The -t option will restrict the time axis so that only records between
 the beginning of the first year and the beginning of the second year are
@@ -153,7 +165,8 @@ def aplot(series, K):
             continue
         yield list(block)
 
-def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
+def plot(arg, inp, out, meta, timewindow=None, mode='temp',
+  offset=0.0, scale=0.1):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
     name, location) is taken from the `meta` file (usually v2.inv).
@@ -172,7 +185,7 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp', scale=0.1):
     def valid(datum):
         return datum != BAD
 
-    datadict = asdict(arg, inp, mode, scale)
+    datadict = asdict(arg, inp, mode, offset=offset, scale=scale)
     if not datadict:
         raise Error('No data found for %s' % (', '.join(arg)))
         
@@ -556,14 +569,19 @@ def from_lines(lines, scale=0.1):
     return from_years(years)
         
 
-def asdict(arg, inp, mode, scale=0.1):
+def asdict(arg, inp, mode, offset=0.0, scale=0.1):
     """`arg` should be a list of 11-digit station identifiers or
     12-digit record identifiers.  The records from `inp` are extracted
     and returned as a dictionary (that maps identifiers to (data,begin)
     pair).  If `mode` is 'anom' then data are converted to monthly
     anomalies; if `mode` is 'annual' then data are converted to annual
     anomalies (using the GISTEMP algorithm that copes with missing
-    months).
+    months).  *offset* can be used to offset each station.  The first
+    station in the *arg* list will have no offset, each subsequent
+    station will have its data biased by adding *offset* (the offset
+    increasing arithmetically for each station).  All of the duplicates
+    for a given station will be offset by the same amount.  The visual
+    effect is to displace stations upward (if the offset is positive).
     """
 
     # Clear Climate Code, tool directory
@@ -574,6 +592,7 @@ def asdict(arg, inp, mode, scale=0.1):
     v2 = v2index.File(inp)
 
     table = {}
+    running_offset = 0.0
     for id in arg:
         for id12,rows in v2.get(id):
             data,begin = from_lines(rows, scale)
@@ -581,9 +600,18 @@ def asdict(arg, inp, mode, scale=0.1):
                 series.anomalize(data, None)
             if mode == 'annual':
                 _, data = series.monthly_annual(data)
+            data = apply_data_offset(data, running_offset)
             table[id12] = (data,begin)
+        running_offset += offset
 
     return table
+
+def apply_data_offset(data, offset):
+    def off(x):
+        if x != BAD:
+           return x+offset
+        return x
+    return [off(x) for x in data]
 
 def colour_iter(background=(255,255,255)):
     """Generate a random sequence of colours, all different."""
@@ -664,7 +692,7 @@ def main(argv=None):
     try:
         infile = 'input/v2.mean'
         metafile = 'input/v2.inv'
-        opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:s:t:y')
+        opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:s:t:y', ['offset='])
         if not arg:
             raise Usage('At least one identifier must be supplied.')
         outfile = arg[0] + '.svg'
@@ -672,6 +700,8 @@ def main(argv=None):
         for k,v in opt:
             if k == '-c':
                 update_config(config, v)
+            if k == '--offset':
+                key['offset'] = float(v)
             if k == '-a':
                 key['mode'] = 'anom'
             if k == '-o':

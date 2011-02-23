@@ -340,6 +340,8 @@ def nature201102(arg):
     (expects to find a completed result directory).
     """
 
+    import os
+
     out = open('nature.v2', 'w')
     labels=['_ccc-gistemp', 'NASA_GISTEMP']
 
@@ -353,6 +355,14 @@ def nature201102(arg):
 
     stationplot.main(
       ("stationplot -o nature.svg -c yscale=300;ytick=0.2;legend=none -s 0.01 -y -d nature.v2 %s %s" % tuple(labels)).split())
+    print "generating PDF..."
+    # Expects to find "inkscape" on PATH.
+    # On drj's Mac, add
+    # "/Applications/Inkscape.app/Contents/Resources/bin" to the PATH
+    # first.
+    # See http://inkscape.modevia.com/inkscape-man.html for inkscape
+    # command line use.
+    os.system('inkscape --export-pdf=nature.pdf nature.svg')
 
 
 def kmlpolystyle(color, id):

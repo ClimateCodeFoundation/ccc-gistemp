@@ -345,12 +345,12 @@ def nature201102(arg):
     # Download GISTEMP global result and copy together with the global
     # result on local disk to a GHCN v2 format file, 'nature.v2'
     out = open('nature.v2', 'w')
-    labels=['_ccc-gistemp', 'NASA_GISTEMP']
+    labels=['_ccc-gistemp', 'NASA_GISTEMP', 'cccNASA_diff']
 
     print "fetching data..."
     dotabletov2(['result/mixedGLB.Ts.ho2.GHCN.CL.PA.txt',
       'http://data.giss.nasa.gov/gistemp/tabledata/GLB.Ts+dSST.txt'], out,
-      labels=labels)
+      labels=labels[:2])
     out.close()
 
     # Compute difference series: ccc-gistemp - GISTEMP:
@@ -364,15 +364,16 @@ def nature201102(arg):
     difference = giss_data.Series()
     difference.set_series(stations[0].first_month,
       [p-q for p,q in zip(stations[0].series, stations[1].series)])
-    difference.uid = '_cccNASAdiff'
+    difference.uid = labels[2]
     w = gio.GHCNV2Writer(file=open(out.name, 'a'))
     w.write(difference)
+    w.close()
 
     print "generating SVG..."
     from tool import stationplot
 
     stationplot.main(
-      ("stationplot -o nature.svg --offset -0.2 -c yscale=300;ytick=0.2;legend=none -s 0.01 -y -d nature.v2 %s %s" % tuple(labels)).split())
+      ("stationplot -o nature.svg --axes=yyr --offset -0.2 -c rscale=6000;yscale=300;ytick=0.2;legend=none -s 0.01 -y -d nature.v2 %s %s %s" % tuple(labels)).split())
     print "generating PDF..."
     # Expects to find "inkscape" on PATH.
     # On drj's Mac, add

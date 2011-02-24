@@ -24,7 +24,7 @@ The options are:
   [-c config]
   [-d v2.mean]
   [-o file.svg]
-  [--offset +0.2]
+  [--offset 0,+0.2]
   [-t YYYY,YYYY]
   [-s 0.01]
 
@@ -42,10 +42,10 @@ subtracted from it) by using the -a option.  The -y option will compute
 monthly anomalies and then average them in blocks of 12 to form yearly
 (annual) anomalies.
 
-Series can be offset vertically using the --offset option.  Each station
-in the argument list will be progressively offset by the value of the
-argument.  Positive offsets will cause the data on the chart to be
-displaced vertically.  All of the duplicates for a station will be
+Series can be offset vertically using the --offset option.  The argument
+should be a comma separated list of offsets, each offset will be applied
+to the corresponding station (positive offset will shift upwards,
+negative downwards).  All of the duplicates for a station will be
 offset by the same amount.
 
 The -t option will restrict the time axis so that only records between
@@ -98,6 +98,8 @@ config.yscale = 10
 config.rscale = 200
 # Ticks on Y axis (in scaled data units, that is, degrees C).
 config.ytick = 5
+# Ticks on R axis.
+config.rtick = 0.01
 # Style of legend.  'pianola' or 'none'.
 config.legend = 'pianola'
 # Workaround a bug in InkScape when it renders the SVG to PDF.
@@ -174,7 +176,7 @@ def curves(series, K):
         yield list(block)
 
 def plot(arg, inp, out, meta, timewindow=None, mode='temp',
-  offset=0.0, scale=0.1, axes=None):
+  offset=None, scale=0.1, axes=None):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
     name, location) is taken from the `meta` file (usually v2.inv).
@@ -258,12 +260,14 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
         bottom[axis] = math.floor(axismin[axis]*scale-smidgin)
         top[axis] = math.ceil(axismax[axis]*scale+smidgin)
     del axis
+    print axismin, axismax
+    print bottom, top
     # The plot is sized according to the y axis (on the left), the r
     # axis is subsidiary.
     plotheight = top['y'] - bottom['y']
     legendh = legend_height(datadict)
     lborder = 125
-    rborder = config.fontsize*2
+    rborder = 65
 
     out.write("""<svg width='%dpx' height='%dpx'
       xmlns="http://www.w3.org/2000/svg"
@@ -326,9 +330,9 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
             (config.fontsize, x*config.xscale, config.overshoot, minyear+x))
       # Vertical axis.
       with Tag(out, 'g', attr={'id':'vaxis',
-        'font-size':('%.1f' % config.fontsize),
-        'text-anchor':'end'}):
-          render_vaxis(out, 'y', mode, bottom, plotheight, plotwidth)
+        'font-size':('%.1f' % config.fontsize),}):
+          for axis in axesused:
+              render_vaxis(out, axis, mode, bottom, top, plotwidth)
 
           # Horizontal rule at datum==0
           out.write("  <path d='M0 %.1fl%.1f 0' />\n" %
@@ -427,65 +431,75 @@ def render_legend(out, datadict, minyear):
             out.write("  <g class='record%s'><path d='M%.1f %dl%.1f 0' /></g>\n" %
               (id12, (begin-minyear)*config.xscale, y, length*config.xscale))
 
-def render_vaxis(out, axis, mode, bottom, plotheight, plotwidth):
+def render_vaxis(out, axis, mode, bottom, top, plotwidth):
     """Either the 'y' (on left) or the 'r' axis (on right)."""
 
-    vscale = getattr(config, axis+'scale')
-    tick = getattr(config, axis+'tick')
-
-    # Ticks on the vertical axis.
-    # Ticks every *tick* degrees C.
-    every = tick*vscale
-    # Works best when *every* is an integer.
-    assert int(every) == every
-    every = int(every)
-    # *s* the offset, in pixels, of the lowest tick from the bottom of
-    # the chart.
-    s = (-bottom['y']) % every
-    tickat = [x+s for x in range(0, int(plotheight+1-s), every)]
-    # *tickvec* is negative (to the left) for the y-axis, positive (to
-    # the right) for the r-axis.
-    tickvec = dict(y=-8,r=+8)[axis]
-    # x coordinate of the axis to be drawn.
-    if axis == 'y':
-        xcoord = 0
-    elif axis == 'r':
-        xcoord = plotwidth
-    # The actual tick marks.
-    out.write("  <path d='" +
-      ''.join(['M%.1f %.1fl%d 0' % (xcoord, -y, tickvec) for y in tickat]) +
-      "' />\n")
-    # The labels for the ticks.
-    # *prec* gives the number of figures after the decimal point for the
-    # y-axis tick label.
-    prec = -int(round(math.log10(tick) - 0.001))
-    prec = max(0, prec)
-    tickfmt = '%%.%df' % prec
-    # A y offset used to correct for a bug when InkScape renders to PDF
-    # (alignment-baseline is ignored, and the labels are half a line too
-    # high).
-    if config.buginkscapepdf:
-        yoffset = config.fontsize * 0.3
+    if 'y' == axis:
+        anchor = 'end'
     else:
-        yoffset = 0
-    for y in tickat:
-        # Note: "%.0f' % 4.999 == '5'
-        out.write(("  <text alignment-baseline='middle'"
-          " x='-8' y='%.1f'>" + tickfmt + "</text>\n") %
-          (-y+yoffset, (y+bottom['y'])/float(vscale)))
+        anchor = 'start'
+    with Tag(out, 'g', attr={'text-anchor':anchor}):
+        vscale = getattr(config, axis+'scale')
+        tick = getattr(config, axis+'tick')
+        # Height, in pixels, of the range of data on this axis.
+        height = top[axis] - bottom[axis]
 
-    # Vertical label.
-    out.write(
-      "  <defs><path id='pvlabel' d='M-%d %.1fl0 -800'/></defs>\n" %
-      (3.5*config.fontsize-8, -plotheight*0.5+400))
-    # :todo: make label configurable.
-    if 'temp' in mode:
-        value = 'Temperature'
-    else:
-        value = 'Anomaly'
-    out.write("  <text text-anchor='middle'>"
-      "<textPath xlink:href='#pvlabel' startOffset='50%%'>"
-      u"%s (\N{DEGREE SIGN}C)</textPath></text>\n" % value)
+        # Ticks on the vertical axis.
+        # Ticks every *tick* degrees C.
+        every = tick*vscale
+        # Works best when *every* is an integer.
+        assert int(every) == every
+        every = int(every)
+        # *s* the offset, in pixels, of the lowest tick from the bottom of
+        # the chart.
+        s = (-bottom[axis]) % every
+        tickat = [x+s for x in range(0, int(height+1-s), every)]
+        # *tickvec* is negative (to the left) for the y-axis, positive (to
+        # the right) for the r-axis.
+        tickvec = dict(y=-8,r=+8)[axis]
+        # x coordinate of the axis to be drawn.
+        if axis == 'y':
+            xcoord = 0
+        elif axis == 'r':
+            xcoord = plotwidth
+        # The actual tick marks.
+        out.write("  <path d='" +
+          ''.join(['M%.1f %.1fl%d 0' % (xcoord, -y, tickvec) for y in tickat]) +
+          "' />\n")
+
+        # The labels for the ticks.
+        # *prec* gives the number of figures after the decimal point for the
+        # y-axis tick label.
+        prec = -int(round(math.log10(tick) - 0.001))
+        prec = max(0, prec)
+        tickfmt = '%%.%df' % prec
+        # A y offset used to correct for a bug when InkScape renders to PDF
+        # (alignment-baseline is ignored, and the labels are half a line too
+        # high).
+        if config.buginkscapepdf:
+            yoffset = config.fontsize * 0.3
+        else:
+            yoffset = 0
+        print >> sys.stderr, axis, top, bottom, vscale, tickat
+        for y in tickat:
+            # Note: "%.0f' % 4.999 == '5'
+            out.write(("  <text alignment-baseline='middle'"
+              " x='%.1f' y='%.1f'>" + tickfmt + "</text>\n") %
+              (xcoord+tickvec, -y+yoffset, (y+bottom[axis])/float(vscale)))
+
+        # Vertical label.  Only for y axis.
+        if 'y' == axis:
+            out.write(
+              "  <defs><path id='pvlabel' d='M-%d %.1fl0 -800'/></defs>\n" %
+              (3.5*config.fontsize-8, -height*0.5+400))
+            # :todo: make label configurable.
+            if 'temp' in mode:
+                value = 'Temperature'
+            else:
+                value = 'Anomaly'
+            out.write("  <text text-anchor='middle'>"
+              "<textPath xlink:href='#pvlabel' startOffset='50%%'>"
+              u"%s (\N{DEGREE SIGN}C)</textPath></text>\n" % value)
 
 def cssidescape(identifier):
     """Escape an identifier so that it is suitable for use as a CSS
@@ -661,7 +675,7 @@ def from_lines(lines, scale=0.1):
     return from_years(years)
         
 
-def asdict(arg, inp, mode, axes, offset=0.0, scale=0.1):
+def asdict(arg, inp, mode, axes, offset=None, scale=0.1):
     """`arg` should be a list of 11-digit station identifiers or
     12-digit record identifiers.  The records from `inp` are extracted
     and returned as a dictionary (that maps identifiers to (data,begin)
@@ -684,17 +698,17 @@ def asdict(arg, inp, mode, axes, offset=0.0, scale=0.1):
     v2 = v2index.File(inp)
 
     table = {}
-    running_offset = 0.0
-    for id,axis in zip(arg, axes):
+    if not offset:
+        offset = [0.0] * len(arg)
+    for id,axis,off in zip(arg, axes, offset):
         for id12,rows in v2.get(id):
             data,begin = from_lines(rows, scale)
             if mode == 'anom':
                 series.anomalize(data, None)
             if mode == 'annual':
                 _, data = series.monthly_annual(data)
-            data = apply_data_offset(data, running_offset)
+            data = apply_data_offset(data, off)
             table[id12] = (data,begin,axis)
-        running_offset += offset
 
     return table
 
@@ -796,7 +810,7 @@ def main(argv=None):
             if k == '-c':
                 update_config(config, v)
             if k == '--offset':
-                key['offset'] = float(v)
+                key['offset'] = [float(x) for x in v.split(',')]
             if k == '-a':
                 key['mode'] = 'anom'
             if k == '-o':

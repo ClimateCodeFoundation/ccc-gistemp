@@ -374,7 +374,7 @@ def nature201102(arg):
     from tool import stationplot
 
     stationplot.main(
-      ("stationplot -o nature.svg --axes=yyr --offset -0.2 -c rscale=6000;yscale=300;ytick=0.2;legend=none;buginkscapepdf=1 -s 0.01 -y -d nature.v2 %s %s %s" % tuple(labels)).split())
+      ("stationplot -o nature.svg --axes=yyr --offset 0,-0.2,0 -c rscale=6000;yscale=300;ytick=0.2;legend=none;buginkscapepdf=1 -s 0.01 -y -d nature.v2 %s %s %s" % tuple(labels)).split())
     print "generating PDF..."
     # Expects to find "inkscape" on PATH.
     # On drj's Mac, add

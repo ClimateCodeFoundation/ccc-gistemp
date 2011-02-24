@@ -453,7 +453,14 @@ def render_vaxis(out, axis, mode, bottom, top, plotwidth):
         # *s* the offset, in pixels, of the lowest tick from the bottom of
         # the chart.
         s = (-bottom[axis]) % every
-        tickat = [x+s for x in range(0, int(height+1-s), every)]
+        # Works best when *s* is an integer.
+        assert int(s) == s
+        s = int(s)
+        slimit = height+1
+        # If the top is nearly at a tick mark, force an extra tick mark.
+        if (slimit % every) > .8*every:
+            slimit += every
+        tickat = range(s, int(slimit), every)
         # *tickvec* is negative (to the left) for the y-axis, positive (to
         # the right) for the r-axis.
         tickvec = dict(y=-8,r=+8)[axis]
@@ -480,7 +487,6 @@ def render_vaxis(out, axis, mode, bottom, top, plotwidth):
             yoffset = config.fontsize * 0.3
         else:
             yoffset = 0
-        print >> sys.stderr, axis, top, bottom, vscale, tickat
         for y in tickat:
             # Note: "%.0f' % 4.999 == '5'
             out.write(("  <text alignment-baseline='middle'"

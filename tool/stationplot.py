@@ -100,6 +100,8 @@ config.rscale = 200
 config.ytick = 5
 # Style of legend.  'pianola' or 'none'.
 config.legend = 'pianola'
+# Workaround a bug in InkScape when it renders the SVG to PDF.
+config.buginkscapepdf = False
 
 def derive_config(config):
     """Some configuration parameters are derived from others if they
@@ -172,7 +174,7 @@ def curves(series, K):
         yield list(block)
 
 def plot(arg, inp, out, meta, timewindow=None, mode='temp',
-  offset=0.0, scale=0.1, axes=None, buginkscapepdf=False):
+  offset=0.0, scale=0.1, axes=None):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
     name, location) is taken from the `meta` file (usually v2.inv).
@@ -440,11 +442,18 @@ def render_yaxis(out, mode, bottom, plotheight, plotwidth):
     prec = -int(round(math.log10(config.ytick) - 0.001))
     prec = max(0, prec)
     tickfmt = '%%.%df' % prec
+    # A y offset used to correct for a bug when InkScape renders to PDF
+    # (alignment-baseline is ignored, and the labels are half a line too
+    # high).
+    if config.buginkscapepdf:
+        yoffset = config.fontsize * 0.3
+    else:
+        yoffset = 0
     for y in tickat:
         # Note: "%.0f' % 4.999 == '5'
         out.write(("  <text alignment-baseline='middle'"
           " x='-8' y='%.1f'>" + tickfmt + "</text>\n") %
-          (-y, (y+bottom['y'])/float(config.yscale)))
+          (-y+yoffset, (y+bottom['y'])/float(config.yscale)))
     # Horizontal rule at datum==0
     out.write("  <path d='M0 %.1fl%.1f 0' />\n" %
       (bottom['y'], plotwidth))
@@ -768,8 +777,6 @@ def main(argv=None):
         for k,v in opt:
             if k == '--axes':
                 key['axes'] = v
-            if k == '--buginkscape':
-                key['buginkscapepdf'] = True
             if k == '-c':
                 update_config(config, v)
             if k == '--offset':

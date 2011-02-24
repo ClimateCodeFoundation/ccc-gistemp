@@ -95,6 +95,7 @@ config.overshoot = 16
 config.xscale = 6
 # Pixels per degree C.
 config.yscale = 10
+config.rscale = 200
 # Ticks on Y axis (in scaled data units, that is, degrees C).
 config.ytick = 5
 # Style of legend.  'pianola' or 'none'.
@@ -138,11 +139,14 @@ gray
 #a6cee3
 """.split()
 
-def aplot(series, K):
-    """`series` is a (data,begin) pair.  Each datum is enumerated with
-    its fractional year coordinate, and the entire series is split into
-    contiguous chunks.  The results are intended to be suitable for
-    plotting.
+def curves(series, K):
+    """`series` is a (data,begin) pair.  The output is a number of
+    curves, each curves specified by (x,y) pairs: Each input datum
+    becomes a y-coordinate and its associated x-coordinate is 
+    its fractional year.  There is one curve for each contiguous chunk
+    of data.
+
+    The results are intended to be suitable for plotting.
 
     *K* is the number of data items per year.  This is 12 for monthly
     data; 1 for annual data.
@@ -160,7 +164,7 @@ def aplot(series, K):
         for m,datum in enumerate(data):
             yield (first + (m+0.5)/K, datum)
 
-    data,first = series
+    data,first,_ = series
 
     for isbad,block in groupby(enum_frac(data), lambda x: x[1] == BAD):
         if isbad:
@@ -187,7 +191,7 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
     def valid(datum):
         return datum != BAD
 
-    datadict = asdict(arg, inp, mode, offset=offset, scale=scale)
+    datadict = asdict(arg, inp, mode, axes='yyr', offset=offset, scale=scale)
     if not datadict:
         raise Error('No data found for %s' % (', '.join(arg)))
         
@@ -209,36 +213,46 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
     # Calculate first and last year, and highest and lowest temperature.
     minyear = 9999
     limyear = -9999
-    highest = -9999
-    lowest = 9999
+    # Max and mins for the data that are assigned to each of the two
+    # vertical axes.
+    axismax = dict(r=-9999, y=-9999)
+    axismin = dict(r=9999, y=9999)
     if timewindow:
         # :todo: make work with mode=annual
         datadict = window(datadict, timewindow)
-    for _,(data,begin) in datadict.items():
+    for _,(data,begin,axis) in datadict.items():
         minyear = min(minyear, begin)
         limyear = max(limyear, begin + (len(data)//K))
         valid_data = filter(valid, data)
         ahigh = max(valid_data)
         alow = min(valid_data)
-        highest = max(highest, ahigh)
-        lowest = min(lowest, alow)
+        axismax[axis] = max(axismax[axis], ahigh)
+        axismin[axis] = min(axismin[axis], alow)
     # The data should be such that a station cannot have entirely
     # invalid data.  At least one year should have at least one valid
     # datum.
-    assert highest > -9999
-    assert lowest < 9999
+    assert axismax['y'] > -9999
+    assert axismin['y'] < 9999
 
     # Bounds of the box that displays data.  In SVG viewBox format.
-    databox = (minyear, lowest, limyear-minyear, highest-lowest)
+    databox = (minyear, axismin['y'],
+      limyear-minyear, axismax['y']-axismin['y'])
 
     plotwidth = databox[2] * config.xscale
 
     # Bottom edge and top edge of plot area, after data has been scaled.
     # Forcing them to be integers means our plot can be aligned on
     # integer coordinates.
-    ybottom = math.floor((lowest-0.05)*config.yscale)
-    ytop = math.ceil((highest+0.05)*config.yscale)
-    plotheight = ytop - ybottom
+    bottom = {}
+    top = {}
+    for axis in 'yr':
+        scale = getattr(config, axis+'scale')
+        bottom[axis] = math.floor((axismin[axis]-0.05)*scale)
+        top[axis] = math.floor((axismax[axis]+0.05)*scale)
+    del axis
+    # The plot is sized according to the y axis (on the left), the r
+    # axis is subsidiary.
+    plotheight = top['y'] - bottom['y']
     legendh = legend_height(datadict)
     lborder = 125
     rborder = config.fontsize*2
@@ -312,7 +326,7 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
           # Works best when *every* is an integer.
           assert int(every) == every
           every = int(every)
-          s = (-ybottom) % every
+          s = (-bottom['y']) % every
           tickat = map(lambda x:x+s, range(0, int(plotheight+1-s), every))
           out.write("  <path d='" +
             ''.join(map(lambda y: 'M0 %.1fl-8 0' % -y, tickat)) +
@@ -326,9 +340,10 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
               # Note: "%.0f' % 4.999 == '5'
               out.write(("  <text alignment-baseline='middle'"
                 " x='-8' y='%.1f'>" + tickfmt + "</text>\n") %
-                (-y, (y+ybottom)/float(config.yscale)))
+                (-y, (y+bottom['y'])/float(config.yscale)))
           # Horizontal rule at datum==0
-          out.write("  <path d='M0 %.1fl%.1f 0' />\n" % (ybottom, plotwidth))
+          out.write("  <path d='M0 %.1fl%.1f 0' />\n" %
+            (bottom['y'], plotwidth))
 
           # Vertical label.
           out.write(
@@ -347,26 +362,36 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
 
       # Transform so that up (on data chart) is +ve.
       with Tag(out, 'g', attr=dict(transform='scale(1, -1)')):
-        # Transform so that plot lower left is at (0,0):
-        with Tag(out, 'g', attr=dict(transform='translate(0,%.0f)' % -ybottom)):
-          xdatabox = (0, ybottom, databox[2]*config.xscale,
+          xdatabox = (0, 0, databox[2]*config.xscale,
             databox[3]*config.yscale)
           out.write("""<rect class='debug'
             x='%d' y='%.1f' width='%d' height='%.1f'
             stroke='pink' fill='none' opacity='0.30' />\n""" % xdatabox)
 
-          def scale(points):
-              """Take a sequence of (year,datum) pairs and scale using
-              config.xscale and config.yscale to be in a coordinate system
-              where (minyear,0) is at 0,0 and we're 1 to 1 with SVG pixels.
+          def scale(points, vaxis='y'):
+              """Take a sequence of (year,datum) pairs and scale onto
+              the databox (which has 0,0 at lower left and is 1 to 1
+              with SVG pixels)).
+
+              *minyear* and *config.xscale* are used to scale the x value.
+
+	      There can be multiple vertical axes and multiple
+	      scales.  If *vaxis* is 'y' then *y* values are
+	      transformed into (y*config.yscale - ybottom); if
+	      *vaxis* is 'r' (for right) then *y* values are
+	      transformed into (y*config.rscale - rbottom).
               """
 
-              return [((x-minyear)*config.xscale, y*config.yscale)
+              subtrahend = bottom[vaxis]
+              vscale = getattr(config, vaxis+'scale')
+
+              scaled = [((x-minyear)*config.xscale, y*vscale - subtrahend)
                 for x,y in points]
+              return scaled
 
           for id12,series in datadict.items():
               out.write("<g class='record%s'>\n" % id12)
-              for segment in aplot(series, K):
+              for segment in curves(series, K):
                   out.write(aspath(scale(segment))+'\n')
               out.write("</g>\n")
       out.write("</g>\n")
@@ -415,7 +440,7 @@ def render_legend(datadict, minyear, out):
 
     if config.legend == 'pianola':
         yleg = config.overshoot+config.fontsize
-        for i,(id12,(data,begin)) in enumerate(sorted(datadict.items())):
+        for i,(id12,(data,begin,_)) in enumerate(sorted(datadict.items())):
             length = len(data)//K
             y = yleg + config.fontsize*i
             out.write("  <text alignment-baseline='middle'"
@@ -598,7 +623,7 @@ def from_lines(lines, scale=0.1):
     return from_years(years)
         
 
-def asdict(arg, inp, mode, offset=0.0, scale=0.1):
+def asdict(arg, inp, mode, axes, offset=0.0, scale=0.1):
     """`arg` should be a list of 11-digit station identifiers or
     12-digit record identifiers.  The records from `inp` are extracted
     and returned as a dictionary (that maps identifiers to (data,begin)
@@ -622,7 +647,7 @@ def asdict(arg, inp, mode, offset=0.0, scale=0.1):
 
     table = {}
     running_offset = 0.0
-    for id in arg:
+    for id,axis in zip(arg, axes):
         for id12,rows in v2.get(id):
             data,begin = from_lines(rows, scale)
             if mode == 'anom':
@@ -630,7 +655,7 @@ def asdict(arg, inp, mode, offset=0.0, scale=0.1):
             if mode == 'annual':
                 _, data = series.monthly_annual(data)
             data = apply_data_offset(data, running_offset)
-            table[id12] = (data,begin)
+            table[id12] = (data,begin,axis)
         running_offset += offset
 
     return table

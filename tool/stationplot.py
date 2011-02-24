@@ -172,7 +172,7 @@ def curves(series, K):
         yield list(block)
 
 def plot(arg, inp, out, meta, timewindow=None, mode='temp',
-  offset=0.0, scale=0.1, axes=None):
+  offset=0.0, scale=0.1, axes=None, buginkscapepdf=False):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
     name, location) is taken from the `meta` file (usually v2.inv).
@@ -235,6 +235,8 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
     # datum.
     assert axismax['y'] > -9999
     assert axismin['y'] < 9999
+
+    axesused = [k for k,v in axismax.items() if v > -9999]
 
     # Bounds of the box that displays data.  In SVG viewBox format.
     databox = (minyear, axismin['y'],
@@ -300,7 +302,7 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
 
       # Colour legend.
       with Tag(out, 'g', attr=dict(id='legend')):
-          render_legend(datadict, minyear, out)
+          render_legend(out, datadict, minyear)
 
       # Start of "axes" group.
       out.write("<g id='axes'>\n")
@@ -324,43 +326,8 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
       with Tag(out, 'g', attr={'id':'vaxis',
         'font-size':('%.1f' % config.fontsize),
         'text-anchor':'end'}):
-          # Ticks on the vertical axis.
-          # Ticks every *ytick* degrees C.
-          every = config.ytick*config.yscale
-          # Works best when *every* is an integer.
-          assert int(every) == every
-          every = int(every)
-          s = (-bottom['y']) % every
-          tickat = map(lambda x:x+s, range(0, int(plotheight+1-s), every))
-          out.write("  <path d='" +
-            ''.join(map(lambda y: 'M0 %.1fl-8 0' % -y, tickat)) +
-            "' />\n")
-          # *prec* gives the number of figures after the decimal point for the
-          # y-axis tick label.
-          prec = -int(round(math.log10(config.ytick) - 0.001))
-          prec = max(0, prec)
-          tickfmt = '%%.%df' % prec
-          for y in tickat:
-              # Note: "%.0f' % 4.999 == '5'
-              out.write(("  <text alignment-baseline='middle'"
-                " x='-8' y='%.1f'>" + tickfmt + "</text>\n") %
-                (-y, (y+bottom['y'])/float(config.yscale)))
-          # Horizontal rule at datum==0
-          out.write("  <path d='M0 %.1fl%.1f 0' />\n" %
-            (bottom['y'], plotwidth))
+          render_yaxis(out, mode, bottom, plotheight, plotwidth)
 
-          # Vertical label.
-          out.write(
-            "  <defs><path id='pvlabel' d='M-%d %.1fl0 -800'/></defs>\n" %
-            (3.5*config.fontsize-8, -plotheight*0.5+400))
-          # :todo: make label configurable.
-          if 'temp' in mode:
-              value = 'Temperature'
-          else:
-              value = 'Anomaly'
-          out.write("  <text text-anchor='middle'>"
-            "<textPath xlink:href='#pvlabel' startOffset='50%%'>"
-            u"%s (\N{DEGREE SIGN}C)</textPath></text>\n" % value)
       # End of "axes" group.
       out.write("</g>\n")
 
@@ -438,7 +405,7 @@ def legend_height(datadict):
     else:
         return config.fontsize
 
-def render_legend(datadict, minyear, out):
+def render_legend(out, datadict, minyear):
     """Write the SVG for the legend onto the stream *out*."""
     # Includes range indicators for each series.
     # Start of the top line of text for the legend.
@@ -453,6 +420,47 @@ def render_legend(datadict, minyear, out):
               (y, id12))
             out.write("  <g class='record%s'><path d='M%.1f %dl%.1f 0' /></g>\n" %
               (id12, (begin-minyear)*config.xscale, y, length*config.xscale))
+
+def render_yaxis(out, mode, bottom, plotheight, plotwidth):
+    """The whole y axis group."""
+
+    # Ticks on the vertical axis.
+    # Ticks every *ytick* degrees C.
+    every = config.ytick*config.yscale
+    # Works best when *every* is an integer.
+    assert int(every) == every
+    every = int(every)
+    s = (-bottom['y']) % every
+    tickat = map(lambda x:x+s, range(0, int(plotheight+1-s), every))
+    out.write("  <path d='" +
+      ''.join(map(lambda y: 'M0 %.1fl-8 0' % -y, tickat)) +
+      "' />\n")
+    # *prec* gives the number of figures after the decimal point for the
+    # y-axis tick label.
+    prec = -int(round(math.log10(config.ytick) - 0.001))
+    prec = max(0, prec)
+    tickfmt = '%%.%df' % prec
+    for y in tickat:
+        # Note: "%.0f' % 4.999 == '5'
+        out.write(("  <text alignment-baseline='middle'"
+          " x='-8' y='%.1f'>" + tickfmt + "</text>\n") %
+          (-y, (y+bottom['y'])/float(config.yscale)))
+    # Horizontal rule at datum==0
+    out.write("  <path d='M0 %.1fl%.1f 0' />\n" %
+      (bottom['y'], plotwidth))
+
+    # Vertical label.
+    out.write(
+      "  <defs><path id='pvlabel' d='M-%d %.1fl0 -800'/></defs>\n" %
+      (3.5*config.fontsize-8, -plotheight*0.5+400))
+    # :todo: make label configurable.
+    if 'temp' in mode:
+        value = 'Temperature'
+    else:
+        value = 'Anomaly'
+    out.write("  <text text-anchor='middle'>"
+      "<textPath xlink:href='#pvlabel' startOffset='50%%'>"
+      u"%s (\N{DEGREE SIGN}C)</textPath></text>\n" % value)
 
 def cssidescape(identifier):
     """Escape an identifier so that it is suitable for use as a CSS
@@ -760,6 +768,8 @@ def main(argv=None):
         for k,v in opt:
             if k == '--axes':
                 key['axes'] = v
+            if k == '--buginkscape':
+                key['buginkscapepdf'] = True
             if k == '-c':
                 update_config(config, v)
             if k == '--offset':

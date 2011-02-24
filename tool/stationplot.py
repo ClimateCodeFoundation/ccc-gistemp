@@ -140,11 +140,11 @@ gray
 """.split()
 
 def curves(series, K):
-    """`series` is a (data,begin) pair.  The output is a number of
-    curves, each curves specified by (x,y) pairs: Each input datum
-    becomes a y-coordinate and its associated x-coordinate is 
-    its fractional year.  There is one curve for each contiguous chunk
-    of data.
+    """`series` is a (data,begin,axis) tuple (axis is ignored).
+    The output is a number of curves, each curves specified by (x,y)
+    pairs: Each input datum becomes a y-coordinate and its associated
+    x-coordinate is its fractional year.  There is one curve for
+    each contiguous chunk of data.
 
     The results are intended to be suitable for plotting.
 
@@ -172,7 +172,7 @@ def curves(series, K):
         yield list(block)
 
 def plot(arg, inp, out, meta, timewindow=None, mode='temp',
-  offset=0.0, scale=0.1):
+  offset=0.0, scale=0.1, axes=None):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
     name, location) is taken from the `meta` file (usually v2.inv).
@@ -191,7 +191,9 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
     def valid(datum):
         return datum != BAD
 
-    datadict = asdict(arg, inp, mode, axes='yyr', offset=offset, scale=scale)
+    if not axes:
+        axes = 'y' * len(arg)
+    datadict = asdict(arg, inp, mode, axes=axes, offset=offset, scale=scale)
     if not datadict:
         raise Error('No data found for %s' % (', '.join(arg)))
         
@@ -391,8 +393,9 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
 
           for id12,series in datadict.items():
               out.write("<g class='record%s'>\n" % id12)
+              axis = series[2]
               for segment in curves(series, K):
-                  out.write(aspath(scale(segment))+'\n')
+                  out.write(aspath(scale(segment, axis))+'\n')
               out.write("</g>\n")
       out.write("</g>\n")
     out.write("</svg>\n")
@@ -746,12 +749,15 @@ def main(argv=None):
     try:
         infile = 'input/v2.mean'
         metafile = 'input/v2.inv'
-        opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:s:t:y', ['offset='])
+        opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:s:t:y',
+          ['axes=', 'offset='])
         if not arg:
             raise Usage('At least one identifier must be supplied.')
         outfile = arg[0] + '.svg'
         key = {}
         for k,v in opt:
+            if k == '--axes':
+                key['axes'] = v
             if k == '-c':
                 update_config(config, v)
             if k == '--offset':

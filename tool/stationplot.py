@@ -249,8 +249,10 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
     top = {}
     for axis in 'yr':
         scale = getattr(config, axis+'scale')
-        bottom[axis] = math.floor((axismin[axis]-0.05)*scale)
-        top[axis] = math.floor((axismax[axis]+0.05)*scale)
+        # Half a pixel of extra space top and bottom.
+        smidgin = 0.5
+        bottom[axis] = math.floor(axismin[axis]*scale-smidgin)
+        top[axis] = math.ceil(axismax[axis]*scale+smidgin)
     del axis
     # The plot is sized according to the y axis (on the left), the r
     # axis is subsidiary.

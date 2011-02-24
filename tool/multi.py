@@ -342,6 +342,8 @@ def nature201102(arg):
 
     import os
 
+    # Download GISTEMP global result and copy together with the global
+    # result on local disk to a GHCN v2 format file, 'nature.v2'
     out = open('nature.v2', 'w')
     labels=['_ccc-gistemp', 'NASA_GISTEMP']
 
@@ -349,6 +351,22 @@ def nature201102(arg):
     dotabletov2(['result/mixedGLB.Ts.ho2.GHCN.CL.PA.txt',
       'http://data.giss.nasa.gov/gistemp/tabledata/GLB.Ts+dSST.txt'], out,
       labels=labels)
+    out.close()
+
+    # Compute difference series: ccc-gistemp - GISTEMP:
+    import gio
+    from code import giss_data
+
+    reader = gio.GHCNV2Reader(path=out.name)
+    stations = list(reader)
+    assert 2 == len(stations)
+    assert stations[0].first_year == stations[1].first_year
+    difference = giss_data.Series()
+    difference.set_series(stations[0].first_month,
+      [p-q for p,q in zip(stations[0].series, stations[1].series)])
+    difference.uid = '_cccNASAdiff'
+    w = gio.GHCNV2Writer(file=open(out.name, 'a'))
+    w.write(difference)
 
     print "generating SVG..."
     from tool import stationplot

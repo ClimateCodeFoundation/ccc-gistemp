@@ -363,7 +363,8 @@ def nature201102(arg):
     assert stations[0].first_year == stations[1].first_year
     difference = giss_data.Series()
     difference.set_series(stations[0].first_month,
-      [p-q for p,q in zip(stations[0].series, stations[1].series)])
+      [p-q for p,q in zip(stations[0].series, stations[1].series)
+        if p != MISSING and q != MISSING])
     difference.uid = labels[2]
     w = gio.GHCNV2Writer(file=open(out.name, 'a'))
     w.write(difference)

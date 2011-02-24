@@ -328,7 +328,11 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
       with Tag(out, 'g', attr={'id':'vaxis',
         'font-size':('%.1f' % config.fontsize),
         'text-anchor':'end'}):
-          render_yaxis(out, mode, bottom, plotheight, plotwidth)
+          render_vaxis(out, 'y', mode, bottom, plotheight, plotwidth)
+
+          # Horizontal rule at datum==0
+          out.write("  <path d='M0 %.1fl%.1f 0' />\n" %
+            (bottom['y'], plotwidth))
 
       # End of "axes" group.
       out.write("</g>\n")
@@ -423,23 +427,38 @@ def render_legend(out, datadict, minyear):
             out.write("  <g class='record%s'><path d='M%.1f %dl%.1f 0' /></g>\n" %
               (id12, (begin-minyear)*config.xscale, y, length*config.xscale))
 
-def render_yaxis(out, mode, bottom, plotheight, plotwidth):
-    """The whole y axis group."""
+def render_vaxis(out, axis, mode, bottom, plotheight, plotwidth):
+    """Either the 'y' (on left) or the 'r' axis (on right)."""
+
+    vscale = getattr(config, axis+'scale')
+    tick = getattr(config, axis+'tick')
 
     # Ticks on the vertical axis.
-    # Ticks every *ytick* degrees C.
-    every = config.ytick*config.yscale
+    # Ticks every *tick* degrees C.
+    every = tick*vscale
     # Works best when *every* is an integer.
     assert int(every) == every
     every = int(every)
+    # *s* the offset, in pixels, of the lowest tick from the bottom of
+    # the chart.
     s = (-bottom['y']) % every
-    tickat = map(lambda x:x+s, range(0, int(plotheight+1-s), every))
+    tickat = [x+s for x in range(0, int(plotheight+1-s), every)]
+    # *tickvec* is negative (to the left) for the y-axis, positive (to
+    # the right) for the r-axis.
+    tickvec = dict(y=-8,r=+8)[axis]
+    # x coordinate of the axis to be drawn.
+    if axis == 'y':
+        xcoord = 0
+    elif axis == 'r':
+        xcoord = plotwidth
+    # The actual tick marks.
     out.write("  <path d='" +
-      ''.join(map(lambda y: 'M0 %.1fl-8 0' % -y, tickat)) +
+      ''.join(['M%.1f %.1fl%d 0' % (xcoord, -y, tickvec) for y in tickat]) +
       "' />\n")
+    # The labels for the ticks.
     # *prec* gives the number of figures after the decimal point for the
     # y-axis tick label.
-    prec = -int(round(math.log10(config.ytick) - 0.001))
+    prec = -int(round(math.log10(tick) - 0.001))
     prec = max(0, prec)
     tickfmt = '%%.%df' % prec
     # A y offset used to correct for a bug when InkScape renders to PDF
@@ -453,10 +472,7 @@ def render_yaxis(out, mode, bottom, plotheight, plotwidth):
         # Note: "%.0f' % 4.999 == '5'
         out.write(("  <text alignment-baseline='middle'"
           " x='-8' y='%.1f'>" + tickfmt + "</text>\n") %
-          (-y+yoffset, (y+bottom['y'])/float(config.yscale)))
-    # Horizontal rule at datum==0
-    out.write("  <path d='M0 %.1fl%.1f 0' />\n" %
-      (bottom['y'], plotwidth))
+          (-y+yoffset, (y+bottom['y'])/float(vscale)))
 
     # Vertical label.
     out.write(

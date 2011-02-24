@@ -6,6 +6,8 @@
 #
 # David Jones, Clear Climate Code, 2010-03-04
 #
+# Require Python 2.6.
+#
 # For testing purposes it might be interesting to note the following:
 # 61710384000 longest timespan
 # 10160400001 briefest timespan
@@ -264,113 +266,140 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
     out.write("  </style>\n</defs>\n")
 
     # Push chart down and right to give a bit of a border.
-    out.write("<g transform='translate(%.1f,80)'>\n" % lborder)
+    with Tag(out, 'g', attr=dict(transform=('translate(%.1f,80)' % lborder))):
+      # In this section 0,0 is at top left of chart, and +ve y is down.
+      if title:
+          with Tag(out, 'g', attr=dict(id='title')):
+              out.write("  <text font-size='%.1f' x='0' y='-4'>%s</text>\n" %
+                (config.titlesize, title))
 
-    # In this section 0,0 is at top left of chart, and +ve y is down.
-    if title:
-        out.write("  <g id='title'>\n")
-        out.write("  <text font-size='%.1f' x='0' y='-4'>%s</text>\n" %
-          (config.titlesize, title))
-        out.write("  </g>\n")
+      # Transform so that (0,0) on chart is lower left
+      out.write("<g transform='translate(0, %.1f)'>\n" % plotheight)
+      # In this section 0,0 should coincide with bottom left of chart, but
+      # oriented as per SVG default.  +ve y is down.  We are 1-1 with SVG
+      # pixels.
+      # Use yscale and xscale to scale to/and from data coordinates.
 
-    # Transform so that (0,0) on chart is lower left
-    out.write("<g transform='translate(0, %.1f)'>\n" % plotheight)
-    # In this section 0,0 should coincide with bottom left of chart, but
-    # oriented as per SVG default.  +ve y is down.  We are 1-1 with SVG
-    # pixels.
-    # Use yscale and xscale to scale to/and from data coordinates.
+      # Colour legend.
+      with Tag(out, 'g', attr=dict(id='legend')):
+          render_legend(datadict, minyear, out)
 
-    # Colour legend.
-    out.write("<g id='legend'>\n")
-    render_legend(datadict, minyear, out)
-    # End of legend group
-    out.write("</g>\n")
+      # Start of "axes" group.
+      out.write("<g id='axes'>\n")
+      w = limyear - minyear
+      # Ticks on the horizontal axis.
+      s = (-minyear)%10
+      # Where we want ticks, in years offset from the earliest year.
+      # We have ticks every decade.
+      tickat = range(s, w+1, 10)
+      out.write("  <path d='" +
+        ''.join(map(lambda x: 'M%d %.1fl0 %.1f' %
+        (x*config.xscale, config.overshoot, -(plotheight+config.overshoot)),
+        tickat)) +
+        "' />\n")
+      # Horizontal labels.
+      for x in tickat:
+          out.write("  <text text-anchor='middle'"
+            " font-size='%.1f' x='%d' y='%d'>%d</text>\n" %
+            (config.fontsize, x*config.xscale, config.overshoot, minyear+x))
+      # Vertical axis.
+      with Tag(out, 'g', attr={'id':'vaxis',
+        'font-size':('%.1f' % config.fontsize),
+        'text-anchor':'end'}):
+          # Ticks on the vertical axis.
+          # Ticks every *ytick* degrees C.
+          every = config.ytick*config.yscale
+          # Works best when *every* is an integer.
+          assert int(every) == every
+          every = int(every)
+          s = (-ybottom) % every
+          tickat = map(lambda x:x+s, range(0, int(plotheight+1-s), every))
+          out.write("  <path d='" +
+            ''.join(map(lambda y: 'M0 %.1fl-8 0' % -y, tickat)) +
+            "' />\n")
+          # *prec* gives the number of figures after the decimal point for the
+          # y-axis tick label.
+          prec = -int(round(math.log10(config.ytick) - 0.001))
+          prec = max(0, prec)
+          tickfmt = '%%.%df' % prec
+          for y in tickat:
+              # Note: "%.0f' % 4.999 == '5'
+              out.write(("  <text alignment-baseline='middle'"
+                " x='-8' y='%.1f'>" + tickfmt + "</text>\n") %
+                (-y, (y+ybottom)/float(config.yscale)))
+          # Horizontal rule at datum==0
+          out.write("  <path d='M0 %.1fl%.1f 0' />\n" % (ybottom, plotwidth))
 
-    # Start of "axes" group.
-    out.write("<g id='axes'>\n")
-    w = limyear - minyear
-    # Ticks on the horizontal axis.
-    s = (-minyear)%10
-    # Where we want ticks, in years offset from the earliest year.
-    # We have ticks every decade.
-    tickat = range(s, w+1, 10)
-    out.write("  <path d='" +
-      ''.join(map(lambda x: 'M%d %.1fl0 %.1f' %
-      (x*config.xscale, config.overshoot, -(plotheight+config.overshoot)),
-      tickat)) +
-      "' />\n")
-    # Horizontal labels.
-    for x in tickat:
-        out.write("  <text text-anchor='middle'"
-          " font-size='%.1f' x='%d' y='%d'>%d</text>\n" %
-          (config.fontsize, x*config.xscale, config.overshoot, minyear+x))
-    # Vertical axis.
-    out.write("  <g id='vaxis' font-size='%.1f' text-anchor='end'>" %
-      config.fontsize)
-    # Ticks on the vertical axis.
-    # Ticks every *ytick* degrees C.
-    every = config.ytick*config.yscale
-    # Works best when *every* is an integer.
-    assert int(every) == every
-    every = int(every)
-    s = (-ybottom) % every
-    tickat = map(lambda x:x+s, range(0, int(plotheight+1-s), every))
-    out.write("  <path d='" +
-      ''.join(map(lambda y: 'M0 %.1fl-8 0' % -y, tickat)) +
-      "' />\n")
-    # *prec* gives the number of figures after the decimal point for the
-    # y-axis tick label.
-    prec = -int(round(math.log10(config.ytick) - 0.001))
-    prec = max(0, prec)
-    tickfmt = '%%.%df' % prec
-    for y in tickat:
-        # Note: "%.0f' % 4.999 == '5'
-        out.write(("  <text alignment-baseline='middle'"
-          " x='-8' y='%.1f'>" + tickfmt + "</text>\n") %
-          (-y, (y+ybottom)/float(config.yscale)))
-    # Horizontal rule at datum==0
-    out.write("  <path d='M0 %.1fl%.1f 0' />\n" % (ybottom, plotwidth))
+          # Vertical label.
+          out.write(
+            "  <defs><path id='pvlabel' d='M-%d %.1fl0 -800'/></defs>\n" %
+            (3.5*config.fontsize-8, -plotheight*0.5+400))
+          # :todo: make label configurable.
+          if 'temp' in mode:
+              value = 'Temperature'
+          else:
+              value = 'Anomaly'
+          out.write("  <text text-anchor='middle'>"
+            "<textPath xlink:href='#pvlabel' startOffset='50%%'>"
+            u"%s (\N{DEGREE SIGN}C)</textPath></text>\n" % value)
+      # End of "axes" group.
+      out.write("</g>\n")
 
-    # Vertical label.
-    out.write("  <defs><path id='pvlabel' d='M-%d %.1fl0 -800'/></defs>\n" %
-      (3.5*config.fontsize-8, -plotheight*0.5+400))
-    # :todo: make label configurable.
-    if 'temp' in mode:
-        value = 'Temperature'
-    else:
-        value = 'Anomaly'
-    out.write("  <text text-anchor='middle'>"
-      "<textPath xlink:href='#pvlabel' startOffset='50%%'>"
-      u"%s (\N{DEGREE SIGN}C)</textPath></text>\n" % value)
-    # End of vertical axis group.
-    out.write("</g>\n")
-    # End of "axes" group.
-    out.write("</g>\n")
+      # Transform so that up (on data chart) is +ve.
+      with Tag(out, 'g', attr=dict(transform='scale(1, -1)')):
+        # Transform so that plot lower left is at (0,0):
+        with Tag(out, 'g', attr=dict(transform='translate(0,%.0f)' % -ybottom)):
+          xdatabox = (0, ybottom, databox[2]*config.xscale,
+            databox[3]*config.yscale)
+          out.write("""<rect class='debug'
+            x='%d' y='%.1f' width='%d' height='%.1f'
+            stroke='pink' fill='none' opacity='0.30' />\n""" % xdatabox)
 
-    # Transform so that up (on data chart) is +ve.
-    out.write("<g transform='scale(1, -1)'>\n")
-    # Transform so that plot lower left is at (0,0):
-    out.write("<g transform='translate(0,%.0f)'>\n" % -ybottom)
-    xdatabox = (0, ybottom, databox[2]*config.xscale, databox[3]*config.yscale)
-    out.write("""<rect class='debug' x='%d' y='%.1f' width='%d' height='%.1f'
-      stroke='pink' fill='none' opacity='0.30' />\n""" % xdatabox)
+          def scale(points):
+              """Take a sequence of (year,datum) pairs and scale using
+              config.xscale and config.yscale to be in a coordinate system
+              where (minyear,0) is at 0,0 and we're 1 to 1 with SVG pixels.
+              """
 
-    def scale(points):
-        """Take a sequence of (year,datum) pairs and scale using
-        config.xscale and config.yscale to be in a coordinate system
-        where (minyear,0) is at 0,0 and we're 1 to 1 with SVG pixels.
-        """
+              return [((x-minyear)*config.xscale, y*config.yscale)
+                for x,y in points]
 
-        return [((x-minyear)*config.xscale, y*config.yscale) for x,y in points]
-
-    for id12,series in datadict.items():
-        out.write("<g class='record%s'>\n" % id12)
-        for segment in aplot(series, K):
-            out.write(aspath(scale(segment))+'\n')
-        out.write("</g>\n")
-    out.write("</g>\n" * 4)
+          for id12,series in datadict.items():
+              out.write("<g class='record%s'>\n" % id12)
+              for segment in aplot(series, K):
+                  out.write(aspath(scale(segment))+'\n')
+              out.write("</g>\n")
+      out.write("</g>\n")
     out.write("</svg>\n")
 
+
+class Tag(object):
+    """Use in the 'with' statement in order to automatically balance XML
+    tags.
+    """
+
+    def __init__(self, out, name, attr):
+        """Create a context manager (with __enter__ and __exit__
+        methods) that will write out the start and end tags.
+        """
+
+        self.out = out
+        self.name = name
+        self.attr = attr
+
+    def __enter__(self):
+        # http://docs.python.org/release/2.5.4/lib/module-xml.sax.saxutils.html
+        from xml.sax.saxutils import quoteattr
+
+        self.out.write("<%s" % self.name)
+        for name,value in self.attr.items():
+            self.out.write(' %s=%s' % (name, quoteattr(value)))
+        self.out.write('>\n')
+
+    def __exit__(self, *_):
+        self.out.write("</%s>\n" % self.name)
+
+            
 def legend_height(datadict):
     """Height of the legend.  Seems to include the x-axis label (?)"""
 

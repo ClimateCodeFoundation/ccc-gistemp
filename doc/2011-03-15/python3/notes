@@ -1,0 +1,113 @@
+$URL$
+$Rev$
+
+ccc-gistemp Python 3 Case Study
+David Jones, Climate Code Foundation
+2011-03-15
+
+INTRODUCTION
+
+Notes for presenting a case study of the conversion of ccc-gistemp to
+Python 3.  The initial presentation is intended to be made to the Python
+NorthWest group on 2011-03-17.
+
+== Python 3 ==
+
+New version of the language, many deliberately incompatible changes.  To
+ease the transition, use 2to3.  How does ccc-gistemp plan to
+simultaneously support Python 2 and Python 3?  Primarily develop in
+Python 2, but make sure that the code works when run through 2to3.  This
+requires some changes now because the current result of 2to3 doesn't
+work, and will require some small changes to ongoing practice.  At some
+point, we'll run 2to3 and use that as our ongoing code base, dropping
+Python 2.  We currently support Python versions 2.4 through to 2.7.
+We support 4 versions, so numerically that suggests we'll drop Python 2
+support when Python 3.3 is released and we'll switch to supporting
+Python versions 3.0 to 3.3.  There has been one release of Python 3 in
+each of the last 3 years.  Perhaps we'll see Python 3.3 in 2012, and
+we'll be dropping Python 2 support.  Frankly it seems a bit early.
+
+== Clarity ==
+
+Code that is clear in Python 2 isn't necessarily clear once it's been
+through 2to3.  Conversely some code that is clear after it's been
+through 2to3 sometimes doesn't look clear (before 2to3).  During the
+transition period, changes may emphasise the clarity of the 2to3
+translated code, rather than the actual submitted code.
+
+== An amusing bug? ==
+
+Old code:
+
+      lat = i[0]*math.pi/180
+      z = math.sin(lat)
+      c = math.cos(lat)
+      long = i[1]*math.pi/180
+      x = math.cos(long) * c
+      y = math.sin(long) * c
+      return (x,y,z)
+
+New code (after 2to3):
+
+      lat = i[0]*math.pi/180
+      z = math.sin(lat)
+      c = math.cos(lat)
+      long = i[1]*math.pi/180
+      x = math.cos(int) * c
+      y = math.sin(int) * c
+      return (x,y,z)
+
+This code that convert a latitude,longitude coordinate to a 3D cartesian
+x,y,z coordinate.  The variable names are "lat" for latitude and "long"
+for longitude.
+
+Note the change from "long" to "int".  But in this case, "long" is a
+variable name, so it's inappropriate to change it.  The change 2to3 made
+makes the code buggy.  As it happens the code is not usually used.  I
+don't think it occurred to me when I first wrote the code that "long"
+is a Python builtin.  Moral: don't name your variables after Python
+builtins!
+
+There's a similar problem in the function "sigma()" where the argument
+is unwisely called "list".
+
+== Code improvement ==
+
+Old code:
+
+       if helena_ds.has_key(id):
+
+New code:
+
+       if id in helena_ds:
+
+
+== Code worse ==
+
+Old code:
+
+   for i,(sum,count) in enumerate(zip(sums, counts)):
+
+New code:
+
+   for i,(sum,count) in enumerate(list(zip(sums, counts))):
+
+zip in Python 2 returns a list, in Python 3 it returns an iterator (like
+itertools.izip).  So calls to "zip()" are wrapped in "list()".  In this
+case, because enumerate works on iterators as well as lists, the call to
+"list()" is not necessary, but 2to3 doesn't spot that.
+
+== Not caught by 2to3 ==
+
+Old code:
+
+   for y in range(len(series)/12):
+
+Note that in Python 2 the result of "len(series)/12" is an int.  In
+Python 3 the result is a float, even when the exact answer is an integer
+(as it is in this case, len(series) is always a multiple of 12).
+
+Best fix:
+
+   for y in range(len(series)//12):
+

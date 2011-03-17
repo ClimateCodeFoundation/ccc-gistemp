@@ -13,21 +13,30 @@ NorthWest group on 2011-03-17.
 
 == Python 3 ==
 
-New version of the language, many deliberately incompatible changes.  To
-ease the transition, use 2to3.  How does ccc-gistemp plan to
-simultaneously support Python 2 and Python 3?  Primarily develop in
-Python 2, but make sure that the code works when run through 2to3.  This
-requires some changes now because the current result of 2to3 doesn't
-work, and will require some small changes to ongoing practice.  At some
-point, we'll run 2to3 and use that as our ongoing code base, dropping
-Python 2.  We currently support Python versions 2.4 through to 2.7.
-We support 4 versions, so numerically that suggests we'll drop Python 2
-support when Python 3.3 is released and we'll switch to supporting
-Python versions 3.0 to 3.3.  There has been one release of Python 3 in
-each of the last 3 years.  Perhaps we'll see Python 3.3 in 2012, and
-we'll be dropping Python 2 support.  Frankly it seems a bit early.
+New version of the language, many deliberately incompatible changes.
+Python 3.0 was released 2.3 years ago!  To ease the transition, use
+2to3.
+
+How does ccc-gistemp plan to simultaneously support Python 2 and
+Python 3?  Primarily develop in Python 2, but make sure that the
+code works when run through 2to3.  This requires some changes now
+because the current result of 2to3 doesn't work, and will require
+some small changes to ongoing practice.  At some point, we'll run
+2to3 and use that as our ongoing code base, dropping Python 2.  We
+currently support Python versions 2.4 through to 2.7.  We support
+4 versions, so numerically that suggests we'll drop Python 2 support
+when Python 3.3 is released and we'll switch to supporting Python
+versions 3.0 to 3.3.  There has been one release of Python 3 in
+each of the last 3 years.  Perhaps we'll see Python 3.3 in 2012,
+and we'll be dropping Python 2 support.  Frankly it seems a bit
+early.
 
 John Keyes, one of our volunteers, did a preliminary investigation.
+He ran ccc-gistemp through 2to3 and then fixed up any remaining
+problems.  Our plan is to analyse this work, partly presented here, and
+make the necessary changes to the Python 2 code, so that when translated
+with 2to3 it will run without any further changes in Python 3.  I'm very
+grateful for his efforts.
 
 == Clarity ==
 
@@ -37,7 +46,42 @@ through 2to3 sometimes doesn't look clear (before 2to3).  During the
 transition period, changes may emphasise the clarity of the 2to3
 translated code, rather than the actual submitted code.
 
+Simple examples of this abound: Where 2to3 makes it less clear:
+
+Old code:
+
+   for record in t.values():
+
+New code:
+
+   for record in list(t.values()):
+
+In Python 2 "values()" returns a list, but in Python 3 "values()"
+returns an iterator.  2to3 can't tell that either a list or an iterator
+will do in this case, and to be on the safe side it inserts the call to
+"list()".
+
+Where 2to3 makes it more clear:
+
+Old code:
+
+   for v_avg, v_new in itertools.izip(combined, data):
+
+New code:
+
+   for v_avg, v_new in zip(combined, data):
+
+Old code:
+
+       if helena_ds.has_key(id):
+
+New code:
+
+       if id in helena_ds:
+
 == An amusing bug? ==
+
+A salutary lesson in variable naming.
 
 Old code:
 
@@ -73,43 +117,18 @@ builtins!
 There's a similar problem in the function "sigma()" where the argument
 is unwisely called "list".
 
-== Code improvement ==
-
-Old code:
-
-       if helena_ds.has_key(id):
-
-New code:
-
-       if id in helena_ds:
-
-
-== Code worse ==
-
-Old code:
-
-   for i,(sum,count) in enumerate(zip(sums, counts)):
-
-New code:
-
-   for i,(sum,count) in enumerate(list(zip(sums, counts))):
-
-zip in Python 2 returns a list, in Python 3 it returns an iterator (like
-itertools.izip).  So calls to "zip()" are wrapped in "list()".  In this
-case, because enumerate works on iterators as well as lists, the call to
-"list()" is not necessary, but 2to3 doesn't spot that.
-
 == Not caught by 2to3 ==
 
 Old code:
 
    for y in range(len(series)/12):
 
-Note that in Python 2 the result of "len(series)/12" is an int.  In
+2to3 doesn't change this code, but it won't work in Python 3.  That's
+because in Python 2 the result of "len(series)/12" is an int.  In
 Python 3 the result is a float, even when the exact answer is an integer
 (as it is in this case, len(series) is always a multiple of 12).
 
-Best fix:
+Best fix is to use the integer division operator:
 
    for y in range(len(series)//12):
 

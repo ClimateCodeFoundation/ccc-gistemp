@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="1024px"
+   height="768px"
+   id="svg6307"
+   sodipodi:version="0.32"
+   inkscape:version="0.46"
+   sodipodi:docname="slide030.svg"
+   inkscape:output_extension="org.inkscape.output.svg.inkscape">
+  <defs
+     id="defs6309">
+    <inkscape:perspective
+       sodipodi:type="inkscape:persp3d"
+       inkscape:vp_x="0 : 384 : 1"
+       inkscape:vp_y="0 : 1000 : 0"
+       inkscape:vp_z="1024 : 384 : 1"
+       inkscape:persp3d-origin="512 : 256 : 1"
+       id="perspective6315" />
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="0.71"
+     inkscape:cx="512"
+     inkscape:cy="388.70595"
+     inkscape:current-layer="layer1"
+     inkscape:document-units="px"
+     showgrid="false"
+     inkscape:window-width="1052"
+     inkscape:window-height="755"
+     inkscape:window-x="105"
+     inkscape:window-y="22" />
+  <metadata
+     id="metadata6312">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     id="layer1"
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer">
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;font-family:Bitstream Vera Sans"
+       x="161.97182"
+       y="180.67606"
+       id="text6317"><tspan
+         sodipodi:role="line"
+         id="tspan6319"
+         x="161.97182"
+         y="180.67606">      lat = i[0]*math.pi/180</tspan><tspan
+         sodipodi:role="line"
+         x="161.97182"
+         y="230.67607"
+         id="tspan6321">      z = math.sin(lat)</tspan><tspan
+         sodipodi:role="line"
+         x="161.97182"
+         y="280.67609"
+         id="tspan6323">      c = math.cos(lat)</tspan><tspan
+         sodipodi:role="line"
+         x="161.97182"
+         y="330.67609"
+         id="tspan6325">      long = i[1]*math.pi/180</tspan><tspan
+         sodipodi:role="line"
+         x="161.97182"
+         y="380.67609"
+         id="tspan6327">      x = math.cos(<tspan
+   style="fill:#008000;fill-opacity:1"
+   id="tspan6850">long</tspan>) * c</tspan><tspan
+         sodipodi:role="line"
+         x="161.97182"
+         y="430.67609"
+         id="tspan6329">      y = math.sin(<tspan
+   style="fill:#008000;fill-opacity:1"
+   id="tspan6880">long</tspan>) * c</tspan><tspan
+         sodipodi:role="line"
+         x="161.97182"
+         y="480.67609"
+         id="tspan6333">      return (x,y,z)</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:72px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;font-family:Bitstream Vera Sans;-inkscape-font-specification:Bitstream Vera Sans"
+       x="171.83098"
+       y="82.084511"
+       id="text6335"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         id="tspan6337"
+         x="171.83098"
+         y="82.084511">Poor Variable Names</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;font-family:Bitstream Vera Sans"
+       x="161.97182"
+       y="607.43665"
+       id="text6888"><tspan
+         sodipodi:role="line"
+         id="tspan6890"
+         x="161.97182"
+         y="607.43665">      long = i[1]*math.pi/180</tspan><tspan
+         sodipodi:role="line"
+         x="161.97182"
+         y="657.43665"
+         id="tspan6892">      x = math.cos(<tspan
+   style="fill:#800000;fill-opacity:1"
+   id="tspan6906">int</tspan>) * c</tspan><tspan
+         sodipodi:role="line"
+         x="161.97182"
+         y="707.43665"
+         id="tspan6894">      y = math.sin(<tspan
+   style="fill:#800000;fill-opacity:1"
+   id="tspan6908">int</tspan>) * c</tspan><tspan
+         sodipodi:role="line"
+         x="161.97182"
+         y="757.43665"
+         id="tspan6896" /></text>
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;font-family:Bitstream Vera Sans"
+       x="60.563381"
+       y="334.19717"
+       id="text6898"><tspan
+         sodipodi:role="line"
+         id="tspan6900"
+         x="60.563381"
+         y="334.19717">old:</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;font-family:Bitstream Vera Sans"
+       x="64.788734"
+       y="659.54932"
+       id="text6902"><tspan
+         sodipodi:role="line"
+         id="tspan6904"
+         x="64.788734"
+         y="659.54932">new:</tspan></text>
+  </g>
+</svg>

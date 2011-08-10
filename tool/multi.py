@@ -147,7 +147,7 @@ def whatstations(argv):
 
     whatstations --mask maskfile
 
-    Works by examing the log files.
+    Works by examining the log files.
     """
 
     # http://docs.python.org/release/2.4.4/lib/module-getopt.html

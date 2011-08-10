@@ -7,8 +7,6 @@
 # David Jones, Ravenbrook Limited, 2010-01-07
 # Copyright (C) 2008-2010 Ravenbrook Limited.
 
-import os
-
 """
 fetch.py [--help] [input-files] ...
 
@@ -21,6 +19,8 @@ on the internet.  If no arguments are supplied, nothing will be fetched.
 
 # http://www.python.org/doc/2.4.4/lib/module-getopt.html
 import getopt
+# http://docs.python.org/release/2.4.4/lib/module-os.html
+import os
 # http://www.python.org/doc/2.4.4/lib/module-sys.html
 import sys
 # http://www.python.org/doc/2.4.4/lib/module-urllib.html

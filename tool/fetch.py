@@ -6,15 +6,18 @@
 #
 # David Jones, Ravenbrook Limited, 2010-01-07
 # Copyright (C) 2008-2010 Ravenbrook Limited.
+# Copyright (C) 2011 Climate Code Foundation.
 
 """
-fetch.py [--help] [input-files] ...
+fetch.py [--help] [--list] [input-files] ...
 
 Script to fetch (download from the internet) the inputs required for
 the GISTEMP program.
 
 Any input files passed as arguments will be fetched from their locations
 on the internet.  If no arguments are supplied, nothing will be fetched.
+
+--list  List all things that can be fetched.
 """
 
 # http://www.python.org/doc/2.4.4/lib/module-getopt.html
@@ -56,6 +59,40 @@ def fetch(files, prefix='input/', output=sys.stdout):
 
     import itertools
     import os
+
+    place = places()
+
+    # Check that we can fetch the requested files.
+    for n in files:
+        if n not in place:
+            raise Error("Don't know how to fetch %s" % n)
+
+    handler = dict(special, url=fetch_url)
+
+    # Attempt to create the directories required for *prefix*.
+    try:
+        os.makedirs(prefix)
+    except OSError:
+        # Expected if the directories already exist.
+        pass
+
+    # Convert from list of files to list of (*place*, *local*) pairs.
+    # *local* is the localfilename, which will include a compression
+    # extension when the asked-for name might not; *place* is a list of
+    # the form ['url', URL].
+    files = [place[file] for file in files]
+    # sort the list so that places with the same handler get grouped
+    # together.  This is so that we can do multiple extracts from a tar
+    # file in one pass.
+    files.sort()
+    for hname,group in itertools.groupby(files, key=lambda x: x[0][0]):
+        handler[hname](group, prefix, output)
+
+def places():
+    """Return the *place* dict that maps from the name of a file, to
+    where it is found.  The keys of this dict are the files that this
+    program knows how to fetch.
+    """
 
     # See
     # http://groups.google.com/group/ccc-gistemp-discuss/web/compiling-gistemp-source?hl=en
@@ -159,17 +196,6 @@ def fetch(files, prefix='input/', output=sys.stdout):
       '/pub/data/ushcn/v2/monthly']
 
 
-    # A "special" place is one that isn't just an ordinary URL.
-    # Places are identified as being "special" when they are a list
-    # whose first element is a key in this *special* dictionary.
-    # Ordinary strings are assumed to be URLs and are not special.
-    # But the first element of a string is a one character string, so
-    # all *special* keys should be longer than 1 character.
-    special = dict(
-      tar=fetch_tar,
-      zip=fetch_zip,
-      ushcn=fetch_ushcn,
-    )
     def addurl(d):
         """Add 'url' handler to all plain strings."""
         for short, long in d.items():
@@ -200,32 +226,8 @@ def fetch(files, prefix='input/', output=sys.stdout):
     place = dict(removeZ(place))
     # *place* now maps from *name* to a (*long*, *short*) pair; only for
     # compression extensions are *name* and *short* different.
+    return place
 
-    # Check that we can fetch the requested files.
-    for n in files:
-        if n not in place:
-            raise Error("Don't know how to fetch %s" % n)
-
-    handler = dict(special, url=fetch_url)
-
-    # Attempt to create the directories required for *prefix*.
-    try:
-        os.makedirs(prefix)
-    except OSError:
-        # Expected if the directories already exist.
-        pass
-
-    # Convert from list of files to list of (*place*, *local*) pairs.
-    # *local* is the localfilename, which will include a compression
-    # extension when the asked-for name might not; *place* is a list of
-    # the form ['url', URL].
-    files = [place[file] for file in files]
-    # sort the list so that places with the same handler get grouped
-    # together.  This is so that we can do multiple extracts from a tar
-    # file in one pass.
-    files.sort()
-    for hname,group in itertools.groupby(files, key=lambda x: x[0][0]):
-        handler[hname](group, prefix, output)
 
 def fetch_url(l, prefix, output):
     """(helper function used by :meth:`fetch`)
@@ -375,6 +377,19 @@ def fetch_from_tar(inp, want, prefix='input', log=sys.stdout,
                     break
                 out.write(buf)
 
+# A "special" place is one that isn't just an ordinary URL.
+# Places are identified as being "special" when they are a list
+# whose first element is a key in this *special* dictionary.
+# Ordinary strings are assumed to be URLs and are not special.
+# But the first element of a string is a one character string, so
+# all *special* keys should be longer than 1 character.
+# Sorry about the global.
+special = dict(
+  tar=fetch_tar,
+  zip=fetch_zip,
+  ushcn=fetch_ushcn,
+)
+
 def progress_hook(out):
     """Return a progress hook function, suitable for passing to
     urllib.retrieve, that writes to the file object *out*.
@@ -393,6 +408,14 @@ def progress_hook(out):
         out.flush()
     return it
 
+def list_things():
+    """List the things that this program knows how to fetch."""
+
+    things = places().keys()
+    things.sort()
+    for k in things:
+        print k
+
 class Error(Exception):
     """Some sort of problem with fetch."""
 
@@ -406,11 +429,13 @@ def main(argv=None):
         argv = sys.argv
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "", ["help"])
+            opts, args = getopt.getopt(argv[1:], "", ["help", "list"])
             for o,a in opts:
                 if o in ('--help',):
                     print __doc__
                     return 0
+                if o == '--list':
+                    return list_things()
         except getopt.error, msg:
              raise Usage(msg)
         fetch(args)

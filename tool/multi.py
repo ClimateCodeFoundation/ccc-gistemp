@@ -79,26 +79,21 @@ def timecount(argv):
 
     counts(out=sys.stdout, **option)
 
-def counts(mask, out):
-    """Print to out a count for each month of the number of stations
-    used."""
-    
-    log = open('log/step3.log')
-    cells = cellsofmask(open(mask))
+def counts(out, mask=None):
+    """Print to *out* a count for each month of the number of stations
+    used.  *mask* specifies the name of a mask file to be used; only the
+    cells present in the mask file will be examined for station usage."""
 
     # Dictionary that maps from station (12 char identifier) to
     # monthset, where *monthset* is a set of the numbers from 0
     # (January) to 11 (December).
     stationmonths = dict()
-    for row in log:
-        row = row.split(' ', 2)
-        if row[1] != 'stations':
-            continue
+
+    for row in stations_logged(mask):
         stations = json.loads(row[2])
-        if row[0] in cells:
-            for station,weight,months in stations:
-                stationmonths[station] = monthset(months) | stationmonths.get(
-                  station, set())
+        for station,weight,months in stations:
+            stationmonths[station] = monthset(months) | stationmonths.get(
+              station, set())
 
     monthcount = {}
     path = 'work/step2.v2'
@@ -156,28 +151,49 @@ def whatstations(argv):
     option = dict((o[2:],v) for o,v in opts)
     stations(out=sys.stdout, **option)
 
-def stations(mask, out):
-    """Print to *out* a list of the stations used."""
+def stations_logged(mask=None, log='log/step3.log'):
+    """An iterator that yields each of the log records from step3 that
+    identify the stations used (that is, the second item in the row is
+    "stations").  *mask* (optionally) specifies the name of a cell mask
+    file; when used only the cells present in the mask are examined.
+    *log* specifies the name of the log file to examine.
 
-    log = open('log/step3.log')
-    cells = cellsofmask(open(mask))
+    Each log record is yielded as a triple (cellid, 'stations',
+    JSONstring).  *JSONstring* is a string suitable for passing to
+    json.loads().
+    """
 
-    allstations = dict()
-    cellcount = 0
+    log = open(log)
+    if mask:
+        cells = cellsofmask(open(mask))
+
     for row in log:
         row = row.split(' ', 2)
         if row[1] != 'stations':
             continue
-        stations = json.loads(row[2])
-        if row[0] in cells:
-            for item in stations:
-                station,weight = item[:2]
-                if weight:
-                    allstations[station] = max(
-                      allstations.get(station, 0), weight)
-            cellcount += 1
+        if not mask or row[0] in cells:
+            yield row
 
-    print >>out, "Cells: %d/%d" % (cellcount, len(cells))
+
+def stations(out, mask=None):
+    """Print to *out* a list of the stations used."""
+
+    allstations = dict()
+    cellcount = 0
+    for row in stations_logged(mask=mask):
+        stations = json.loads(row[2])
+        for item in stations:
+            station,weight = item[:2]
+            if weight:
+                allstations[station] = max(
+                  allstations.get(station, 0), weight)
+        cellcount += 1
+
+    if mask:
+        ncells = len(cellsofmask(mask))
+    else:
+        ncells = 8000
+    print >>out, "Cells: %d/%d" % (cellcount, ncells)
     print >>out, "Stations: %d" % len(allstations)
     for station,weight in sorted(allstations.iteritems()):
         print >>out, station, weight

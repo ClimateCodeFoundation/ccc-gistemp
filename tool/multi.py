@@ -178,25 +178,33 @@ def stations_logged(mask=None, log='log/step3.log'):
 def stations(out, mask=None):
     """Print to *out* a list of the stations used."""
 
-    allstations = dict()
+    station_weight = dict()
+    station_months = dict()
     cellcount = 0
     for row in stations_logged(mask=mask):
         stations = json.loads(row[2])
         for item in stations:
-            station,weight = item[:2]
+            station,weight,months = item[:3]
             if weight:
-                allstations[station] = max(
-                  allstations.get(station, 0), weight)
+                station_weight[station] = max(
+                  station_weight.get(station, 0), weight)
+                station_months[station] = station_months.get(
+                  station, set()) | monthset(months)
         cellcount += 1
+    
+    def asstr(s):
+        """Convert set of months to string."""
+
+        return ''.join('01'[i in s] for i in range(12))
 
     if mask:
         ncells = len(cellsofmask(mask))
     else:
         ncells = 8000
     print >>out, "Cells: %d/%d" % (cellcount, ncells)
-    print >>out, "Stations: %d" % len(allstations)
-    for station,weight in sorted(allstations.iteritems()):
-        print >>out, station, weight
+    print >>out, "Stations: %d" % len(station_weight)
+    for station,weight in sorted(station_weight.iteritems()):
+        print >>out, station, asstr(station_months[station]), weight
 
 def cellsofmask(inp):
     """*inp* is an open mask file.  The returned value is a set of all

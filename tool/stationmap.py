@@ -17,6 +17,8 @@ input/v2.inv.
 
 import re
 import sys
+# http://docs.python.org/release/2.5.4/lib/module-xml.sax.saxutils.html
+from xml.sax.saxutils import escape
 
 # ccc-gistemp
 import gio
@@ -39,6 +41,8 @@ def map(inp, out=sys.stdout, land=None):
     g.stations {
       stroke: green; stroke-width: 1.4; stroke-linecap: round; fill: none
     }
+    g.stations text { visibility: hidden; }
+    g.stations path:hover + text { stroke: black; visibility: visible; }
     text { fill: black; font-family: Verdana }
   </style></defs>
 """)
@@ -50,14 +54,21 @@ def map(inp, out=sys.stdout, land=None):
 	out.write("\n")
 
     out.write("<g class='stations'>\n")
-    out.write("<g transform='translate(0, 360) scale(1,-1)'>\n")
+    out.write(
+"""<!-- Within this group, Plate Carree projection (equirectangular) used.
+     180 West is x=0; 180 East is 720;
+     90 South is y=360; 90 North is y=0. -->
+""")
     for station in stations(inp):
 	lat,lon = station.lat,station.lon
         lon += 180.0
-        lat += 90.0
+        lat = 90.0 - lat
 	lat,lon = [x*2.0 for x in (lat,lon)]
         out.write("<path d='M%.2f %.2fl0 0' />\n" % (lon,lat))
-    out.write("</g>\n"*2)
+        out.write("<text x='8' y='375'>%s %+06.2f%+07.2f  %s</text>\n" %
+          (station.uid, station.lat, station.lon,
+           escape(' '.join(station.name.split()))))
+    out.write("</g>\n")
     out.write("</svg>\n")
 
 def stations(filenames):

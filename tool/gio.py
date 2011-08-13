@@ -1151,7 +1151,7 @@ def station_metadata(path=None, file=None, format='v2'):
     return result
 
 def augmented_station_metadata(path=None, file=None, format='v2'):
-    """Reads station metadata just like augmented_station_metadata() but
+    """Reads station metadata just like station_metadata() but
     additionally augments records with metadata obtained from another 
     file, specified by parameters.augment_metadata.
     """

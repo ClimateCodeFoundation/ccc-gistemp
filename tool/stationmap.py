@@ -31,12 +31,13 @@ def map(inp, out=sys.stdout):
 """)
     out.write("""<defs>
   <style type="text/css">
-    path { stroke: green; stroke-width: 2.8; stroke-linecap: round; fill: none }
+    g.stations {
+      stroke: green; stroke-width: 1.4; stroke-linecap: round; fill: none }
     text { fill: black; font-family: Verdana }
   </style></defs>
 """)
 
-    out.write("<g id='stations'>\n")
+    out.write("<g class='stations'>\n")
     out.write("<g transform='translate(0, 360) scale(1,-1)'>\n")
     for station in stations(inp):
         lat,lon = station.lat,station.lon

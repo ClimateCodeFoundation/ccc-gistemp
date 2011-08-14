@@ -5,7 +5,7 @@
 # David Jones, 2011-08-13, Climate Code Foundation.
 
 """
-stationmap.py station-list
+stationmap.py [--land land.svg] [--no-text] station-list
 
 Plot the stations on a map (SVG output).
 
@@ -13,6 +13,11 @@ Plot the stations on a map (SVG output).
 and any line starting with 11 alphanumeric characters (no spaces) is
 used.  The location metadata for the stations is taken from the file
 input/v2.inv.
+
+--land specifies an SVG file for the land to be used as a background.
+
+--no-text removes the "hover over" text labels from the SVG output; this
+  is useful for converting the output to PDF with Inkscape.
 """
 
 import re
@@ -23,7 +28,7 @@ from xml.sax.saxutils import escape
 # ccc-gistemp
 import gio
 
-def map(inp, out=sys.stdout, land=None):
+def map(inp, out=sys.stdout, land=None, text=True):
     """Plot stations on map.  *inp* is a list of filenames specifying
     the station IDs.  *land*, if specified, names an SVG file for
     the land to be used as background (this option is really only
@@ -65,9 +70,10 @@ def map(inp, out=sys.stdout, land=None):
         lat = 90.0 - lat
 	lat,lon = [x*2.0 for x in (lat,lon)]
         out.write("<path d='M%.2f %.2fl0 0' />\n" % (lon,lat))
-        out.write("<text x='8' y='375'>%s %+06.2f%+07.2f  %s</text>\n" %
-          (station.uid, station.lat, station.lon,
-           escape(' '.join(station.name.split()))))
+        if text:
+            out.write("<text x='8' y='375'>%s %+06.2f%+07.2f  %s</text>\n" %
+              (station.uid, station.lat, station.lon,
+               escape(' '.join(station.name.split()))))
     out.write("</g>\n")
     out.write("</svg>\n")
 
@@ -96,10 +102,12 @@ def main(argv=None):
         argv = sys.argv
 
     option = {}
-    opts,arg = getopt.getopt(argv[1:], '', ['land='])
+    opts,arg = getopt.getopt(argv[1:], '', ['land=', 'no-text'])
     for o,v in opts:
         if o == '--land':
             option['land'] = v
+        if o == '--no-text':
+            option['text'] = False
 
     map(arg, **option)
 

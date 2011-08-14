@@ -5,7 +5,7 @@
 # David Jones, 2011-08-13, Climate Code Foundation.
 
 """
-stationmap.py [--land land.svg] [--no-text] station-list
+stationmap.py [--clock] [--land land.svg] [--no-text] station-list
 
 Plot the stations on a map (SVG output).
 
@@ -14,12 +14,20 @@ and any line starting with 11 alphanumeric characters (no spaces) is
 used.  The location metadata for the stations is taken from the file
 input/v2.inv.
 
+--clock means that each station is plotted as a "clock" showing the
+  years in which records are present (for this to work, the
+  *station-list* file must be an extract of v2.mean).
+
 --land specifies an SVG file for the land to be used as a background.
 
 --no-text removes the "hover over" text labels from the SVG output; this
   is useful for converting the output to PDF with Inkscape.
 """
 
+# http://docs.python.org/release/2.4.4/lib/module-itertools.html
+import itertools
+import math
+# http://docs.python.org/release/2.4.4/lib/module-re.html
 import re
 import sys
 # http://docs.python.org/release/2.5.4/lib/module-xml.sax.saxutils.html
@@ -28,7 +36,7 @@ from xml.sax.saxutils import escape
 # ccc-gistemp
 import gio
 
-def map(inp, out=sys.stdout, land=None, text=True):
+def map(inp, out=sys.stdout, land=None, text=True, clock=False):
     """Plot stations on map.  *inp* is a list of filenames specifying
     the station IDs.  *land*, if specified, names an SVG file for
     the land to be used as background (this option is really only
@@ -48,6 +56,8 @@ def map(inp, out=sys.stdout, land=None, text=True):
     g.stations {
       stroke: green; stroke-width: 1.4; stroke-linecap: round; fill: none
     }
+    path.R0 { stroke: none; fill: black }
+    path.R1 { stroke: none; fill: red }
     g.stations text { visibility: hidden; }
     g.stations path:hover + text { stroke: black; visibility: visible; }
     text { fill: black; font-family: Verdana }
@@ -66,12 +76,58 @@ def map(inp, out=sys.stdout, land=None, text=True):
      180 West is x=0; 180 East is 720;
      90 South is y=360; 90 North is y=0. -->
 """)
+    if clock:
+        years,allyears = station_years(inp)
+        miny = min(allyears)
+        maxy = max(allyears)
     for station in stations(inp):
 	lat,lon = station.lat,station.lon
         lon += 180.0
         lat = 90.0 - lat
 	lat,lon = [x*2.0 for x in (lat,lon)]
-        out.write("<path d='M%.2f %.2fl0 0' />\n" % (lon,lat))
+        if clock:
+            def sectorxy(i):
+                """Convert from sector index to x,y (normalised to
+                unit circle, with y positive is down).  There are
+                N sectors per circle, and sector index 0 is top of
+                clock, positive is clockwise.
+                """
+
+                # Convert to radians with th=0 is East of clock;
+                # positive is still clockwise which matches the
+                # y positive is down convention of the SVG drawing surface.
+                th = math.pi*2*i/N - math.pi*0.5
+                return math.cos(th), math.sin(th)
+            r = 4 # radius of clock
+            N = maxy-miny+1 # Number of sectors (1 per year)
+            # Split into sectors where each sector is either a block of
+            # absent or present years.
+            for p,g in itertools.groupby(
+              enumerate(y in years[station.uid] for y in range(miny,maxy+1)),
+              lambda x:x[1]):
+                # p: True for a block of present years
+                # g: group of (i,p) pairs
+                # Each sector (is a path that) starts with "M x y" that
+                # moves to the centre of the circle.
+                # class attribute will be R0 for sectors marking years
+                # with no records, and R1 for sectors marking years with
+                # records.
+                out.write("<path class='R%d' d='M%.2f %.2f " % (p, lon,lat))
+                g = list(g)
+                s,_ = g[0]
+                # *s* is start angle, in N units per circle.
+                sx,sy = [p*r for p in sectorxy(s)]
+                out.write("l %.2f %.2f " % (sx, sy))
+                # *f* is finish angle.
+                f = s+len(g)
+                assert f <= N
+                fx,fy = [p*r for p in sectorxy(f)]
+                large = len(g) > N/2
+                out.write("a %.2f %.2f 0 %d 1 %.2f %.2f z " %
+                  (r,r, large, fx-sx,fy-sy))
+                out.write("' />\n")
+        else:
+            out.write("<path d='M%.2f %.2fl0 0' />\n" % (lon,lat))
         if text:
             out.write("<text x='8' y='375'>%s %+06.2f%+07.2f  %s</text>\n" %
               (station.uid, station.lat, station.lon,
@@ -95,6 +151,20 @@ def stations(filenames):
     if lost:
         raise Exception("Couldn't find metadata for some stations.")
 
+def station_years(filenames):
+    """Returns a dictionary mapping from 11-character station id to set of
+    years, and a set of all the years found.  Years are integers."""
+
+    filename = filenames[0]
+    result = {}
+    allyears = set()
+    for l in open(filename):
+        id = l[:11]
+        year = set([int(l[12:16])])
+        allyears |= year
+        result[id] = result.get(id, set()) | year
+    return result, allyears
+
 
 def main(argv=None):
     # http://docs.python.org/release/2.4.1/lib/module-getopt.html
@@ -104,8 +174,10 @@ def main(argv=None):
         argv = sys.argv
 
     option = {}
-    opts,arg = getopt.getopt(argv[1:], '', ['land=', 'no-text'])
+    opts,arg = getopt.getopt(argv[1:], '', ['clock', 'land=', 'no-text'])
     for o,v in opts:
+        if o == '--clock':
+            option['clock'] = True
         if o == '--land':
             option['land'] = v
         if o == '--no-text':

@@ -260,8 +260,6 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
         bottom[axis] = math.floor(axismin[axis]*scale-smidgin)
         top[axis] = math.ceil(axismax[axis]*scale+smidgin)
     del axis
-    print axismin, axismax
-    print bottom, top
     # The plot is sized according to the y axis (on the left), the r
     # axis is subsidiary.
     plotheight = top['y'] - bottom['y']

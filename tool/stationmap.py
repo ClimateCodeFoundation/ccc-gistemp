@@ -174,7 +174,11 @@ def main(argv=None):
         argv = sys.argv
 
     option = {}
-    opts,arg = getopt.getopt(argv[1:], '', ['clock', 'land=', 'no-text'])
+    try:
+        opts,arg = getopt.getopt(argv[1:], '', ['clock', 'land=', 'no-text'])
+    except getopt.GetoptError:
+        print __doc__
+        return 2
     for o,v in opts:
         if o == '--clock':
             option['clock'] = True
@@ -183,7 +187,7 @@ def main(argv=None):
         if o == '--no-text':
             option['text'] = False
 
-    map(arg, **option)
+    return map(arg, **option)
 
 if __name__ == '__main__':
     main()

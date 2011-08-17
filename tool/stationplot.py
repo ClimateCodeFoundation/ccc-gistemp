@@ -201,12 +201,14 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
     if not datadict:
         raise Error('No data found for %s' % (', '.join(arg)))
         
+    title = []
     if meta:
         meta = get_meta(datadict, meta)
-        title = []
         for id11,d in meta.items():
             title.append('%s %+06.2f%+07.2f  %s' %
               (id11, d['lat'], d['lon'], d['name']))
+    # Note, the '\n' is an attempt to get SVG to use more than one
+    # "line".  But it doesn't work.  So... :todo: fix that then.
     title = '\n'.join(title)
 
     # Assign number of data items per year.
@@ -801,7 +803,7 @@ def main(argv=None):
 
     try:
         infile = 'input/v2.mean'
-        metafile = 'input/v2.inv'
+        metafile = None
         opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:s:t:y',
           ['axes=', 'offset='])
         if not arg:
@@ -839,7 +841,15 @@ def main(argv=None):
             infile = sys.stdin
         else:
             infile = open(infile)
-        metafile = open(metafile)
+        if metafile is None:
+            # The default is 'input/v2.inv' but we don't complain if we
+            # can't open it.
+            try:
+                metafile = open('input/v2.inv')
+            except IOError:
+                pass
+        else:
+            metafile = open(metafile)
         derive_config(config)
         return plot(arg, inp=infile, out=outfile, meta=metafile, **key)
     except (getopt.GetoptError, Usage), e:

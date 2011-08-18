@@ -26,6 +26,7 @@ The options are:
   [-o file.svg]
   [--offset 0,+0.2]
   [-t YYYY,YYYY]
+  [--title title]
   [-s 0.01]
 
 Tool to plot the records for a station.  Stations have an 11-digit
@@ -176,7 +177,7 @@ def curves(series, K):
         yield list(block)
 
 def plot(arg, inp, out, meta, timewindow=None, mode='temp',
-  offset=None, scale=0.1, axes=None):
+  offset=None, scale=0.1, title=None, axes=None):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
     name, location) is taken from the `meta` file (usually v2.inv).
@@ -201,15 +202,18 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
     if not datadict:
         raise Error('No data found for %s' % (', '.join(arg)))
         
-    title = []
     if meta:
         meta = get_meta(datadict, meta)
-        for id11,d in meta.items():
-            title.append('%s %+06.2f%+07.2f  %s' %
-              (id11, d['lat'], d['lon'], d['name']))
-    # Note, the '\n' is an attempt to get SVG to use more than one
-    # "line".  But it doesn't work.  So... :todo: fix that then.
-    title = '\n'.join(title)
+        if title is None:
+            title = []
+            for id11,d in meta.items():
+                title.append('%s %+06.2f%+07.2f  %s' %
+                  (id11, d['lat'], d['lon'], d['name']))
+            # Note, the '\n' is an attempt to get SVG to use more than one
+            # "line".  But it doesn't work.  So... :todo: fix that then.
+            title = '\n'.join(title)
+    if title is None:
+        title = ''
 
     # Assign number of data items per year.
     global K # :todo: made not global.
@@ -805,7 +809,7 @@ def main(argv=None):
         infile = 'input/v2.mean'
         metafile = None
         opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:s:t:y',
-          ['axes=', 'offset='])
+          ['axes=', 'offset=', 'title='])
         if not arg:
             raise Usage('At least one identifier must be supplied.')
         outfile = arg[0] + '.svg'
@@ -827,6 +831,8 @@ def main(argv=None):
                 metafile = v
             if k == '-t':
                 key['timewindow'] = parse_topt(v)
+            if k == '--title':
+                key['title'] = v
             if k == '-y':
                 key['mode'] = 'annual'
             if k == '-s':

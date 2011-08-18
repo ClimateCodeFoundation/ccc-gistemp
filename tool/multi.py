@@ -16,6 +16,8 @@ import extend_path
 
 # http://docs.python.org/release/2.6.6/library/json.html
 import json
+# http://docs.python.org/release/2.4.4/lib/module-os.html
+import os
 import re
 import sys
 import urllib
@@ -70,34 +72,47 @@ def tablemonthlies(f):
         yield year,monthlies
 
 def timecount(argv):
-    """[command] [--mask maskfile] Count of stations used over time."""
+    """[command] [--mask maskfile] [--dir .] Count of stations
+    used over time."""
 
     # http://docs.python.org/release/2.4.4/lib/module-getopt.html
     import getopt
-    opts,arg = getopt.getopt(argv[1:], '', ['mask='])
+    opts,arg = getopt.getopt(argv[1:], '', ['dir=', 'mask='])
     option = dict((o[2:],v) for o,v in opts)
 
     counts(out=sys.stdout, **option)
 
-def counts(out, mask=None):
+def counts(out, dir='.', mask=None):
     """Print to *out* a count for each month of the number of stations
-    used.  *mask* specifies the name of a mask file to be used; only the
-    cells present in the mask file will be examined for station usage."""
+    used.
+    
+    *dir* specifies the name of a directory for the input files
+    (that are intermediate products of ccc-gistemp);
+    from this directory the files used are: 'log/step3.log' (to
+    determine what stations and months are used), and 'work/step2.v2'
+    (to determine which specific months of those stations have data
+    present).
+
+    *mask* specifies the name of a mask file to be used; only the
+    cells present in the mask file will be examined for station usage.
+    """
 
     # Dictionary that maps from station (12 char identifier) to
     # monthset, where *monthset* is a set of the numbers from 0
     # (January) to 11 (December).
     stationmonths = dict()
 
-    for row in stations_logged(mask):
+    log = os.path.join(dir, 'log', 'step3.log')
+    step2 = os.path.join(dir, 'work', 'step2.v2')
+
+    for row in stations_logged(mask, log=log):
         stations = json.loads(row[2])
         for station,weight,months in stations:
             stationmonths[station] = monthset(months) | stationmonths.get(
               station, set())
 
     monthcount = {}
-    path = 'work/step2.v2'
-    for station in gio.GHCNV2Reader(path=path):
+    for station in gio.GHCNV2Reader(path=step2):
         if station.uid not in stationmonths:
             continue
         for m in stationvalidmonths(station):
@@ -364,8 +379,6 @@ def nature201102(arg):
     (expects to find a completed result directory).
     """
 
-    import os
-
     # Download GISTEMP global result and copy together with the global
     # result on local disk to a GHCN v2 format file, 'nature.v2'
     out = open('nature.v2', 'w')
@@ -576,13 +589,13 @@ def VdotV(u, v):
 def commands(arg):
     """[command] Show command list."""
 
-    rx = re.compile(r'\[command] *')
+    prefix = re.compile(r'\[command] *')
 
     for name,f in members.items():
         doc = getattr(f, '__doc__')
-        if doc and rx.match(doc):
-            doc = rx.sub('', doc)
-            doc = doc.replace('\n', '')
+        if doc and prefix.match(doc):
+            doc = prefix.sub('', doc)
+            doc = re.sub(r'\n *', ' ', doc)
             doc = re.sub(r'[;.] +.*', '.', doc)
             print name, ':', doc
 

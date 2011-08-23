@@ -152,17 +152,18 @@ def stationvalidmonths(record):
     return set(first+i for i,v in enumerate(record.series) if valid(v))
 
 def whatstations(argv):
-    """[command] [--mask maskfile]  Determines what (land) stations are
-    used for a particular area.
+    """[command] [--mask maskfile] [--log step3.log] Determines
+    what (land) stations are used for a particular area.
 
     whatstations --mask maskfile
 
-    Works by examining the log files.
+    Works by examining the Step 3 log file, which can be specified with
+    --log option.
     """
 
     # http://docs.python.org/release/2.4.4/lib/module-getopt.html
     import getopt
-    opts,arg = getopt.getopt(argv[1:], '', ['mask='])
+    opts,arg = getopt.getopt(argv[1:], '', ['log=', 'mask='])
     option = dict((o[2:],v) for o,v in opts)
     stations(out=sys.stdout, **option)
 
@@ -189,14 +190,13 @@ def stations_logged(mask=None, log='log/step3.log'):
         if not mask or row[0] in cells:
             yield row
 
-
-def stations(out, mask=None):
+def stations(out, log='log/step3.log', mask=None):
     """Print to *out* a list of the stations used."""
 
     station_weight = dict()
     station_months = dict()
     cellcount = 0
-    for row in stations_logged(mask=mask):
+    for row in stations_logged(log=log, mask=mask):
         stations = json.loads(row[2])
         for item in stations:
             station,weight,months = item[:3]
@@ -213,7 +213,7 @@ def stations(out, mask=None):
         return ''.join('01'[i in s] for i in range(12))
 
     if mask:
-        ncells = len(cellsofmask(mask))
+        ncells = len(cellsofmask(open(mask)))
     else:
         ncells = 8000
     print >>out, "Cells: %d/%d" % (cellcount, ncells)

@@ -67,11 +67,17 @@ def boxcontains(box, p):
     s,n,w,e = box
     return s <= p[0] < n and w <= p[1] < e
 
+def usage():
+    print __doc__
+    return 2
+
 def main(argv=None):
     import sys
     if argv is None:
         argv = sys.argv
     arg = argv[1:]
+    if len(arg) < 1:
+        return usage()
     if len(arg) > 1:
         stations = arg[1]
     else:

@@ -154,24 +154,30 @@ def stationvalidmonths(record):
     return set(first+i for i,v in enumerate(record.series) if valid(v))
 
 def wherestations(argv):
-    """[command] [--inv v2.inv] [--stations stations]  Outputs the cells
-    (as a mask file) that are occupied by at least one station in the
-    *stations* file.
+    """[command] [--inv v2.inv] stations [...]  Outputs the cells
+    (as a mask file) that are occupied by at least one station list in
+    any of the *stations* files.
     """
 
     # http://docs.python.org/release/2.4.4/lib/module-getopt.html
     import getopt
     opts,arg = getopt.getopt(argv[1:], '', ['inv='])
     option = dict((o[2:],v) for o,v in opts)
-    where_stations(out=sys.stdout, **option)
+    where_stations(arg, out=sys.stdout, **option)
 
-def where_stations(out, stations='input/v2.inv', inv='input/v2.inv'):
+here = os.path.abspath(__file__)
+parent = os.path.dirname(os.path.dirname(here))
+input = os.path.join(parent, 'input')
+
+def where_stations(stations=[os.path.join(input, 'v2.inv')], out=None,
+  inv=os.path.join(input, 'v2.inv')):
     """Implementation of whatstations command."""
 
     from code import eqarea
     from code import giss_data
 
-    stations = set(l[:11] for l in open(stations) if ':' not in l)
+    stations = set(l[:11] for l in
+      itertools.chain(*[open(f) for f in stations]) if ':' not in l)
     meta = gio.station_metadata(path=inv)
     assert meta
     # Restrict meta to the set *stations*

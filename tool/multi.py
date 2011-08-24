@@ -151,6 +151,38 @@ def stationvalidmonths(record):
     first = record.first_month - 1
     return set(first+i for i,v in enumerate(record.series) if valid(v))
 
+def wherestations(argv):
+    """[command] [--inv v2.inv] [--stations stations]  Outputs the cells
+    (as a mask file) that are occupied by at least one station in the
+    *stations* file.
+    """
+
+    # http://docs.python.org/release/2.4.4/lib/module-getopt.html
+    import getopt
+    opts,arg = getopt.getopt(argv[1:], '', ['inv='])
+    option = dict((o[2:],v) for o,v in opts)
+    where_stations(out=sys.stdout, **option)
+
+def where_stations(out, stations='input/v2.inv', inv='input/v2.inv'):
+    """Implementation of whatstations command."""
+
+    from code import eqarea
+    from code import giss_data
+
+    stations = set(l[:11] for l in open(stations) if ':' not in l)
+    meta = gio.station_metadata(path=inv)
+    assert meta
+    # Restrict meta to the set *stations*
+    meta = dict((uid,m) for uid,m in meta.iteritems() if uid in stations)
+
+    for cell in eqarea.grid8k():
+        if any(eqarea.boxcontains(cell, (s.lat,s.lon))
+          for s in meta.itervalues()):
+            m = 1.0
+        else:
+            m = 0.0
+        out.write("%sMASK%.3f\n" % (giss_data.boxuid(cell), m))
+
 def whatstations(argv):
     """[command] [--mask maskfile] [--log step3.log] Determines
     what (land) stations are used for a particular area.

@@ -165,6 +165,13 @@ def wherestations(argv):
     option = dict((o[2:],v) for o,v in opts)
     where_stations(arg, out=sys.stdout, **option)
 
+def wherecells(argv):
+    """[command] step3.v2  Outputs the cells with data.
+    """
+
+    arg = argv[1:]
+    where_cells(arg, out=sys.stdout)
+
 here = os.path.abspath(__file__)
 parent = os.path.dirname(os.path.dirname(here))
 input = os.path.join(parent, 'input')
@@ -186,6 +193,23 @@ def where_stations(stations=[], out=None,
     count = eqarea.GridCounter()
     for s in meta.itervalues():
         count(s.lat, s.lon)
+    for c,cell in count.boxes():
+        m = c > 0
+        out.write("%sMASK%.3f\n" % (giss_data.boxuid(cell), m))
+
+def where_cells(cells=[], out=None):
+    """Implementation of wherecells."""
+
+    from code import eqarea
+    from code import giss_data
+
+    cells = set(l[:11] for l in
+      itertools.chain(*[open(f) for f in cells]))
+    cells = [map(float, re.match(r'([-+]\d+\.\d+)([-+]\d+\.\d+)', l).groups())
+      for l in cells]
+    count = eqarea.GridCounter()
+    for lat,lon in cells:
+        count(lat, lon)
     for c,cell in count.boxes():
         m = c > 0
         out.write("%sMASK%.3f\n" % (giss_data.boxuid(cell), m))

@@ -263,6 +263,13 @@ def centre(box) :
     sinc = 0.5*(math.sin(box[0]*math.pi/180) + math.sin(box[1]*math.pi/180))
     return (math.asin(sinc)*180/math.pi, 0.5*(box[2]+box[3]))
 
+def boxcontains(box, p):
+    """True iff *box* (4-tuple of (s,n,w,e) ) contains point *p* (pair
+    of (lat,lon)."""
+
+    s,n,w,e = box
+    return s <= p[0] < n and w <= p[1] < e
+
 
 def main() :
     # http://www.python.org/doc/2.3.5/lib/module-doctest.html

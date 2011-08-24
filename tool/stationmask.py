@@ -51,7 +51,7 @@ def stationmask(inp, stations, out, inv, dribble):
         lat = float(line[43:49])
         lon = float(line[50:57])
         for box in selectboxes:
-            if boxcontains(box, (lat,lon)):
+            if eqarea.boxcontains(box, (lat,lon)):
                 selected.append(uid)
                 dribble.write('\r%d stations' % len(selected))
                 break
@@ -59,13 +59,6 @@ def stationmask(inp, stations, out, inv, dribble):
     selected = set(selected)
     for id11 in sorted(selected):
         out.write(id11 + '\n')
-
-def boxcontains(box, p):
-    """True iff *box* (4-tuple of (s,n,w,e) ) contains point *p* (pair
-    of (lat,lon)."""
-
-    s,n,w,e = box
-    return s <= p[0] < n and w <= p[1] < e
 
 def usage():
     print __doc__

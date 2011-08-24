@@ -37,6 +37,7 @@ import png
 import extend_path
 from code import eqarea
 from code.giss_data import MISSING
+import gio
 
 def topng(inp, date=None):
     """Convert *inp* into a PNG file.  Input file can be a step5mask
@@ -57,7 +58,7 @@ def topng(inp, date=None):
     cells = eqarea.grid8k()
     if not date:
         # Mask file in text format.
-        values = maskbybox(inp, cells)
+        values = gio.maskboxes(inp, cells)
         colour = greyscale
         isgrey = True
     else:
@@ -92,19 +93,6 @@ def topng(inp, date=None):
       bitdepth=8)
     w.write(open(outpath, 'wb'), a)
 
-def maskbybox(inp, grid):
-    """Read a step5mask file box by box.  Yield (value, box) pair.
-    """
-    for row,box in itertools.izip(inp, grid):
-        lat = float(row[:5])
-        lon = float(row[5:11])
-        s,n,w,e = box
-        # If either of these fail, the input mask is in wrong sequence.
-        assert s < lat < n
-        assert w < lon < e
-        v = float(row[16:21])
-        yield v, box
-
 def greyscale(v):
     """Convert value *v* in range 0 to 1 to a greyscale.  0 is white.
     """
@@ -116,7 +104,6 @@ def extractdate(inp, cells, date):
     the binary subbox file *inp* extract the values corresponding to the
     date box by box.
     """
-    import gio
 
     year,month = map(int, date.split('-'))
 

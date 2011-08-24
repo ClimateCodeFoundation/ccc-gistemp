@@ -1316,6 +1316,19 @@ def magic_meta(path):
         path = os.path.join('input', path)
         return augmented_station_metadata(path, format='ushcnv2')
 
+def maskboxes(inp, grid):
+    """Read a step5mask file box by box.  Yield (value, box) pair.
+    """
+    for row,box in itertools.izip(inp, grid):
+        lat = float(row[:5])
+        lon = float(row[5:11])
+        s,n,w,e = box
+        # If either of these fail, the input mask is in wrong sequence.
+        assert s < lat < n
+        assert w < lon < e
+        v = float(row[16:21])
+        yield v, box
+
 class Input:
     """Generally one instance is created: the result of
     step0_input()."""

@@ -14,10 +14,12 @@ Run "python tool/multi.py commands" to see command list.
 
 import extend_path
 
-# http://docs.python.org/release/2.6.6/library/json.html
-import json
+# http://docs.python.org/release/2.4.4/lib/module-getopt.html
+import getopt
 # http://docs.python.org/release/2.4.4/lib/module-itertools.html
 import itertools
+# http://docs.python.org/release/2.6.6/library/json.html
+import json
 # http://docs.python.org/release/2.4.4/lib/module-os.html
 import os
 import re
@@ -77,8 +79,6 @@ def timecount(argv):
     """[command] [--mask maskfile] [--dir .] Count of stations
     used over time."""
 
-    # http://docs.python.org/release/2.4.4/lib/module-getopt.html
-    import getopt
     opts,arg = getopt.getopt(argv[1:], '', ['dir=', 'mask='])
     option = dict((o[2:],v) for o,v in opts)
 
@@ -159,8 +159,6 @@ def wherestations(argv):
     any of the *stations* files.
     """
 
-    # http://docs.python.org/release/2.4.4/lib/module-getopt.html
-    import getopt
     opts,arg = getopt.getopt(argv[1:], '', ['inv='])
     option = dict((o[2:],v) for o,v in opts)
     where_stations(arg, out=sys.stdout, **option)
@@ -224,8 +222,6 @@ def whatstations(argv):
     --log option.
     """
 
-    # http://docs.python.org/release/2.4.4/lib/module-getopt.html
-    import getopt
     opts,arg = getopt.getopt(argv[1:], '', ['log=', 'mask='])
     option = dict((o[2:],v) for o,v in opts)
     stations(out=sys.stdout, **option)
@@ -291,32 +287,17 @@ def cellsofmask(inp):
 
     return set(row[:12] for row in inp if float(row[16:21]))
 
-def maskmap(arg):
-    """[command] mask  Draws an SVG map of the cells in mask."""
+def maskmap(argv):
+    """[command] [--class css-class] mask  Draws an SVG map of the
+    cells in mask."""
+
+    opts,arg = getopt.getopt(argv[1:], '', ['class='])
+    option = dict((o[2:],v) for o,v in opts)
 
     from code import eqarea
 
-    maskfile = arg[1]
+    maskfile = arg[0]
     out = sys.stdout
-
-    def colour(x):
-        """Choose colour for cell.  Returned as an (r,g,b,a) 4-tuple
-        with values between 0.0 and 1.0.
-        """
-
-        assert v in (0,1)
-        if v:
-            return (1.0, 0.0, 0.0, 0.4)
-        else:
-            return (0.0, 0.0, 0.0, 0.0)
-    def SVGfill(t):
-        """Render the 4-tuple t as an attribute fragment that specifies
-        fill and fill-opacity.  For example,
-        "fill='rgb(192,192,255)' fill-opacity='1.0'".
-        """
-
-        return ("fill='rgb(%.0f,%.0f,%.0f)' " % tuple(255.0*x for x in t[:3]) +
-          "fill-opacity='%.3f'" % t[3])
 
     def transform(p):
         u"""Transform p=(lat,lon) into (x,y) used for map system.  Which
@@ -332,16 +313,26 @@ def maskmap(arg):
       xmlns="http://www.w3.org/2000/svg"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       version="1.1">\n""")
+    out.write("""<defs>
+  <style type="text/css">
+    path.m0 { stroke: none; fill: rgb(0,0,0); fill-opacity: 0.0; }
+    path.m1 { stroke: none; fill: rgb(255,0,0); fill-opacity: 0.4; }
+  </style>\n</defs>
+""")
 
-    out.write("<g class='mask' transform='translate(0,360) scale(1,-1)'>\n")
+    class_ = option.get('class', 'mask')
+
+    out.write("<g class='%s' transform='translate(0,360) scale(1,-1)'>\n" %
+      class_)
     cells = eqarea.grid8k()
     for v,box in gio.maskboxes(open(maskfile), cells):
         s,n,w,e = box
         corners = [(n,w), (n,e), (s,e), (s,w)]
         corners = map(transform, corners)
-        out.write("<path d='M %.2f %.2f L" % corners[0] +
+        out.write("<path class='m%.0f'" % v +
+          " d='M %.2f %.2f L" % corners[0] +
           " %.2f"*6 % tuple(itertools.chain(*corners[1:])) +
-          " z' %s />\n" % SVGfill(colour(v)))
+          " z' />\n")
     out.write("</g>\n")
     out.write("</svg>\n")
 

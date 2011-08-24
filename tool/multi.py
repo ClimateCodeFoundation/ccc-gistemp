@@ -332,7 +332,7 @@ def celldict(f):
 
 def reportinonelist(cell, name, culprit, weight):
     """For the cell and logfile identified by the strings *cell*
-    and *name, print a report of the stations contributing to
+    and *name*, print a report of the stations contributing to
     that cell that appear only in that file (and not in the
     corresponding cell in the other file).  *culprit* is a
     sequence of the station identifiers, *weight* is a dict that

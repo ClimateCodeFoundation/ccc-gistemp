@@ -64,6 +64,8 @@ def map(inp, out=sys.stdout, back=[], text=True, clock=False):
     }
     path.R0 { stroke: none; fill: black }
     path.R1 { stroke: none; fill: red }
+    path.m0 { stroke: none; fill-opacity: 0.0; }
+    path.m1 { stroke: none; fill: grey; fill-opacity: 0.4; }
     g.stations text { visibility: hidden; }
     g.stations path:hover + text { stroke: black; visibility: visible; }
     text { fill: black; font-family: Verdana }

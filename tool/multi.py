@@ -16,6 +16,8 @@ import extend_path
 
 # http://docs.python.org/release/2.6.6/library/json.html
 import json
+# http://docs.python.org/release/2.4.4/lib/module-itertools.html
+import itertools
 # http://docs.python.org/release/2.4.4/lib/module-os.html
 import os
 import re
@@ -259,6 +261,60 @@ def cellsofmask(inp):
     value."""
 
     return set(row[:12] for row in inp if float(row[16:21]))
+
+def maskmap(arg):
+    """[command] mask  Draws an SVG map of the cells in mask."""
+
+    from code import eqarea
+
+    maskfile = arg[1]
+    out = sys.stdout
+
+    def colour(x):
+        """Choose colour for cell.  Returned as an (r,g,b,a) 4-tuple
+        with values between 0.0 and 1.0.
+        """
+
+        assert v in (0,1)
+        if v:
+            return (1.0, 0.0, 0.0, 0.4)
+        else:
+            return (0.0, 0.0, 0.0, 0.0)
+    def SVGfill(t):
+        """Render the 4-tuple t as an attribute fragment that specifies
+        fill and fill-opacity.  For example,
+        "fill='rgb(192,192,255)' fill-opacity='1.0'".
+        """
+
+        return ("fill='rgb(%.0f,%.0f,%.0f)' " % tuple(255.0*x for x in t[:3]) +
+          "fill-opacity='%.3f'" % t[3])
+
+    def transform(p):
+        u"""Transform p=(lat,lon) into (x,y) used for map system.  Which
+        in this case is Plate Carr\xe9e with x from 0 to 720, and y from
+        0 to 360."""
+
+        lat,lon = p
+        y = (90+lat)*2
+        x = (180+lon)*2
+        return x,y
+
+    out.write("""<svg 
+      xmlns="http://www.w3.org/2000/svg"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      version="1.1">\n""")
+
+    out.write("<g class='mask' transform='translate(0,360) scale(1,-1)'>\n")
+    cells = eqarea.grid8k()
+    for v,box in gio.maskboxes(open(maskfile), cells):
+        s,n,w,e = box
+        corners = [(n,w), (n,e), (s,e), (s,w)]
+        corners = map(transform, corners)
+        out.write("<path d='M %.2f %.2f L" % corners[0] +
+          " %.2f"*6 % tuple(itertools.chain(*corners[1:])) +
+          " z' %s />\n" % SVGfill(colour(v)))
+    out.write("</g>\n")
+    out.write("</svg>\n")
 
 
 def cmpcontributors(arg):

@@ -28,6 +28,7 @@ input/v2.inv.
 
 # http://docs.python.org/release/2.4.4/lib/module-itertools.html
 import itertools
+import os
 import math
 # http://docs.python.org/release/2.4.4/lib/module-re.html
 import re
@@ -140,13 +141,17 @@ def map(inp, out=sys.stdout, back=[], text=True, clock=False):
     out.write("</g>\n")
     out.write("</svg>\n")
 
+here = os.path.abspath(__file__)
+parent = os.path.dirname(os.path.dirname(here))
+input = os.path.join(parent, 'input')
+
 def stations(filenames):
     """Yield the metadata for each station listed in *filenames*."""
 
     rows = itertools.chain(*[open(f) for f in filenames])
 
     ids = set(l[:11] for l in rows if re.match(r'\w{11}', l))
-    meta = gio.station_metadata(path='input/v2.inv')
+    meta = gio.station_metadata(path=os.path.join(input, 'v2.inv'))
     lost = False
     for id in ids:
         if id in meta:

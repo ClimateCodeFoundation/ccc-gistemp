@@ -5,7 +5,7 @@
 # David Jones, 2011-08-13, Climate Code Foundation.
 
 """
-stationmap.py [--clock] [--land land.svg] [--no-text] station-list
+stationmap.py [--clock] [--back land.svg,layer.svg] [--no-text] station-list
 
 Plot the stations on a map (SVG output).
 
@@ -18,7 +18,9 @@ input/v2.inv.
   years in which records are present (for this to work, the
   *station-list* file must be an extract of v2.mean).
 
---land specifies an SVG file for the land to be used as a background.
+--back specifies a comma separated list of SVG files to be used as
+  a background.  Typically used for a land background, and possibly
+  other layers.
 
 --no-text removes the "hover over" text labels from the SVG output; this
   is useful for converting the output to PDF with Inkscape.
@@ -36,11 +38,14 @@ from xml.sax.saxutils import escape
 # ccc-gistemp
 import gio
 
-def map(inp, out=sys.stdout, land=None, text=True, clock=False):
+def map(inp, out=sys.stdout, back=[], text=True, clock=False):
     """Plot stations on map.  *inp* is a list of filenames specifying
-    the station IDs.  *land*, if specified, names an SVG file for
-    the land to be used as background (this option is really only
-    expected to work with certain specially prepared SVG files).
+    the station IDs.  *back*, if specified, is a list of names of SVG
+    files to be used as background (this option is really only
+    expected to work with certain specially prepared SVG files; the
+    first <g> element is extracted from the file using a regular
+    expression); The *back* option can be used to provide a land mass
+    background image.
     """
 
     out.write("""<svg
@@ -64,10 +69,10 @@ def map(inp, out=sys.stdout, land=None, text=True, clock=False):
   </style></defs>
 """)
 
-    if land:
-	land = open(land).read()
-        landfrag = re.search(r'<g class=.land..*</g>', land, re.DOTALL)
-        out.write(landfrag.group())
+    for filename in back:
+	text = open(filename).read()
+        gfrag = re.search(r'<g .*</g>', text, re.DOTALL)
+        out.write(gfrag.group())
 	out.write("\n")
 
     out.write("<g class='stations'>\n")
@@ -175,15 +180,15 @@ def main(argv=None):
 
     option = {}
     try:
-        opts,arg = getopt.getopt(argv[1:], '', ['clock', 'land=', 'no-text'])
+        opts,arg = getopt.getopt(argv[1:], '', ['clock', 'back=', 'no-text'])
     except getopt.GetoptError:
         print __doc__
         return 2
     for o,v in opts:
         if o == '--clock':
             option['clock'] = True
-        if o == '--land':
-            option['land'] = v
+        if o == '--back':
+            option['back'] = v.split(',')
         if o == '--no-text':
             option['text'] = False
 

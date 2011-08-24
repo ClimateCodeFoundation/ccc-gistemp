@@ -5,7 +5,7 @@
 # David Jones, 2011-08-13, Climate Code Foundation.
 
 """
-stationmap.py [--clock] [--back land.svg,layer.svg] [--no-text] station-list
+stationmap.py [--clock] [--back land.svg,...] [--no-text] station-list [...]
 
 Plot the stations on a map (SVG output).
 
@@ -143,9 +143,9 @@ def map(inp, out=sys.stdout, back=[], text=True, clock=False):
 def stations(filenames):
     """Yield the metadata for each station listed in *filenames*."""
 
-    filename = filenames[0]
+    rows = itertools.chain(*[open(f) for f in filenames])
 
-    ids = set(l[:11] for l in open(filename) if re.match(r'\w{11}', l))
+    ids = set(l[:11] for l in rows if re.match(r'\w{11}', l))
     meta = gio.station_metadata(path='input/v2.inv')
     lost = False
     for id in ids:

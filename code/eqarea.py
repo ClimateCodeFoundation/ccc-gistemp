@@ -270,6 +270,32 @@ def boxcontains(box, p):
     s,n,w,e = box
     return s <= p[0] < n and w <= p[1] < e
 
+class GridCounter:
+    def __init__(self):
+        """An object that bins points into cells, keeping a count of how
+        many points are in each cell.  To count a point at (lat, lon)
+        call this object with lat,lon as arguments.  To get the list of
+        (count,cell) pairs, call the .boxes method.
+        """
+
+        self.box = [(box,list(cells)) for box,cells in gridsub()]
+        self.count = [[0 for _ in cells] for _,cells in self.box]
+
+    def __call__(self, lat, lon):
+        p = (lat,lon)
+        for i,(box,cells) in enumerate(self.box):
+            if boxcontains(box, p):
+                for j,cell in enumerate(cells):
+                    if boxcontains(cell, p):
+                        self.count[i][j] += 1
+                        return
+        raise Error("No cell for %r." % p)
+
+    def boxes(self):
+        for (_,cells),counts in zip(self.box, self.count):
+            for cell,count in zip(cells,counts):
+                yield count,cell
+
 
 def main() :
     # http://www.python.org/doc/2.3.5/lib/module-doctest.html

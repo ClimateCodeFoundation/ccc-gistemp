@@ -169,7 +169,7 @@ here = os.path.abspath(__file__)
 parent = os.path.dirname(os.path.dirname(here))
 input = os.path.join(parent, 'input')
 
-def where_stations(stations=[os.path.join(input, 'v2.inv')], out=None,
+def where_stations(stations=[], out=None,
   inv=os.path.join(input, 'v2.inv')):
     """Implementation of whatstations command."""
 
@@ -183,12 +183,11 @@ def where_stations(stations=[os.path.join(input, 'v2.inv')], out=None,
     # Restrict meta to the set *stations*
     meta = dict((uid,m) for uid,m in meta.iteritems() if uid in stations)
 
-    for cell in eqarea.grid8k():
-        if any(eqarea.boxcontains(cell, (s.lat,s.lon))
-          for s in meta.itervalues()):
-            m = 1.0
-        else:
-            m = 0.0
+    count = eqarea.GridCounter()
+    for s in meta.itervalues():
+        count(s.lat, s.lon)
+    for c,cell in count.boxes():
+        m = c > 0
         out.write("%sMASK%.3f\n" % (giss_data.boxuid(cell), m))
 
 def whatstations(argv):

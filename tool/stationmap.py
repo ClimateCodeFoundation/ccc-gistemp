@@ -5,7 +5,7 @@
 # David Jones, 2011-08-13, Climate Code Foundation.
 
 """
-stationmap.py [--clock] [--back land.svg,...] [--no-text] station-list [...]
+stationmap.py [--clock] [--back land.svg,...] [-css css-file] [--no-text] station-list [...]
 
 Plot the stations on a map (SVG output).
 
@@ -21,6 +21,9 @@ input/v2.inv.
 --back specifies a comma separated list of SVG files to be used as
   a background.  Typically used for a land background, and possibly
   other layers.
+
+--css specifies a command separated list of CSS files; they are appended
+  as is to the end of the CSS section in the output SVG.
 
 --no-text removes the "hover over" text labels from the SVG output; this
   is useful for converting the output to PDF with Inkscape.
@@ -39,7 +42,7 @@ from xml.sax.saxutils import escape
 # ccc-gistemp
 import gio
 
-def map(inp, out=sys.stdout, back=[], text=True, clock=False):
+def map(inp, out=sys.stdout, back=[], css=[], text=True, clock=False):
     """Plot stations on map.  *inp* is a list of filenames specifying
     the station IDs.  *back*, if specified, is a list of names of SVG
     files to be used as background (this option is really only
@@ -69,6 +72,9 @@ def map(inp, out=sys.stdout, back=[], text=True, clock=False):
     g.stations text { visibility: hidden; }
     g.stations path:hover + text { stroke: black; visibility: visible; }
     text { fill: black; font-family: Verdana }
+""")
+    out.writelines(itertools.chain(*[open(f) for f in css]))
+    out.write("""
   </style></defs>
 """)
 
@@ -187,7 +193,8 @@ def main(argv=None):
 
     option = {}
     try:
-        opts,arg = getopt.getopt(argv[1:], '', ['clock', 'back=', 'no-text'])
+        opts,arg = getopt.getopt(argv[1:], '',
+          ['clock', 'back=', 'css=', 'no-text'])
     except getopt.GetoptError:
         print __doc__
         return 2
@@ -196,6 +203,8 @@ def main(argv=None):
             option['clock'] = True
         if o == '--back':
             option['back'] = v.split(',')
+        if o == '--css':
+            option['css'] = v.split(',')
         if o == '--no-text':
             option['text'] = False
 

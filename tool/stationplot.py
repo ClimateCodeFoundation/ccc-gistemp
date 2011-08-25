@@ -22,6 +22,7 @@ Usage: python stationplot.py [options] station-id
 The options are:
   [-a] [-y]
   [-c config]
+  [--colour blue,black,...]
   [-d v2.mean]
   [-o file.svg]
   [--offset 0,+0.2]
@@ -37,6 +38,13 @@ have several "duplicate" records associated with it.
 Specifying an 11-digit identifier will plot all the duplicates
 associated with that station; a 12-digit indentifier will plot only a
 single record.
+
+Colours can be explicitly assigned using the --colour option.  A station
+will be assigned its corresponding colour in the list of comma separated
+colours, if that station identifier is associated with exactly one
+record (in other words, if an 11 digit ID is used and there are several
+associated station records, none of them will be coloured according to
+the --colour option).
 
 Anomalies can be plotted (each datum has the mean for that month
 subtracted from it) by using the -a option.  The -y option will compute
@@ -176,7 +184,7 @@ def curves(series, K):
             continue
         yield list(block)
 
-def plot(arg, inp, out, meta, timewindow=None, mode='temp',
+def plot(arg, inp, out, meta, colour=[], timewindow=None, mode='temp',
   offset=None, scale=0.1, title=None, axes=None):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
@@ -290,9 +298,17 @@ def plot(arg, inp, out, meta, timewindow=None, mode='temp',
     text { fill: black; font-family: Verdana }
 """ % ('display: none', '')[config.debug])
     colours = itertools.chain(colour_list, colour_iter())
-    for id12,colour in zip(sorted(datadict), colours):
+    # Assign colours from --colour argument, if and only if there is
+    # exactly one entry in the dict corresponding to the station id.
+    colourdict = {}
+    for key,c in zip(arg,colour):
+        keys = [k for k in datadict if k.startswith(key)]
+        if len(keys) == 1:
+            colourdict[keys[0]] = c
+    for id12,c in zip(sorted(datadict), colours):
+        c = colourdict.get(id12, c)
         cssidescaped = cssidescape('record' + id12)
-        out.write("    g.%s { stroke: %s }\n" % (cssidescaped, colour))
+        out.write("    g.%s { stroke: %s }\n" % (cssidescaped, c))
     out.write("  </style>\n</defs>\n")
 
     # Push chart down and right to give a bit of a border.
@@ -809,7 +825,7 @@ def main(argv=None):
         infile = 'input/v2.mean'
         metafile = None
         opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:s:t:y',
-          ['axes=', 'offset=', 'title='])
+          ['axes=', 'colour=', 'offset=', 'title='])
         if not arg:
             raise Usage('At least one identifier must be supplied.')
         outfile = arg[0] + '.svg'
@@ -817,6 +833,8 @@ def main(argv=None):
         for k,v in opt:
             if k == '--axes':
                 key['axes'] = v
+            if k == '--colour':
+                key['colour'] = v.split(',')
             if k == '-c':
                 update_config(config, v)
             if k == '--offset':

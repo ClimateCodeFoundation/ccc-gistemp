@@ -24,6 +24,7 @@ The options are:
   [-c config]
   [--colour blue,black,...]
   [-d v2.mean]
+  [--caption figure1]
   [-o file.svg]
   [--offset 0,+0.2]
   [-t YYYY,YYYY]
@@ -185,7 +186,7 @@ def curves(series, K):
         yield list(block)
 
 def plot(arg, inp, out, meta, colour=[], timewindow=None, mode='temp',
-  offset=None, scale=0.1, title=None, axes=None):
+  offset=None, scale=0.1, caption=None, title=None, axes=None):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
     name, location) is taken from the `meta` file (usually v2.inv).
@@ -278,6 +279,7 @@ def plot(arg, inp, out, meta, colour=[], timewindow=None, mode='temp',
     # axis is subsidiary.
     plotheight = top['y'] - bottom['y']
     legendh = legend_height(datadict)
+    captionh = caption_height(caption)
     lborder = 125
     rborder = 65
 
@@ -285,7 +287,7 @@ def plot(arg, inp, out, meta, colour=[], timewindow=None, mode='temp',
       xmlns="http://www.w3.org/2000/svg"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       version="1.1">\n""" %
-      (plotwidth+lborder+rborder, plotheight+100+legendh))
+      (plotwidth+lborder+rborder, plotheight+100+legendh+captionh))
 
     # Style
     out.write("""<defs>
@@ -328,7 +330,12 @@ def plot(arg, inp, out, meta, colour=[], timewindow=None, mode='temp',
 
       # Colour legend.
       with Tag(out, 'g', attr=dict(id='legend')):
-          render_legend(out, datadict, minyear)
+          ly = render_legend(out, datadict, minyear)
+
+      # Caption, below legend.
+      if caption:
+          with Tag(out, 'g', attr=dict(id='caption')):
+              render_caption(out, ly, caption)
 
       # Start of "axes" group.
       out.write("<g id='axes'>\n")
@@ -435,8 +442,17 @@ def legend_height(datadict):
     else:
         return config.fontsize
 
+def caption_height(caption):
+    """Height of the caption."""
+
+    # :todo: not very general.
+    return 1.5 * config.fontsize
+
 def render_legend(out, datadict, minyear):
-    """Write the SVG for the legend onto the stream *out*."""
+    """Write the SVG for the legend onto the stream *out*.  Return the
+    lowest y coordinate used.
+    """
+
     # Includes range indicators for each series.
     # Start of the top line of text for the legend.
 
@@ -450,6 +466,17 @@ def render_legend(out, datadict, minyear):
               (y, id12))
             out.write("  <g class='record%s'><path d='M%.1f %dl%.1f 0' /></g>\n" %
               (id12, (begin-minyear)*config.xscale, y, length*config.xscale))
+        return y
+
+def render_caption(out, y, caption):
+      """*y* is the y coordinate of the bottom edge of the printed
+      region immediately above the caption (which is normally the
+      legend).
+      """
+      # :todo: Abstract; multi-line; XML escape.
+      out.write("  <text font-size='%.1f' x='0' y='%.1f'>" %
+        (config.fontsize, y+caption_height(caption)))
+      out.write(caption + "</text>\n")
 
 def render_vaxis(out, axis, mode, bottom, top, plotwidth):
     """Either the 'y' (on left) or the 'r' axis (on right)."""
@@ -825,7 +852,7 @@ def main(argv=None):
         infile = 'input/v2.mean'
         metafile = None
         opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:s:t:y',
-          ['axes=', 'colour=', 'offset=', 'title='])
+          ['axes=', 'caption=', 'colour=', 'offset=', 'title='])
         if not arg:
             raise Usage('At least one identifier must be supplied.')
         outfile = arg[0] + '.svg'
@@ -833,6 +860,8 @@ def main(argv=None):
         for k,v in opt:
             if k == '--axes':
                 key['axes'] = v
+            if k == '--caption':
+                key['caption'] = v
             if k == '--colour':
                 key['colour'] = v.split(',')
             if k == '-c':

@@ -79,8 +79,8 @@ def map(inp, out=sys.stdout, back=[], css=[], text=True, clock=False):
 """)
 
     for filename in back:
-	text = open(filename).read()
-        gfrag = re.search(r'<g .*</g>', text, re.DOTALL)
+	bigstring = open(filename).read()
+        gfrag = re.search(r'<g .*</g>', bigstring, re.DOTALL)
         out.write(gfrag.group())
 	out.write("\n")
 

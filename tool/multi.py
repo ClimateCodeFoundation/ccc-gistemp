@@ -13,13 +13,13 @@ Run "python tool/multi.py commands" to see command list.
 """
 
 import extend_path
+import simplejson as json
 
 # http://docs.python.org/release/2.4.4/lib/module-getopt.html
 import getopt
 # http://docs.python.org/release/2.4.4/lib/module-itertools.html
 import itertools
 # http://docs.python.org/release/2.6.6/library/json.html
-import json
 # http://docs.python.org/release/2.4.4/lib/module-os.html
 import os
 import re

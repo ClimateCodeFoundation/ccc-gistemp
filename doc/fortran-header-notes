@@ -1,0 +1,112 @@
+Notes on Fortran file header records in ccc-gistemp
+Nick Barnes, Ravenbrook Limited, 2010-03-13
+
+1. Introduction
+
+ccc-gistemp produces binary Fortran files in steps 3, 4, and 5, and
+reads them in steps 4 and 5.  The files are part of the GISTEMP result
+set, so we are required to continue producing them.
+
+The files each have a header record and then the data records.  At
+present, the "core" code in code/ generally yields a SubboxMetaData
+object followed by the data record objects.  However, the existence,
+and most of the contents, of the SubboxMetaData object are irrelevant
+to the GISTEMP algorithm.  They should be removed from the core code.
+Each file may have a small number of header values which are pertinent
+to the algorithm: a container (e.g. an object or tuple) which just
+holds these should be passed around instead.
+
+The files as actually written need to have the correct and complete
+header record, so tool/giss_io needs code to construct these records
+from the smaller containers.  When reading a binary file we should
+retain the values we want from the header record and discard the rest
+(after checking).
+
+2. Flow of Header Record Data
+
+Starting at the end and working backwards:
+
+2.1. Step 5 outputs
+
+step5_output() produces this Fortran file:
+
+   result/ZON.Ts.ho2.GHCN.CL.PA.1200
+
+In the header record this contains a title string and 8-tuple of
+integers, info[].  step5_output() internally uses the value of info[5]
+(iyrbeg).
+
+info is produced by step5.SBBXtoBX(), and passed unchanged through
+step5.zonav() and step5.annzon().  In SBBBXtoBX, info is the same as
+the header read from the land dataset, except info[5] - the number of
+the first year of data - is the minimum of the ocean and land first
+years.
+
+The title string written to this binary file is derived from a title
+string produced in step 3 - including the radius and start year - and
+passed through step5.SBBXtoBX(), step5.zonav() and step5.annzon().
+
+step5_bx_output produces this file:
+
+   result/BX.Ts.ho2.GHCN.CL.PA.1200
+
+(note that this is not a required GISTEMP product, but we produce it
+for regression testing against the matching file produced by a GISTEMP
+run).
+
+This has a header record with the same 8-tuple info[] produced by
+SBBXtoBX, and also the same step 3 title string.
+
+2.2. Uses within step 5
+
+So much for step 5's outputs.  How about the use of metadata within
+step 5?
+
+SBBXtoBX uses header data as follows:
+
+land_meta.monm   # total number of months in the record
+land_meta.yrbeg  # land start year
+ocean_meta.yrbeg # ocean start year
+land_meta.title  # (to yield, only)
+
+It yields the land_meta header record, except for items 4 and 5:
+   4: 2 * land_meta.monm + 5
+   5: combined_year_beg
+
+zonav does not change header data.  It uses these:
+
+info[5] # iyrbeg
+info[3] # monm
+titlei  # (to yield, only)
+
+annzon does not change header data.  It uses these:
+
+info[5] # iyrbeg
+info[3] # monm
+title   # (to yield, only)
+
+Note that if we 
+
+2.3. Step 5 inputs
+
+2.4. Step 4 outputs
+
+As we can see above, the only header item produced by step 4 and
+subsequently used in ccc-gistemp is ocean_meta.yrbeg.  However, step 4
+also produces the Fortran binary file
+
+     result/SSBX.HadR2
+
+2.5. Uses within step 4
+
+2.6. Step 4 inputs
+
+2.7. Step 3 outputs
+
+2.8. Production in step 3
+
+
+
+
+
+

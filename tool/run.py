@@ -218,8 +218,9 @@ def main(argv=None):
                         "to %s and try again." % rootdir)
 
         # Carry out preflight checks and fetch missing files.
-        import preflight
-        preflight.checkit(sys.stderr)
+        import fetch
+        fetcher = fetch.Fetcher()
+        fetcher.fetch()
 
         # Create all the temporary directories we're going to use.
         for d in ['log', 'result', 'work']:

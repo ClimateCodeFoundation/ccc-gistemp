@@ -4,20 +4,83 @@
 #
 # fetch.py
 #
-# David Jones, Ravenbrook Limited, 2010-01-07
+# David Jones and Nick Barnes, Climate Code Foundation.
 # Copyright (C) 2008-2010 Ravenbrook Limited.
 # Copyright (C) 2011 Climate Code Foundation.
 
 """
-fetch.py [--help] [--list] [input-files] ...
+fetch.py [--help] [--list] [--force] [--store <dir>] [--config <file>] [pattern] ...
 
 Script to fetch (download from the internet) the inputs required for
-the GISTEMP program.
+the ccc-gistemp program.
 
-Any input files passed as arguments will be fetched from their locations
-on the internet.  If no arguments are supplied, nothing will be fetched.
+The groups, bundles, bundle members, and individual files fetchable
+are defined by the configuration file specified by --config <file>
+(default 'config/sources').
 
---list  List all things that can be fetched.
+Everything fetched ends up in the directory specified by --store <dir>
+(default 'input').
+
+If no such arguments are given, the default is to fetch those files in
+the default group.  In the config file provided with ccc-gistemp, that
+means the files required for normal ccc-gistemp operation.
+
+Any arguments are treated as regular expressions and matched against
+groups, bundles, files, or bundle members (in that order).  The first
+matching item for each argument is fetched.  
+
+Unless --force is set, no file that already exists is created.
+
+--list lists all things that can be fetched.
+
+The config file syntax is as follows:
+
+    Comments begin '#' and run to the end of the line.
+    Every line begins with a keyword, followed by a colon.
+    Keywords are not case-sensitive.
+
+    A fetchable item is either:
+
+        file: <url> [<local filename>]
+
+    which denotes a fetchable item which is also a source dataset, or
+
+        bundle: <url> [<local filename>]
+
+    which denotes a 'bundle': a file which can be unpacked into
+    a number of files, one or more of which may be source datasets,
+    identified thusly:
+
+        member: <pattern> [<local filename>]
+
+    <pattern> is a regular expression matching the tail of a pathname
+    within the most-recently described bundle.
+
+    The system works out for itself how to unpack a bundle.  These may
+    be based on the bundle's name or contents: you shouldn't have to
+    worry about it.
+
+    <local filename> in each of the above is an optional name to give
+    the fetched item or extracted member.  If absent, the system uses
+    a filename derived from the fetched item or extracted member.
+
+    <url> may be any ftp:// or http:// URL.  It may also be of this
+    form:
+
+       ftpmatch://<site>/<path>/<pattern>
+
+    In which case the directory <path> on the FTP site <site> is
+    searched for filenames matching <pattern> and the last such file
+    is fetched.  This 'feature' was developed for USHCN version 2
+    datasets.
+
+    All the contents of this file may be divided into disjoint
+    'groups'.  Each group is named.  Groups are introduced with group
+    lines:
+
+      group: <group name>
+
+    The default group name is the empty string.
 """
 
 # http://www.python.org/doc/2.4.4/lib/module-getopt.html
@@ -29,6 +92,7 @@ import sys
 # http://www.python.org/doc/2.4.4/lib/module-urllib.html
 import urllib
 
+import itertools
 import re
 
 # http://www.python.org/doc/2.4.4/lib/module-tarfile.html
@@ -38,6 +102,7 @@ if sys.version_info[:3] <= (2, 5, 1):
     import ccc_tarfile as tarfile
 else:
     import tarfile
+
 # Same for zipfile.  We need the open method of a ZipFile object, but
 # that's only on Python 2.6 and above.  ccc_zipfile is a copy of the
 # Python zipfile module from 2.6 and happily it works on Python 2.4.
@@ -46,349 +111,298 @@ if sys.version_info[:2] <= (2, 5):
 else:
     import zipfile
 
+class Fetcher(object):
+    def __init__(self, **kwargs):
+        self.force = kwargs.pop('force', False)
+        self.output = kwargs.pop('output', sys.stdout)
+        self.prefix = kwargs.pop('prefix', 'input/')
+        self.config_file = kwargs.pop('config_file', 'config/sources')
+        self.requests = kwargs.pop('requests', None)
 
-def fetch(files, prefix='input/', output=sys.stdout):
-    """Download a bunch of files.  *files* is a list of the files to
-    download (just the basename part, the bit after the last directory
-    separator, with or without the compression suffix).  *prefix* (not
-    normally changed from the default) is the location on the local
-    file system where the files will be downloaded.  *output* (not
-    normally changed from the default) is where progress messages
-    appear.
-    """
+    def fetch(self):
+        (bundles, files) = self.find_requests(self.requests)
+        for url, local in files:
+            self.fetch_one(url, local)
+        for ((url, local), members) in bundles.items():
+            self.fetch_one(url, local, members=members)
 
-    import itertools
-    import os
+    def make_prefix(self):
+        try:
+            os.makedirs(self.prefix)
+        except OSError:
+            # Expected if the directories already exist.
+            pass
 
-    place = places()
-
-    # Check that we can fetch the requested files.
-    for n in files:
-        if n not in place:
-            raise Error("Don't know how to fetch %s" % n)
-
-    handler = dict(special, url=fetch_url)
-
-    # Attempt to create the directories required for *prefix*.
-    try:
-        os.makedirs(prefix)
-    except OSError:
-        # Expected if the directories already exist.
-        pass
-
-    # Convert from list of files to list of (*place*, *local*) pairs.
-    # *local* is the localfilename, which will include a compression
-    # extension when the asked-for name might not; *place* is a list of
-    # the form ['url', URL].
-    files = [place[file] for file in files]
-    # sort the list so that places with the same handler get grouped
-    # together.  This is so that we can do multiple extracts from a tar
-    # file in one pass.
-    files.sort()
-    for hname,group in itertools.groupby(files, key=lambda x: x[0][0]):
-        handler[hname](group, prefix, output)
-
-def places():
-    """Return the *place* dict that maps from the name of a file, to
-    where it is found.  The keys of this dict are the files that this
-    program knows how to fetch.
-    """
-
-    # See
-    # http://groups.google.com/group/ccc-gistemp-discuss/web/compiling-gistemp-source?hl=en
-    # (But station_inventory.Z corrected to station.inventory.Z)
-
-    # There appears to be an HTTP server for the NOAA data:
-    # http://www1.ncdc.noaa.gov/pub/data/ghcn/v2/
-    # drj can't find any documentation that says this is the right place to
-    # use.  HTTP would be better because we can find out the length of
-    # the file so we can show progress better (and possibly diagnose /
-    # restart interrupted downloads).
-
-    # We are moving from USHCNv1 (hcn_doe_mean_data.Z) to USHCNv2
-    # (9641C_200907_F52.avg.gz).  It does no harm to remember how to
-    # fetch the older file.
-    # The name of the USHCNv2 file changes every time NOAA make a new
-    # release (it incorporates the date).  For now, just update this by
-    # hand.  :todo: use ftplib to get the name of the latest release.
-
-    # v2.mean.Z used to be in the NOAA list, but now we get a zip file,
-    # so it's handled slightly specially a bit later on.
-    noaa = """
-    ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.temperature.inv
-    ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/hcn_doe_mean_data.Z
-    ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_200907_F52.avg.gz
-    ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_201002_F52.avg.gz
-    ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_201003_F52.avg.gz
-    ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/station.inventory.Z
-    ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/ghcnm.latest.qcu.tar.gz
-    """.split()
-
-    giss = """
-    ftp://data.giss.nasa.gov/pub/gistemp/SBBX.HadR2
-    """.split()
-
-    giss_test = """
-    http://ccc-gistemp.googlecode.com/files/ccc-gistemp-test-2009-12-28.tar.gz
-    """.split()
-
-    # Not normally used; see tool/landmask.py
-    land_mask = """
-    http://islscp2.sesda.com/ISLSCP2_1/data/ancillary/land_water_masks_xdeg/land_ocean_masks_xdeg.zip
-    http://islscp2.sesda.com/ISLSCP2_1/data/ancillary/land_outlines_xdeg/land_water_outlines_xdeg.zip
-    http://islscp2.sesda.com/ISLSCP2_1/data/ancillary/land_outlines_xdeg/land_only_outlines_xdeg.zip
-    """.split()
-
-    # This is all the inputs that are simple URLs
-    all = noaa + giss + giss_test + land_mask
-
-    # *place* is a dictionary that maps from short name to URL or some
-    # other indicator of location.
-    # The value can either be a string, in which case it is treated as a
-    # URL, or a list of the form [handler, something else], in which
-    # case *handler* will be used (as a key to find a function) to
-    # handle downloads.
-    place = dict((url.split('/')[-1], url) for url in all)
-
-    # Add the things that come from tar files:
-    step0inputs = """
-    antarc1.list
-    antarc1.txt
-    antarc2.list
-    antarc2.txt
-    antarc3.list
-    antarc3.txt
-    t_hohenpeissenberg_200306.txt_as_received_July17_2003
-    ushcn2.tbl
-    ushcnV2_cmb.tbl
-    """.split()
-
-    step1inputs = """
-    mcdw.tbl
-    sumofday.tbl
-    v2.inv
-    """.split()
-
-    step45inputs = """
-    oisstv2_mod4.clim.gz
-    """.split()
-
-    gistemp_source_tar = \
-      'http://data.giss.nasa.gov/gistemp/sources/GISTEMP_sources.tar.gz'
-
-    for n in step0inputs:
-        place[n] = ['tar', gistemp_source_tar,
-          'GISTEMP_sources[^/]*/STEP0/input_files/' + n + '$']
-    for n in step1inputs:
-        place[n] = ['tar', gistemp_source_tar,
-          'GISTEMP_sources[^/]*/STEP1/input_files/' + n + '$']
-    for n in step45inputs:
-        place[n] = ['tar', gistemp_source_tar,
-          'GISTEMP_sources[^/]*/STEP4_5/input_files/' + n + '$']
-
-    place['v2.mean'] = ['zip',
-      'ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/zipd/v2.mean.zip',
-      'raid2g/ghcn/v2/data/current/zipd/v2.mean']
-
-    # For the USHCN (V2) data, the filename we need to retrieve is
-    # variable (it changes every time new USHCN data is released).
-    place['ushcnv2.gz'] = ['ushcn', 'ftp.ncdc.noaa.gov',
-      '/pub/data/ushcn/v2/monthly']
-
-
-    def addurl(d):
-        """Add 'url' handler to all plain strings."""
-        for short, long in d.items():
-            if long[0] in special:
-                yield short, long
+    def key_lines(self):
+        comment_re = re.compile(r'((.*?[^\\])??)#')
+        key_re = re.compile('^([a-zA-Z_]+)\s*:\s*(.*)$')
+        for (no, l) in itertools.izip(itertools.count(1), open(self.config_file)):
+            m = comment_re.match(l)
+            if m:
+                bare = m.group(1)
             else:
-                # Ordinary URL.
-                yield short, ['url', long]
-    place = dict(addurl(place))
-    # Now make the *place* dictionary have short names both with and
-    # without the compression suffix.
-    def removeZ(d):
-        """Ensure that we can ask for either the compressed or
-        uncompressed version of a file.  To do this we add a short name
-        with the extension removed when the extension is one of:
-        '.Z'; '.gz'.
+                bare = l
+            bare = bare.strip()
+            # ignore blank lines
+            if len(bare) == 0:
+                continue
+            m = key_re.match(bare)
+            if m:
+                yield (no, m.groups())
+            else:
+                raise Error("%s:%d: malformed line '%s'" % (self.config_file, no, l.strip()))
 
-        Ultimately, it is the compressed version that is fetched.
-        """
-        # *name* is a dictionary that maps from short name, with and
-        # without compression suffix, to the URL.
-        name = {}
-        for short, long in d.items():
-            split = short.split('.')
-            if split[-1].lower() in ['z','gz']:
-                yield '.'.join(split[:-1]), (long, short)
-            yield short, (long, short)
-    place = dict(removeZ(place))
-    # *place* now maps from *name* to a (*long*, *short*) pair; only for
-    # compression extensions are *name* and *short* different.
-    return place
+    def read_config(self):
+        valid_keys=dict(group  = re.compile(r'^\s*(.*?)\s*$'),
+                        file   = re.compile(r'^([^\s]+)(\s+.*)?\s*$'),
+                        bundle = re.compile(r'^([^\s]+)(\s+.*)?\s*$'),
+                        member = re.compile(r'^([^\s]+)(\s+.*)?\s*$'))
+        group=''
+        config={'': dict(files = [], bundles = {})}
+        for (no, (k,v)) in self.key_lines():
+            k = k.lower()
+            if k not in valid_keys:
+                raise Error("%s:%d: unknown key '%s'" % (filename, no, k))
+            m = valid_keys[k].match(v)
+            if not m:
+                raise Error("%s:%d: malformed '%s' line" %(filename, no, k))
 
+            # 'bundle' only persists over 'member' lines.
+            if k != 'member':
+                bundle = None
 
-def fetch_url(l, prefix, output):
-    """(helper function used by :meth:`fetch`)
+            if k == 'group':
+                group = m.group(1)
+                config[group] = dict(files=[], bundles={})
+            elif k == 'file':
+                config[group]['files'].append(m.groups())
+                pattern = m.group(1)
+                local = m.group(2)
+            elif k == 'bundle':
+                bundle = m.groups()
+                members = []
+                config[group]['bundles'][bundle] = members
+                pattern = m.group(1)
+                local = m.group(2)
+            elif k == 'member':
+                if bundle is None:
+                    raise Error("%s:%d: 'member' line with no bundle." %(filename, no))
+                config[group]['bundles'][bundle].append(m.groups())
+                pattern = m.group(1)
+                local = m.group(2)
+        return config
 
-    *l* is a list of (*place*,*name*) pairs.  Each *name* is a short name,
-    each *place* is a pair ('url',*url*).
-    """
+    def list_things(self):
+        """List the things that we know how to fetch."""
 
-    import os
+        config = self.read_config()
+        group_names = config.keys()
+        group_names.sort()
+        for g in group_names:
+            if g == '':
+                self.output.write("Default group: \n")
+            else:
+                self.output.write("Group '%s':\n" % g)
+            bs = config[g]['bundles'].items()
+            bs.sort()
+            for ((pattern, local), members) in bs:
+                self.output.write("  bundle '%s':\n" % pattern)
+                if local:
+                    self.output.write("   (read to '%s')\n" % local)
+                for (pattern, local) in members:
+                    self.output.write("    member '%s'\n" % pattern)
+                    if local:
+                        self.output.write("    (read to '%s')\n" % local)
+            fs = config[g]['files']
+            fs.sort()
+            for (pattern, local) in fs:
+                self.output.write("  file '%s'\n" % pattern)
+                if local:
+                    self.output.write("   (read to '%s')\n" % local)
 
-    for (handler, url), name in l:
-        assert handler == 'url'
-        # Make a local filename.
-        local = os.path.join(prefix, name)
-        output.write(name + ' ' + url + '\n')
-        urllib.urlretrieve(url, local, progress_hook(output))
-        output.write('\n')
-        output.flush()
+    def find_requests(self, requests):
+        config = self.read_config()
+        bundles = {}
+        files = []
+        def add(fs, bs):
+            for f in fs:
+                files.append(f)
+            for (b,ms) in bs.items():
+                bundles[b] = bundles.get(b,[]) + ms
+        if not requests:
+            requests=['']
+        for request in requests:
+            if request in config:
+                add(config[request]['files'], config[request]['bundles'])
+                requests.remove(request)
+        for request in requests:
+            for group_name in config.keys():
+                if re.search(request, group_name):
+                    self.output.write("No group named '%s', using '%s' instead.\n"
+                                      % (request, group_name))
+                    add(config[group_name]['files'], config[group_name]['bundles'])
+                    requests.remove(request)
+        for request in requests:
+            for dict in config.values():
+                for (b,ms) in dict['bundles'].items():
+                    (pattern, local) = b
+                    if re.search(request, pattern) or (local is not None and re.search(request, local)):
+                        self.output.write("No group matching '%s',\n"
+                                          "    using bundle '%s:%s' instead.\n"
+                                          % (request, pattern, local))
+                        add([], {(pattern, local): ms})
+                        requests.remove(request)
+        for request in requests:
+            for dict in config.values():
+                for (pattern, local) in dict['files']:
+                    if re.search(request, pattern) or (local is not None and re.search(request, local)):
+                        self.output.write("No group or bundle matching '%s',\n"
+                                          "    using file '%s:%s' instead.\n"
+                                          % (request, pattern, local))
+                        add([(pattern, local)], {})
+                        requests.remove(request)
+        for request in requests:
+            for dict in config.values():
+                for (b,ms) in dict['bundles'].items():
+                    for (pattern, local) in ms:
+                        if re.search(request, pattern) or (local is not None and re.search(request, local)):
+                            self.output.write("No group or bundle matching '%s',\n"
+                                              "    using member '%s:%s'\n"
+                                              "    of bundle '%s:%s' instead.\n"
+                                              % (request, pattern, local, b[0], b[1]))
+                            add([], {b: [(pattern, local)]})
+                            requests.remove(request)
+        if requests:
+            raise Error("Don't know how to fetch these items: %s" % requests)
+        return (bundles, files)
 
-def fetch_tar(l, prefix, output):
-    """(helper function used by :meth:`fetch`)
-
-    *l* is a list of (*place*,*name*) pairs.  Each *name* is a short name,
-    each *place* is a triple ('tar',*url*,*member*).
-    """
-
-    import itertools
-    
-    # Group by URL so that we process all the members from the same tar
-    # file together.
-    # :todo: we should probably sort here, to ensure that the same tar
-    # members comes together.  In practice, there is only one tar file.
-    for url,group in itertools.groupby(l, key=lambda x: x[0][1]):
-        base, ext = os.path.splitext(url)
-        if ext == ".tar":
-            tar_compression_type = ""
+    def fetch_one(self, url, local, members=[]):
+        m = re.match('([a-z]+)://([^/]+)/(.*/)([^/]+)$', url)
+        if m is None:
+            raise Error("Malformed URL '%s'" % url)
+        protocol = m.group(1)
+        if protocol in 'http ftp'.split():
+            self.fetch_url(url, local, members)
+        elif protocol == 'ftpmatch':
+            host = m.group(2)
+            path = m.group(3)
+            pattern = m.group(4)
+            self.ftpmatch(host, path, pattern, local, members)
         else:
-            tar_compression_type = ext[1:]
-        name = url.split('/')[-1]
-        fetch_url([[['url', url], name]], prefix, output)
-        tar = open(os.path.join(prefix, name), 'rb')
-        members = map(lambda x: x[0][2], group)
-        print >>output, 'Extracting members from', url, '...'
-        fetch_from_tar(tar, members, prefix, output,
-            compression_type=tar_compression_type)
-        print >>output, "  ... finished extracting"
+            raise Error("Unknown protocol '%s' in URL '%s'" % (protocol, url))
 
-def fetch_zip(l, prefix, output):
-    """(helper function used by :meth:`fetch`)
+    def fetch_url(self, url, local, members):
+        import os
+        if local is None:
+            local=url.split('/')[-1]
+        name = os.path.join(self.prefix, local.strip())
+        if os.path.exists(name) and not self.force:
+            self.output.write("%s already exists.\n" % name)
+        else:
+            self.make_prefix()
+            self.output.write("Fetching %s to %s\n" % (url, name))
+            urllib.urlretrieve(url, name, progress_hook(self.output))
+            self.output.write('\n')
+            self.output.flush()
+            if not os.path.exists(name):
+                raise Error("Fetching %s to %s failed." % (url, name))
+        if os.path.getsize(name) == 0:
+            raise Error("%s is empty." % name)
+        if members:
+            self.extract(name, members)
 
-    *l* is a list of (*place*,*name*) pairs.  Each *name* is a short name,
-    each *place* is a triple ('zip',*url*,*member*).
-    """
+    def ftpmatch(self, host, path, pattern, local, members):
+        regexp = re.compile(pattern)
+        # http://www.python.org/doc/2.4.4/lib/module-ftplib.html
+        import ftplib
 
-    import itertools
-    import os
-
-    # Group by URL, as per fetch_tar.
-    for url,group in itertools.groupby(l, key=lambda x: x[0][1]):
-        name = url.split('/')[-1]
-        fetch_url([[['url', url], name]], prefix, output)
-        z = zipfile.ZipFile(os.path.join(prefix, name))
-        print >>output, 'Extracting members from', url, '...'
-        for place,name in group:
-            # Only works for text files.
-            dest = open(os.path.join(prefix, name), 'w')
-            src = z.open(place[2])
-            while 1:
-                s = src.read(9999)
-                if s == '':
-                    break
-                dest.write(s)
-            dest.close()
-            src.close()
-        print >>output, "  ... finished extracting"
-
-def fetch_ushcn(l, prefix, output):
-    """(helper function used by :meth:`fetch`)
-
-    *l* is a list of (*place*,*name*) pairs.  Each *name* is a short
-    name, each *place* is a triple ('ushcn',*host*,*directory*).
-
-    Retrieves a USHCN (V2) file opening an FTP connection to the host,
-    and scanning the directory, looking for files that match a
-    particular pattern.  The file with the most recent date in its
-    filename is downloaded.
-    """
-
-    # http://www.python.org/doc/2.4.4/lib/module-ftplib.html
-    import ftplib
-    # http://www.python.org/doc/2.4.4/lib/module-re.html
-    import re
-
-    # Regular expression for USHCN V2 filename.
-    file = re.compile(r'9641C_\d{6}_F52.avg.gz')
-
-    for place,name in l:
-        helper,host,directory = place
-        assert 'ushcn' == helper
-        remote = ftplib.FTP(host, 'ftp', 'ccc-staff@ravenbrook.com')
-        remote.cwd(directory)
+        remote = ftplib.FTP(host, 'ftp', 'info@climatecode.org')
+        remote.cwd(path)
         dir = remote.nlst()
-        good = filter(file.match, dir)
+        good = filter(regexp.match, dir)
         good.sort()
-        # Most recent file sorts to the end of the list, because dates
-        # are in the form YYYYMM.
+        if not good:
+            raise Error("Could not find any file matching '%s' at ftp://%s/%s" % (pattern, host, path))
         remotename = good[-1]
-        if directory[0] != '/':
-            directory = '/' + directory
-        fetch_url(
-          [(('url',
-             'ftp://%s%s/%s' % (host, directory, remotename)), name)],
-          prefix, output)
+        path = path.strip('/')
+        self.fetch_url('ftp://%s/%s/%s' % (host, path, remotename), local, members)
 
-def fetch_from_tar(inp, want, prefix='input', log=sys.stdout,
-        compression_type=""):
-    """Fetch a list of files from a tar file.  *inp* is an open file
-    object, *want* is the list of names that are required.  Each file
-    will be stored in the directory *prefix* using just the last
-    component of its name.
+    def extract(self, name, members):
+        exts = name.split('.')
+        if exts[-1] in 'gz bz bz2'.split():
+            exts = exts[:-1]
+        if exts[-1] in 'tar tgz tbz tbz2'.split():
+            self.extract_tar(name, members)
+        elif exts[-1] in 'zip'.split():
+            self.extract_zip(name, members)
 
-    Because of the way Python's tarfile module works, *inp* can be a tar
-    file or a compressed tar file.
-    """
+    def extract_tar(self, name, members):
+        # Could figure out compression type here, and pass it in to
+        # tarfile.open, but apparently these days the tarfile module
+        # does it for us.
 
-    import os
+        # The first argument, an empty string, is a dummy which works around
+        # a bug in Python 2.5.1.  See
+        # http://code.google.com/p/ccc-gistemp/issues/detail?id=26
+        tar = tarfile.open('', mode='r', fileobj=open(name,'r'))
+        for info in tar:
+            # would like to use 'any', but that requires Python 2.5
+            matches = [member for member in members if re.search(member[0]+'$', info.name)]
+            if matches:
+                if len(matches) > 1:
+                    raise Error("Multiple patterns match '%s': %s" % (info.name, matches))
+                members.remove(matches[0])
+                local = matches[0][1]
+                if local is None:
+                    local = info.name.split('/')[-1]
+                local = os.path.join(self.prefix, local.strip())
+                if os.path.exists(local) and not self.force:
+                    self.output.write("  ... %s already exists.\n" % local)
+                else:
+                    self.make_prefix()
+                    out = open(local, 'wb')
+                    self.output.write("  ... %s from %s.\n" % (local, info.name))
+                    # The following used to be simply
+                    # ``out.writelines(tar.extractfile(info))``, but the Python2.4
+                    # tarfile.py does not provide iteration support.
+                    member = tar.extractfile(info)
+                    while True:
+                        buf = member.read(4096)
+                        if not buf:
+                            break
+                        out.write(buf)
+        if members:
+            raise Error("Couldn't find these members in '%s': %s" % (name, [member[0] for member in members]))
 
-    # The first argument, an empty string, is a dummy which works around
-    # a bug in Python 2.5.1.  See
-    # http://code.google.com/p/ccc-gistemp/issues/detail?id=26
-    tar = tarfile.open('', mode='r|%s' % compression_type, fileobj=inp)
-    for info in tar:
-        # would like to use 'any', but that requires Python 2.5
-        if [r for r in want if re.match(r, info.name)]:
-            short = info.name.split('/')[-1]
-            local = os.path.join(prefix, short)
-            out = open(local, 'wb')
-            print >>log, "  ... %s from %s." % (short, info.name)
-
-            # The following used to be simply
-            # ``out.writelines(tar.extractfile(info))``, but the Python2.4
-            # tarfile.py does not provide iteration support.
-            member = tar.extractfile(info)
-            while True:
-                buf = member.read(4096)
-                if not buf:
-                    break
-                out.write(buf)
-
-# A "special" place is one that isn't just an ordinary URL.
-# Places are identified as being "special" when they are a list
-# whose first element is a key in this *special* dictionary.
-# Ordinary strings are assumed to be URLs and are not special.
-# But the first element of a string is a one character string, so
-# all *special* keys should be longer than 1 character.
-# Sorry about the global.
-special = dict(
-  tar=fetch_tar,
-  zip=fetch_zip,
-  ushcn=fetch_ushcn,
-)
+    def extract_zip(self, name, members):
+        z = zipfile.ZipFile(name)
+        for entry in z.namelist():
+            matches = [member for member in members if re.search(member[0]+'$', entry)]
+            if matches:
+                if len(matches) > 1:
+                    raise Error("Multiple patterns match '%s': %s" % (entry, matches))
+                members.remove(matches[0])
+                local = matches[0][1]
+                if local is None:
+                    local = entry.split('/')[-1]
+                local = os.path.join(self.prefix, local.strip())
+                if os.path.exists(local) and not self.force:
+                    self.output.write("  ... %s already exists.\n" % local)
+                else:
+                    self.make_prefix()
+                    # Only works for text files.
+                    out = open(local, 'w')
+                    self.output.write("  ... %s from %s.\n" % (local, entry))
+                    src = z.open(entry)
+                    while True:
+                        s = src.read(4096)
+                        if not s:
+                            break
+                        out.write(s)
+                    out.close()
+                    src.close()
+        if members:
+            raise Error("Couldn't find these members in '%s': %s" % (name, [member[0] for member in members]))
 
 def progress_hook(out):
     """Return a progress hook function, suitable for passing to
@@ -408,14 +422,6 @@ def progress_hook(out):
         out.flush()
     return it
 
-def list_things():
-    """List the things that this program knows how to fetch."""
-
-    things = places().keys()
-    things.sort()
-    for k in things:
-        print k
-
 class Error(Exception):
     """Some sort of problem with fetch."""
 
@@ -427,18 +433,30 @@ class Usage(Exception):
 def main(argv=None):
     if argv is None:
         argv = sys.argv
+    write_list = False
+    kwargs = dict()
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "", ["help", "list"])
+            opts, args = getopt.getopt(argv[1:], "", ["help", "list", "force", "store=", "config="])
             for o,a in opts:
                 if o in ('--help',):
                     print __doc__
                     return 0
                 if o == '--list':
-                    return list_things()
+                    write_list = True
+                if o == '--force': 
+                    kwargs.update(force=True)
+                if o == '--config':
+                    kwargs.update(config_file=a)
+                if o == '--store':
+                    kwargs.update(prefix=a)
         except getopt.error, msg:
              raise Usage(msg)
-        fetch(args)
+        fetcher = Fetcher(**kwargs)
+        if write_list:
+            fetcher.list_things()
+        else:
+            fetcher.fetch()
     except Usage, err:
         print >>sys.stderr, err.msg
         print >>sys.stderr, "for help use --help"

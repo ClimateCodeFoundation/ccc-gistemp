@@ -1,0 +1,65 @@
+# Configuration file for ccc-gistemp, describing the
+# location and form of all source datasets.
+#
+# Nick Barnes, Climate Code Foundation, 2012-05-24
+#
+
+# For the syntax and usage of this file, see
+#
+# python tool/fetch.py --help.
+
+# Sea-surface temperatures
+file:   ftp://data.giss.nasa.gov/pub/gistemp/SBBX.HadR2
+
+# GHCN v3
+bundle: ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/ghcnm.tavg.latest.qca.tar.gz
+member: ghcnm.v3.*/ghcnm.tavg.*.qca.dat ghcnm.tavg.qca.dat
+
+# We obtain metadata files, and temperatures from
+# SCAR and Hohenpeissenberg, and SST climatology,
+# from the GISTEMP sources.
+bundle: http://data.giss.nasa.gov/gistemp/sources_v3/GISTEMPv3_sources.tar.gz
+
+# SCAR temperatures
+member: /STEP0/input_files/antarc1.list                                         
+member: /STEP0/input_files/antarc1.txt                                          
+member: /STEP0/input_files/antarc2.list                                         
+member: /STEP0/input_files/antarc2.txt                                          
+member: /STEP0/input_files/antarc3.list                                         
+member: /STEP0/input_files/antarc3.txt                                          
+
+# Hohenpeissenberg temperatures
+member: /STEP0/input_files/t_hohenpeissenberg_200306.txt_as_received_July17_2003
+
+# metadata
+member: /STEP1/input_files/mcdw.tbl    
+member: /STEP1/input_files/ushcn3.tbl  
+member: /STEP1/input_files/sumofday.tbl
+member: /STEP1/input_files/v3.inv
+
+# SST climatology
+member: /STEP4_5/input_files/oisstv2_mod4.clim.gz
+
+# GHCN v2
+group:  ghcn-v2
+bundle: ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/zipd/v2.mean.zip
+member: raid2g/ghcn/v2/data/current/zipd/v2.mean
+
+# USHCNv2
+group:  ushcn-v2
+file:   ftpmatch://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_\d{6}_F52.avg.gz ushcnv2.gz
+
+# ccc-gistemp test data 
+group:  test
+file:   http://ccc-gistemp.googlecode.com/files/ccc-gistemp-test-2009-12-28.tar.gz
+
+# land masks
+group:  landmask
+file:   http://islscp2.sesda.com/ISLSCP2_1/data/ancillary/land_water_masks_xdeg/land_ocean_masks_xdeg.zip
+file:   http://islscp2.sesda.com/ISLSCP2_1/data/ancillary/land_outlines_xdeg/land_water_outlines_xdeg.zip
+file:   http://islscp2.sesda.com/ISLSCP2_1/data/ancillary/land_outlines_xdeg/land_only_outlines_xdeg.zip
+
+# Test of unzipping
+group:  zip-test
+bundle: ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/zipd/v2.prcp.zip
+member: v2.prcp

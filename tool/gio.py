@@ -1178,7 +1178,9 @@ def read_hohenpeissenberg(path):
     We only want data from 1880 to 2002.
     """
 
-    record = code.giss_data.Series(uid='617109620002')
+    record = code.giss_data.Series(uid='617109620000')
+    # should be ...002 but for some reason this changes to ...000 in
+    # GISTEMP v3.
     for line in open(path):
         if line[0] in '12':
             year = int(line[:4])
@@ -1271,7 +1273,7 @@ def ushcn_input_file():
     for f in files:
         if os.path.exists(f) or os.path.exists(f+'.gz'):
             return f
-    raise ValueError, "no USHCN data file in input directory; run tool/preflight.py."
+    raise ValueError, "no USHCN data file in input directory; run tool/fetch.py."
 
 def ghcn3_input_file():
     """Find the GHCN V3 input file.  Looks in the input/ directory for

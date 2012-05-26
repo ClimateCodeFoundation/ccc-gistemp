@@ -144,7 +144,6 @@ def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg_dict):
                                   hohenpeissenberg.series)
                 for i, year in enumerate(range(cut, last_year + 1)):
                     record.add_year(year, new_data[i * 12:(i + 1) * 12])
-
             else:
                 # For other records, just replace the data with the later
                 # years.
@@ -190,16 +189,17 @@ def step0(input):
         data[source] = asdict(input.open(source))
 
     # If we're using GHCN (and we usually are) then we...
-    if 'ghcn' in sources:
+    if 'ghcn' in sources or 'ghcn.v3' in sources:
+        ghcn_data = data.get('ghcn.v3', data.get('ghcn', None))
         # ... adjust the Hohenpeissenberg data;
         if 'hohenpeissenberg' in sources:
-            correct_Hohenpeissenberg(data['ghcn'], data['hohenpeissenberg'])
+            correct_Hohenpeissenberg(ghcn_data, data['hohenpeissenberg'])
         # ... adjust the USHCN data;
         if 'ushcn' in sources:
-            adjust_USHCN(data['ushcn'], data['ghcn'])
+            adjust_USHCN(data['ushcn'], ghcn_data)
         # ... optionally exclude contiguous US stations.
         if not parameters.retain_contiguous_US:
-            discard_contig_us(data['ghcn'])
+            discard_contig_us(ghcn_data)
 
     # Join all data sources together.
     records = {}

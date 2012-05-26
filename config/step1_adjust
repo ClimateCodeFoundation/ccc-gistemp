@@ -1,2 +1,15 @@
+# A pair of manually-configured adjustments to specific station
+# records in GISTEMP STEP 1.  In GISTEMP, these adjustments were made
+# in two distinct phases: (one configured by a file called
+# Ts.discont.RS.alter.IN and the other by combine_pieces_helena.in).
+# In ccc-gistemp, we combined the two into a single manual adjustment
+# phase.
+#
+# GISTEMP itself no longer makes these adjustments (since the change
+# to using the homogenized GHCN-M 3 source data).  ccc-gistemp may
+# retain the ability to do them.
+#
+# Nick Barnes 2012-05-25.
+
 147619010000 147619010002 1976 8 1.0
 425911650000 dummy 1949 12 0.84

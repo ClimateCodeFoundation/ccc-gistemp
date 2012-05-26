@@ -374,7 +374,7 @@ class SubboxReader(object):
 # Obsolescent.
 def StationTsReader(path):
     """Opens a file in Ts.txt file format and yields each station.
-    This is the traditional output of Step 1, but modern ccc-gistemp
+    This is the traditional output of Step 1, but ccc-gistemp now
     uses a v2.mean style output.
 
     """
@@ -407,7 +407,7 @@ def StationTsReader(path):
 # Obsolescent.
 class StationTsWriter(object):
     """Writes a file in Ts.txt format.  The traditional output of
-    step1, but modern ccc-gistemp output uses a v2.mean style output.
+    step1, but ccc-gistemp now uses a v2.mean style output.
     """
 
     def __init__(self, path):
@@ -466,7 +466,9 @@ def GHCNV3Reader(path=None, file=None, meta=None, year_min=None, scale=None):
         print "(Reading %s)" % friendly[element]
 
     element_scale = dict(TAVG=0.01)
-    # Flags that cause value to be rejected. :todo: make parameter.
+    # Quality-control flags that cause value to be rejected.
+    # :todo: make parameter.  When using the QCA dataset
+    # we shouldn't actually see any of these flags.
     reject = 'DKOSTW'
 
     def convert(s):
@@ -489,9 +491,9 @@ def GHCNV3Reader(path=None, file=None, meta=None, year_min=None, scale=None):
     all_missing = [MISSING]*12
 
     for id,lines in itertools.groupby(inp, id11):
-        key = dict(uid=id+'G',
-          first_year=year_min,
-          )
+        key = dict(uid=id+'0',
+                   first_year=year_min,
+                   )
         if meta and meta.get(id):
             key['station'] = meta[id]
         record = code.giss_data.Series(**key)
@@ -982,11 +984,11 @@ def read_USHCN_stations(ushcn_v1_station_path, ushcn_v2_station_path):
     return stations
 
 
-def station_metadata(path=None, file=None, format='v2'):
+def station_metadata(path=None, file=None, format='v3'):
     """Read station metadata from file, return it as a dictionary.
     *format* specifies the format of the metadata can be:
     'v2' for GHCN v2 (with some GISTEMP modifications);
-    'v3' for GHCN v3;
+    'v3' for GHCN v3 (with some GISTEMP modifications);
     'ushcnv2' for USHCN v2.
 
     GHCN v2
@@ -1106,9 +1108,35 @@ def station_metadata(path=None, file=None, format='v2'):
         us_light=    (101, 102, str),           # GISTEMP only
         global_light=(102, 106, blank_int),     # GISTEMP only
     )
-    # See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README for format
-    # of metadata file.
+
+    # the GHCNv3 metadata file provided by GISS, which is restructured
+    # from the GHCN-provided one to look like the GHCNv2 one above,
+    # but has slightly different final fields.
+    
     v3fields = dict(
+        uid=         (0,   11,  str),
+        name=        (12,  42,  str),
+        lat=         (43,  49,  float),
+        lon=         (50,  57,  float),
+        stelev=      (58,  62,  int),
+        grelev=      (62,  67,  blank_int),
+        popcls=      (67,  68,  str),
+        popsiz=      (68,  73,  blank_int),
+        topo=        (73,  75,  str),
+        stveg=       (75,  77,  str),
+        stloc=       (77,  79,  str),
+        ocndis=      (79,  81,  blank_int),
+        airstn=      (81,  82,  str),
+        towndis=     (82,  84,  blank_int),
+        grveg=       (84,  100, str),
+        popcss=      (100, 101, str),
+        global_light=(101, 106, blank_int),   # GISTEMP only
+        berkeley=    (106, 109, str),         # GISTEMP only; comment suggests derived from Berkeley Earth.
+    )
+    
+    # See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README for format
+    # of GHCN's original metadata file.
+    v3_ghcn_fields = dict(
         uid=    (0,    11, str),
         lat=    (12,   20, float),
         lon=    (21,   30, float),
@@ -1126,6 +1154,7 @@ def station_metadata(path=None, file=None, format='v2'):
         grveg=  (90,  106, str),
         popcss= (106, 107, str),
     )
+
     ushcnv2fields = dict(
         uid=     (0,  6, str),
         lat=     (7, 15, float),
@@ -1171,16 +1200,18 @@ def augmented_station_metadata(path=None, file=None, format='v2'):
     return meta
 
 
-def read_hohenpeissenberg(path):
+def read_hohenpeissenberg(path, meta=None, year_min=None):
     """Reads the Hohenpeissenberg data from
     input/t_hohenpeissenberg_200306.txt_as_received_July17_2003
     which has a header line and then one line per year from 1781.
     We only want data from 1880 to 2002.
     """
 
-    record = code.giss_data.Series(uid='617109620000')
+    record = code.giss_data.Series(uid='617109620000', first_year=year_min)
     # should be ...002 but for some reason this changes to ...000 in
     # GISTEMP v3.
+    if meta and record.uid[:11] in meta:
+        record.station = meta[record.uid[:11]]
     for line in open(path):
         if line[0] in '12':
             year = int(line[:4])
@@ -1205,9 +1236,9 @@ def read_generic(name):
 
     f = open(os.path.join('input', name+'.mean'))
 
-    # Read the metadata from the v2.inv file, then merge in foo.v2.inv
+    # Read the metadata from the v3.inv file, then merge in foo.v2.inv
     # file if present.
-    meta = v2meta()
+    meta = v3meta()
     try:
         m = open(os.path.join('input', name+'.inv'))
         print "  Reading metadata from %s" % m.name
@@ -1275,23 +1306,9 @@ def ushcn_input_file():
             return f
     raise ValueError, "no USHCN data file in input directory; run tool/fetch.py."
 
-def ghcn3_input_file():
-    """Find the GHCN V3 input file.  Looks in the input/ directory for
-    sub-directories that start "ghcnm", then picks the most recent one
-    and looks inside that for the .dat file (using the last 8 characters
-    of the directory name to determine most recent)."""
-
-    dirs = filter(os.path.isdir, glob.glob('input/ghcnm*'))
-    dirs.sort(key=lambda x: x[:8], reverse=True)
-    if not dirs:
-        raise IOError('Cannot find GHCN v3 input file.')
-    dir = dirs[0]
-    dats = glob.glob(os.path.join(dir, '*.dat'))
-    return dats[0]
-
-_v2meta = None
-def v2meta():
-    """Return the GHCN v2 metadata.  Loading it (from the modified
+_v3meta = None
+def v3meta():
+    """Return the GHCN v3 metadata.  Loading it (from the modified
     version of the file supplied by GISS) if necessary.
     """
 
@@ -1300,20 +1317,20 @@ def v2meta():
     # found).
     # See http://code.google.com/p/ccc-gistemp/issues/detail?id=88
 
-    global _v2meta
+    global _v3meta
 
-    v2inv = os.path.join('input', 'v2.inv')
-    if not _v2meta:
-        _v2meta = augmented_station_metadata(v2inv, format='v2')
-    return _v2meta
+    v3inv = os.path.join('input', 'v3.inv')
+    if not _v3meta:
+        _v3meta = augmented_station_metadata(v3inv, format='v3')
+    return _v3meta
 
 def magic_meta(path):
     """Return the metadata in the file at *path*.  Magically knows
     whether metadata is in GHCN v2 format, or USHCN v2 format (from the
     name)."""
 
-    if path == 'v2.inv' or path == '':
-        return v2meta()
+    if path == 'v3.inv' or path == '':
+        return v3meta()
     else:
         path = os.path.join('input', path)
         return augmented_station_metadata(path, format='ushcnv2')
@@ -1349,26 +1366,28 @@ class Input:
             return read_USHCN_converted(ushcn_input_file(),
               ushcn_map, meta=ushcn_meta)
         if source == 'ghcn.v3':
-            ghcn3file = ghcn3_input_file()
-            invfile = ghcn3file.replace('.dat', '.inv')
+            ghcn3file = 'input/ghcnm.tavg.qca.dat'
+            invfile = 'input/v3.inv'
             return GHCNV3Reader(file=open(ghcn3file),
               meta=augmented_station_metadata(invfile, format='v3'),
               year_min=code.giss_data.BASE_YEAR)
         if source == 'ghcn':
             return GHCNV2Reader("input/v2.mean",
-                meta=v2meta(),
+                meta=v3meta(),
                 year_min=code.giss_data.BASE_YEAR)
         if source == 'scar':
             return itertools.chain(
                 read_antarctic("input/antarc1.txt", "input/antarc1.list", '8',
-                  meta=v2meta(), year_min=code.giss_data.BASE_YEAR),
+                  meta=v3meta(), year_min=code.giss_data.BASE_YEAR),
                 read_antarctic("input/antarc3.txt", "input/antarc3.list", '9',
-                  meta=v2meta(), year_min=code.giss_data.BASE_YEAR),
+                  meta=v3meta(), year_min=code.giss_data.BASE_YEAR),
                 read_australia("input/antarc2.txt", "input/antarc2.list", '7',
-                  meta=v2meta(), year_min=code.giss_data.BASE_YEAR))
+                  meta=v3meta(), year_min=code.giss_data.BASE_YEAR))
         if source == 'hohenpeissenberg':
             return read_hohenpeissenberg(
-              "input/t_hohenpeissenberg_200306.txt_as_received_July17_2003")
+              "input/t_hohenpeissenberg_200306.txt_as_received_July17_2003",
+              meta=v3meta(),
+              year_min=code.giss_data.BASE_YEAR)
         if source.endswith('.v2'):
             # A "generic" source.  "ca.v2" will look for ca.v2.mean,
             # ca.v2.inv, ca.tbl (all in the input directory).
@@ -1414,18 +1433,18 @@ step0_output = generic_output_step(0)
 
 def step1_input():
     return GHCNV2Reader("work/step0.v2",
-        meta=v2meta(),
+        meta=v3meta(),
         year_min=code.giss_data.BASE_YEAR)
 
 step1_output = generic_output_step(1)
 
 def step2_input():
-    return GHCNV2Reader("work/step1.v2", meta=v2meta())
+    return GHCNV2Reader("work/step1.v2", meta=v3meta())
 
 step2_output = generic_output_step(2)
 
 def step3_input():
-    return GHCNV2Reader("work/step2.v2", meta=v2meta())
+    return GHCNV2Reader("work/step2.v2", meta=v3meta())
 
 STEP3_OUT = os.path.join('result', 'SBBX1880.Ts.GHCN.CL.PA.1200')
 
@@ -1718,7 +1737,7 @@ def boxid_eq(uid1, uid2):
     return abs(lat1 - lat2) < 0.15 and abs(lon1 - lon2) < 0.15
 
 def step5_zone_titles():
-    """Return the titles used for the 14 zones."""
+    """Return the titles used for the 16 zones."""
 
     # Boundaries (degrees latitude, +ve North) of the 8 basic belts.
     band = ['90.0 N',
@@ -1738,6 +1757,8 @@ def step5_zone_titles():
         '  NORTHERN LATITUDES: 23.6 N TO  90.0 N',
         '       LOW LATITUDES: 23.6 S TO  23.6 N',
         '  SOUTHERN LATITUDES: 90.0 S TO  23.6 S',
+        '  NHEM.MID LATITUDES: 23.6 N TO  64.2 N',
+        '  SHEM.MID LATITUDES: 64.2 S TO  23.6 S',
         'NORTHERN HEMISPHERE',
         'SOUTHERN HEMISPHERE',
         'GLOBAL MEANS']
@@ -1794,7 +1815,7 @@ def step5_output_one(item):
         print >> f, title
 
     # iord literal borrowed exactly from Fortran...
-    iord = [14,12,13, 9,10,11, 1,2,3,4,5,6,7,8]
+    iord = [16,14,15, 9,10,11, 1,2,3,4,5,6,7,8]
     # ... and then adjusted for Python index convention.
     iord = map(lambda x: x-1, iord)
     # Display the annual means.
@@ -1832,7 +1853,7 @@ Year  Glob  NHem  SHem    -90N  -24N  -24S    -90N  -64N  -44N  -24N  -EQU  -24S
         iyr = iyrbeg+iy
         print >> out[0], ('%4d' + ' %s'*3 + '  ' + ' %s'*3 +
                           '  ' + ' %s'*8 + '%5d') % tuple([iyr] +
-          [annasstr(iord[zone]) for zone in range(jzm)] + [iyr])
+          [annasstr(zone) for zone in iord] + [iyr])
     # The trailing banner is just like the repeated banner, except that
     # "Year  Glob  NHem  SHem" appears on on the first line, not the
     # second line (and the same for the "Year" that appears at the end

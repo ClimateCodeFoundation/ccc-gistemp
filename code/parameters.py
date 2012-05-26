@@ -8,18 +8,18 @@
 
 """Parameters controlling the GISTEMP algorithm.
 
-Various numeric parameters controlling each phase of the algorithm are
+Various parameters controlling each phase of the algorithm are
 collected and documented here.  They appear here in approximately the
 order in which they are used in the algorithm.
 """
 __docformat__ = "restructuredtext"
 
-data_sources = "ghcn ushcn hohenpeissenberg scar"
+data_sources = "ghcn.v3 hohenpeissenberg scar"
 """Data sources that are used for the analysis (space separated string).
-'ghcn' is the Global Historical Climate Network (NOAA); 'ushcn' is
-the US Historical Climate Network (NOAA); 'hohenpeissenberg' is
-Wiljens data for Hohenpeissenberg; 'scar' is the READER data from
-Scientific Committee on Antarctic Research.
+'ghcn.v3' is the Global Historical Climate Network (NOAA);
+'hohenpeissenberg' is Wiljens data for Hohenpeissenberg;
+'scar' is the READER data from Scientific Committee on Antarctic
+Research.
 """
 
 augment_metadata = ''
@@ -41,19 +41,24 @@ work_file_format = "v2"
 
 USHCN_convert_id = True
 """Whether to convert USHCN station identifiers to GHCN station
-identifiers (using tables supplied by GISS).  In the usual analysis,
-this must be True."""
+identifiers (using tables supplied by GISS), when using USHCN as a
+data source.  In the usual analysis prior to using GHCN v3, this had
+to be True.  Irrelevant in the usual analysis using GHCN v3, as USHCN
+is not used."""
 
 USHCN_meta = ''
-"""Specifies what file to use for USHCN metadata (latitude, longitude).
-If empty then the GHCN v2.inv file is used (and this will only work when
-USHCN_convert_id is True).  Specify "ushcn-v2-stations.txt" and place
-that file in the input/ directory to use the USHCN metadata."""
+"""Specifies what file to use for USHCN metadata (latitude,
+longitude), when using USHCN as a data source.  If empty then the GHCN
+metadata file is used (and this will only work when USHCN_convert_id
+is True).  Specify "ushcn-v2-stations.txt" and place that file in the
+input/ directory to use the USHCN metadata.  Irrelevant in the usual
+analysis using GHCN v3, as USHCN is not used."""
 
 USHCN_offset_start_year = 1980
 """The first year of the period considered when calculating the
 offsets between GHCN and USHCN records, to apply to a USHCN
-temperature series.
+temperature series.  Irrelevant in the usual analysis using GHCN v3,
+as USHCN is not used.
 """
 
 USHCN_offset_max_months = 10
@@ -61,15 +66,16 @@ USHCN_offset_max_months = 10
 between GHCN and USHCN, to apply to a USHCN temperature series.  The
 algorithm starts in the current year and works back to
 *USHCN_offset_start_year*, computing an offset for each month using up
-to *USHCN_offset_max_months* records."""
+to *USHCN_offset_max_months* records.  Irrelevant in the usual
+analysis using GHCN v3, as USHCN is not used."""
 
 retain_contiguous_US = True
-"""Whether to retain GHCN records that are in the contiguous US.
-Ordinarily, USHCN replaces GHCN records, but: some stations have
-duplicates; some GHCN stations have no USHCN counterpart.  This
-parameter affects those records.
+"""Whether to retain GHCN records that are in the contiguous US.  When
+using USHCN ordinarily, USHCN replaces GHCN records, but: some
+stations have duplicates; some GHCN stations have no USHCN
+counterpart.  This parameter affects those records.  When not using
+USHCN, this should be True.
 """
-
 station_combine_min_overlap = 4
 """The minimum number of years of overlap, between a combined record
 and a candidate record, to allow the candidate to be added into the
@@ -95,29 +101,34 @@ station_drop_minimum_months = 20
 with at least this many valid data values, otherwise it is dropped
 immediately prior to the peri-urban adjustment step."""
 
-rural_designator = "global_light"
-"""Specifies which station metadata fields are used to determine whether
-a station is rural or not.  Only certain fields may be specified:
+rural_designator = "global_light <= 10"
+"""Describes the test used to determine whether a station is rural or
+not, in terms of the station metadata fields.  Relevant fields are:
 'global_light' (global satellite nighttime radiance value); 'popcls'
-(GHCN population class); 'us_light' (class derived from satellite nighttime
-radiance covering the US and some neighbouring stations).
+(GHCN population class flag; the value 'R' stands for rural);
+'us_light' (class derived from satellite nighttime radiance covering
+the US and some neighbouring stations), 'berkeley' (a field of unknown
+provenance which seems to be related to the Berkeley Earth Surface
+Temperature project).
 
-The value of this field may be a comma separated sequence, in which case
-the fields are consulted in the order specified until one is found that
-is not blank (the only field for which this is useful is the 'us_light'
-field, and the only intended use of this feature is to emulate a
-previous version of GISTEMP).
+The value of this parameter may be a comma separated sequence.  Each
+member in that sequence can either be a metadata field name, or a
+numeric comparison on a metadata field name (e.g. "global_light <= 10",
+the default).  If a field name appears on its own, the meaning is
+field-dependent.
+
+The fields are consulted in the order specified until one is found
+that is not blank, and that obeys the condition (the only field which
+is likely to be blank is 'us_light': this sequential feature is
+required to emulate a previous version of GISTEMP).
 
 Previous versions of GISTEMP can be "emulated" as follows:
 "popcls" GISTEMP 1999 to 2001
-"us_light,popcls" GISTEMP 2001 to 2010
-"global_light" GISTEMP 2010 onwards
+"us_light, popcls" GISTEMP 2001 to 2010
+"global_light <= 10" GISTEMP 2010 onwards
+"global_light <= 0" GISTEMP 2011 passing 2 as second arg to do_comb_step2.sh 
+"berkeley <= 0" GISTEMP 2011 passing 3 as second arg to do_comb_step2.sh 
 """
-
-max_rural_brightness = 10
-"""The maximum brightness value for a station to be considered rural,
-when 'global_light' is the field used in determing whether a station
-is rural or not (see *rural_designator*)."""
 
 urban_adjustment_min_years = 20
 """When trying to calculate an urban station adjustment, at least this

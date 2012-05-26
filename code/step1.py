@@ -9,7 +9,7 @@
 
 """
 Python code reproducing the Step 1 part of the GISTEMP algorithm.  In
-this step: duplicate records from the same station (a GHCN v2 feature)
+this step: duplicate records from the same station (a GHCN v3 feature)
 are combined into a single record, if possible; certain records (or
 parts) are adjusted or dropped, under the control of configuration
 files.
@@ -18,23 +18,16 @@ Requires the following files in the input/ directory,
 from GISTEMP STEP1/input_files/:
 
 mcdw.tbl
-ushcn2.tbl
+ushcn3.tbl
 sumofday.tbl
-v2.inv
+v3.inv
 
-Do not be tempted to replace v2.inv with the apparently similar
-v2.temperature.inv file available from NOAA,
-ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.temperature.inv .  The
-NOAA file has been treated for GISTEMP's use by, for example, adding
-records corresponding to Antarctic stations that are not used in GHCN
-but are used in the GISTEMP analysis.  Step 1 (this step) expects to
-find a record in v2.inv for every station it has a time series for.
+Also this file from GISTEMP STEP0/input_files/:
 
-Requires the following files in the config/ directory,
-from GISTEMP STEP1/input_files/:
+Ts.strange.v3.list.IN_full
 
-step1_adjust
-Ts.strange.RSU.list.IN
+Do not be tempted to replace v3.inv with the GHCNM 3.1.0 metadata file
+available from NCDC.
 
 Also requires the existence of writeable work/ and log/ directories.
 """
@@ -291,7 +284,7 @@ def adjust_discont(stream):
 
 def drop_strange(data):
     """Drops station records, or parts of records, under control of
-    the file 'config/Ts.strange.RSU.list.IN' file.
+    the file 'input/Ts.strange.v3.list.IN_full' file.
     """
 
     changes_dict = read_config.get_changes_dict()
@@ -471,19 +464,21 @@ def get_actual_endpoints(wgts, begin):
             y_max = max(y_max, y)
     return begin+y_min, begin+y_max
 
-def step1(record_source):
+def step1(records):
     """An iterator for step 1.  Produces a stream of
     `giss_data.Series` instances.
 
-    :Param record_source:
+    :Param records:
         An iterable source of `giss_data.Series` instances (which it
         will assume are station records).
 
     """
-    records = comb_records(record_source)
-    adjusted = adjust_discont(records)
-    combined_pieces = comb_pieces(adjusted)
-    without_strange = drop_strange(combined_pieces)
+    if 'ghcn.v3' not in parameters.data_sources:
+        print "Not GHCN v3: trying to combine records."
+        combined = comb_records(records)
+        adjusted = adjust_discont(combined)
+        records = comb_pieces(adjusted)
+    without_strange = drop_strange(records)
     for record in without_strange:
         assert record.first_year == BASE_YEAR
         yield record

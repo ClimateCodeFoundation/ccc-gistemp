@@ -12,14 +12,14 @@ GISTEMP:
 """
 
 def v2_get_sources():
-    """Reads the three tables mcdw.tbl, ushcn2.tbl, sumofday.tbl and
+    """Reads the three tables mcdw.tbl, ushcn3.tbl, sumofday.tbl and
     return a dictionary that maps from 12-digit (string) station ID to
     the source (which is one of the strings 'MCDW', 'USHCN2',
     'SUMOFDAY').
     """
 
     sources = {}
-    for source in ['MCDW', 'USHCN2', 'SUMOFDAY']:
+    for source in ['MCDW', 'USHCN3', 'SUMOFDAY']:
         for line in open('input/%s.tbl' % source.lower()):
             _, id11, duplicate = line.split()
             sources[id11 + duplicate] = source
@@ -33,24 +33,27 @@ def step1_adjust():
 
     adjust = {}
     for line in open('config/step1_adjust', 'r'):
+        line = line.strip()
+        if line == '' or line[0] == '#':
+            continue
         id, _, year, month, summand = line.split()
         adjust[id] = (int(year), int(month), float(summand))
     return adjust
 
 
 def get_changes_dict():
-    """Reads the file config/Ts.strange.RSU.list.IN and returns a dict
-    result.  Each line in that file begins with a 12-digit station ID
-    - actually the tuple (country-code, WMO station, modifier,
-    duplicate) - and ends with either yyyy/mm, specifying a month
-    datum to omit or with xxxx-yyyy, specifying years to omit.  xxxx
-    can be 0, meaning from the beginning. yyyy can be 9999, meaning to
-    the end.  The dict is a map from ID to ('month',yyyy,mm) or
-    ('years',xxxx,yyyy).
+    """Reads the file input/Ts.strange.v3.list.IN_full and returns a
+    dict result.  Each line in that file begins with a 12-digit
+    station ID - actually the tuple (country-code, WMO station,
+    modifier, duplicate) - and ends with either yyyy/mm, specifying a
+    month datum to omit or with xxxx-yyyy, specifying years to omit.
+    xxxx can be 0, meaning from the beginning. yyyy can be 9999,
+    meaning to the end.  The dict is a map from ID to
+    ('month',yyyy,mm) or ('years',xxxx,yyyy).
     """
 
     dict = {}
-    for line in open('config/Ts.strange.RSU.list.IN', 'r'):
+    for line in open('input/Ts.strange.v3.list.IN_full', 'r'):
         split_line = line.split()
         id = split_line[0]
         try:

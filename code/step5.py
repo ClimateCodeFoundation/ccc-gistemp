@@ -237,8 +237,8 @@ def zonav(meta, boxed_data):
     various latitudinal zones.  Returns an iterator of
     (averages, weights, title) tuples, one per zone.
 
-    14 zones are produced.  The first 8 are the basic belts that are used
-    for the equal area grid, the remaining 6 are combinations:
+    16 zones are produced.  The first 8 are the basic belts that are used
+    for the equal area grid, the remaining 8 are combinations:
 
       0 64N - 90N               \
       1 44N - 64N (asin 0.9)     -  8 24N - 90 N  (0 + 1 + 2)
@@ -249,9 +249,11 @@ def zonav(meta, boxed_data):
       6 64S - 44S                - 10 90S - 24 S  (5 + 6 + 7)
       7 90S - 64S               /
 
-     11 northern hemisphere (0 + 1 + 2 + 3)
-     12 southern hemisphere (4 + 5 + 6 + 7)
-     13 global (all belts 0 to 7)
+     11 northern mid-latitudes (1 + 2)
+     12 southern mid-latitudes (5 + 6)
+     13 northern hemisphere (0 + 1 + 2 + 3)
+     14 southern hemisphere (4 + 5 + 6 + 7)
+     15 global (all belts 0 to 7)
     """
 
     iyrbeg = meta.yrbeg
@@ -358,7 +360,7 @@ def sort_perm(a):
     return sorted, indexes
 
 def zones():
-    """Return the parameters of the 14 zones (8 basic bands and 6
+    """Return the parameters of the 16 zones (8 basic bands and 8
     additional compound zones).
     
     A pair of (*boxes_in_band*,*band_in_zone*) is returned.
@@ -381,7 +383,9 @@ def zones():
     G = set(range(8)) # Global
     S = G - N         # Southern hemisphere
     T = set([3,4])    # Tropics
-    band_in_zone = [N-T, T, S-T, N, S, G]
+    NM = set([1,2])   # Northern mid-latitudes
+    SM = set([5,6])   # Southern mid-latitudes
+    band_in_zone = [N-T, T, S-T, NM, SM, N, S, G]
 
     return boxes_in_band, band_in_zone
 
@@ -398,7 +402,7 @@ def annzon(meta, zoned_averages, alternate={'global':2, 'hemi':True}):
     otherwise.
     """
 
-    zones = 14
+    zones = 16
 
     title = meta.title
     iyrbeg = meta.yrbeg

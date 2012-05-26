@@ -211,24 +211,58 @@ def annual_anomaly(record):
         return None
 
 
+_rural_test = None
+def rural_test():
+    """Returns a list of triples (field_name, comparison, value) which
+    are derived from parameters.rural_designator.  Parsing the
+    parameter into this list is quite laborious, so we only want to do
+    it once."""
+    global _rural_test
+
+    if _rural_test:
+        return _rural_test
+
+    comp_dict = {'=': lambda x,y:x==y,
+                 '<': lambda x,y:x<y,
+                 '<=': lambda x,y:x<=y,
+                 '>': lambda x,y:x>y,
+                 '>=': lambda x,y:x>=y}
+    
+    import re
+    tests = []
+    # Process the list of tests into a set of triples:
+    for test in parameters.rural_designator.split(','):
+        m = re.match(r'([a-z_]+)\s*((=|<|<=|>|>=)\s*([0-9]+))', test)
+        if m:
+            field = m.group(1)
+            if m.group(2):
+                comparison = comp_dict[m.group(3)]
+                value = int(m.group(4))
+            else:
+                comparison = lambda x,y: x==y
+                if field == 'us_light':
+                    value = '1'
+                elif field == 'popcls':
+                    value = 'R'
+                else:
+                    assert 0, "Don't know how to test '%s' in parameters.rural_designator" % field
+        else:
+            assert 0, "Malformed test in parameters.rural_designator: '%s'" % test
+        tests.append((field, comparison, value))
+    
+    _rural_test = tests
+    return _rural_test
+
 def is_rural(station):
     """Test whether the station described by *station* is rural,
     according to the specification of parameters.rural_designator."""
-
-    # Process the list of fields, ignoring any blank ones.
-    for field in parameters.rural_designator.split(','):
-        value = getattr(station, field)
+    tests = rural_test()
+    for (field, comparison, threshold) in tests:
+        value = getattr(station, field, '')
         if str(value).strip() == '':
             continue
         break
-    # Interpet the chosen field for rural indicator.
-    if field == 'global_light':
-        return value <= parameters.max_rural_brightness
-    if field == 'us_light':
-        return value == '1'
-    if field == 'popcls':
-        return value == 'R'
-    assert 0,"Unknown field used in parameters.rural_designator: %s" % field
+    return comparison(value, threshold)
 
 class Struct(object):
     pass

@@ -30,7 +30,7 @@ import warnings
 import extend_path
 import fort
 import code.giss_data
-from code import parameters
+import parameters
 
 
 #: Integer code used to indicate missing data.

@@ -153,7 +153,7 @@ def parse_options(arglist):
             default="",
             help="Select range of steps to run")
     parser.add_option('-p', '--parameter', action='store', default='',
-        help="Redefine parameter from parameters.py during run")
+        help="Redefine parameter from parameters/*.py during run")
     parser.add_option("--no-work_files", "--suppress-work-files",
             action="store_false", default=True, dest="save_work",
             help="Do not save intermediate files in the work sub-directory")
@@ -166,12 +166,12 @@ def parse_options(arglist):
 
 def update_parameters(parm):
     """Take a parameter string from the command line and update the
-    parameters.py module."""
+    parameters module."""
 
     if not parm:
         return
 
-    from code import parameters
+    import parameters
 
     parm = parm.split(';')
     for p in parm:

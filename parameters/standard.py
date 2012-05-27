@@ -1,105 +1,27 @@
 #! /usr/bin/env python
-# $URL$
-# $Rev$
+# $URL: https://ccc-gistemp.googlecode.com/svn/trunk/code/parameters.py $
+# $Rev: 618 $
 #
-# parameters.py
+# parameters/standard.py
 #
 # Nick Barnes, Ravenbrook Limited, 2010-02-15
 
-"""Parameters controlling the GISTEMP algorithm.
+"""Parameters controlling the standard GISTEMP algorithm.
 
 Various parameters controlling each phase of the algorithm are
 collected and documented here.  They appear here in approximately the
 order in which they are used in the algorithm.
+
+Parameters controlling ccc-gistemp extensions to the standard GISTEMP
+algorithm, or obsolete features of GISTEMP, are in other parameter
+files.
 """
 __docformat__ = "restructuredtext"
 
-data_sources = "ghcn.v3 hohenpeissenberg scar"
-"""Data sources that are used for the analysis (space separated string).
-'ghcn.v3' is the Global Historical Climate Network (NOAA);
-'hohenpeissenberg' is Wiljens data for Hohenpeissenberg;
-'scar' is the READER data from Scientific Committee on Antarctic
-Research.
-"""
-
-augment_metadata = ''
-"""(In the usual analysis this parameter is empty) This parameter enables
-additional metadata fields to be read from a file.  The format is
-"name=colA,colB,colC" (with an arbitrary number of comma separated
-columuns).  The file called *name* is opened; each row is a comma
-separated sequence of field values, with the fields being 'colA',
-'colB', and so on.  There must be exactly one column called 'uid'.
-If a station with the same uid appears in the ordinary metadata
-(usually sourced from the v2.inv file) then the extra fields are
-associated with the station.
-"""
-
-work_file_format = "v2"
-"""The format of the intermediate files written to the 'work' directory:
-'v2' for GHCN v2, 'v3' for GHCN v3.
-"""
-
-USHCN_convert_id = True
-"""Whether to convert USHCN station identifiers to GHCN station
-identifiers (using tables supplied by GISS), when using USHCN as a
-data source.  In the usual analysis prior to using GHCN v3, this had
-to be True.  Irrelevant in the usual analysis using GHCN v3, as USHCN
-is not used."""
-
-USHCN_meta = ''
-"""Specifies what file to use for USHCN metadata (latitude,
-longitude), when using USHCN as a data source.  If empty then the GHCN
-metadata file is used (and this will only work when USHCN_convert_id
-is True).  Specify "ushcn-v2-stations.txt" and place that file in the
-input/ directory to use the USHCN metadata.  Irrelevant in the usual
-analysis using GHCN v3, as USHCN is not used."""
-
-USHCN_offset_start_year = 1980
-"""The first year of the period considered when calculating the
-offsets between GHCN and USHCN records, to apply to a USHCN
-temperature series.  Irrelevant in the usual analysis using GHCN v3,
-as USHCN is not used.
-"""
-
-USHCN_offset_max_months = 10
-"""The maximum number of records used when computing a monthly offset
-between GHCN and USHCN, to apply to a USHCN temperature series.  The
-algorithm starts in the current year and works back to
-*USHCN_offset_start_year*, computing an offset for each month using up
-to *USHCN_offset_max_months* records.  Irrelevant in the usual
-analysis using GHCN v3, as USHCN is not used."""
-
-retain_contiguous_US = True
-"""Whether to retain GHCN records that are in the contiguous US.  When
-using USHCN ordinarily, USHCN replaces GHCN records, but: some
-stations have duplicates; some GHCN stations have no USHCN
-counterpart.  This parameter affects those records.  When not using
-USHCN, this should be True.
-"""
-station_combine_min_overlap = 4
-"""The minimum number of years of overlap, between a combined record
-and a candidate record, to allow the candidate to be added into the
-combined record."""
-
-station_combine_bucket_radius = 10
-"""Used when deciding whether to add a non-overlapping station record
-to a combined record.  This number of years is considered, either side
-of the centre of the potential new combined record.  If there are
-enough valid years in each record (see *station_combine_min_mid_years*),
-and the difference between the average anomaly of the combined record
-and the average anomaly of the candidate record, over those years, is
-less than the standard deviation of the combined record, then the
-record is combined."""
-
-station_combine_min_mid_years = 5
-"""The minimum number of acceptable year records in the central
-"bucket", for both the combined record and the candidate record, when
-combining non-overlapping station records."""
-
 station_drop_minimum_months = 20
-"""A combined station record must have at least one month of the year
-with at least this many valid data values, otherwise it is dropped
-immediately prior to the peri-urban adjustment step."""
+"""A station record must have at least one month of the year with at
+least this many valid data values, otherwise it is dropped immediately
+prior to the peri-urban adjustment step."""
 
 rural_designator = "global_light <= 10"
 """Describes the test used to determine whether a station is rural or

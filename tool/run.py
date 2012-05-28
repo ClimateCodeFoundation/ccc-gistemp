@@ -53,17 +53,23 @@ def mkdir(path):
 # that feeds from a file.
 def run_step0(data):
     from code import step0
+    import extension.step0
     if data is None:
         data = gio.step0_input()
-    result = step0.step0(data)
-    return gio.step0_output(result)
+    pre = extension.step0.pre_step0(data)
+    result = step0.step0(pre)
+    post = extension.step0.post_step0(result)
+    return gio.step0_output(post)
 
 def run_step1(data):
     from code import step1
+    import extension.step1
     if data is None:
         data = gio.step1_input()
-    result = step1.step1(data)
-    return gio.step1_output(result)
+    pre = extension.step1.pre_step1(data)
+    result = step1.step1(pre)
+    post = extension.step1.post_step1(result)
+    return gio.step1_output(post)
 
 def run_step2(data):
     from code import step2

@@ -1352,6 +1352,9 @@ class Input:
     """Generally one instance is created: the result of
     step0_input()."""
 
+    def __init__(self):
+        self.sources = parameters.data_sources.split()
+
     def open(self_, source):
         """Open the source (specified as a string), and return an
         iterator."""
@@ -1365,13 +1368,13 @@ class Input:
             ushcn_meta = magic_meta(parameters.USHCN_meta)
             return read_USHCN_converted(ushcn_input_file(),
               ushcn_map, meta=ushcn_meta)
-        if source == 'ghcn.v3':
+        if source == 'ghcn':
             ghcn3file = 'input/ghcnm.tavg.qca.dat'
             invfile = 'input/v3.inv'
             return GHCNV3Reader(file=open(ghcn3file),
               meta=augmented_station_metadata(invfile, format='v3'),
               year_min=code.giss_data.BASE_YEAR)
-        if source == 'ghcn':
+        if source == 'ghcn.v2':
             return GHCNV2Reader("input/v2.mean",
                 meta=v3meta(),
                 year_min=code.giss_data.BASE_YEAR)

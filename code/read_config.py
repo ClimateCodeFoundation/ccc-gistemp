@@ -26,21 +26,6 @@ def v2_get_sources():
     return sources
 
 
-def step1_adjust():
-    """Reads the file config/step1_adjust into a dict,
-    mapping a record identifier to a tuple (year, month, summand).
-    By convention the month is 1 for January."""
-
-    adjust = {}
-    for line in open('config/step1_adjust', 'r'):
-        line = line.strip()
-        if line == '' or line[0] == '#':
-            continue
-        id, _, year, month, summand = line.split()
-        adjust[id] = (int(year), int(month), float(summand))
-    return adjust
-
-
 def get_changes_dict():
     """Reads the file input/Ts.strange.v3.list.IN_full and returns a
     dict result.  Each line in that file begins with a 12-digit

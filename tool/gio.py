@@ -1194,6 +1194,16 @@ def augmented_station_metadata(path=None, file=None, format='v2'):
         for row in open(path):
             row = row.strip().split(',')
             d = dict(zip(columns,row))
+            # Convert things that look like numbers, to numbers.
+            # (except for uid, which is always a string)
+            for k,v in d.items():
+                if k == 'uid':
+                    continue
+                try:
+                    v = float(v)
+                except ValueError:
+                    pass
+                d[k] = v
             uid = d['uid']
             if uid in meta:
                 meta[uid].__dict__.update(d)

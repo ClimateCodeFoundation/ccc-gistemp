@@ -452,6 +452,7 @@ def main(argv=None):
                     kwargs.update(prefix=a)
         except getopt.error, msg:
              raise Usage(msg)
+        kwargs.update(requests=args)
         fetcher = Fetcher(**kwargs)
         if write_list:
             fetcher.list_things()

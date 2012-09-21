@@ -9,7 +9,7 @@ Overview of ccc-gistemp
 ccc-gistemp is a software product written in the Python programming
 language.  It is a replication of GISTEMP.  GISTEMP (and hence
 ccc-gistemp) is a reconstruction of global historical temperature
-anomalies, and is described by its author's at NASA on their webpage:
+anomalies, and is described by its authors at NASA on their webpage:
 http://data.giss.nasa.gov/gistemp/ .  ccc-gistemp is a product of the
 Clear Climate Code project and the Climate Code Foundation.  It attempts
 to do exactly the same thing that GISTEMP does, but with an emphasis on

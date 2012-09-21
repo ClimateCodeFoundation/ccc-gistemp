@@ -231,18 +231,18 @@ class Fetcher(object):
                 bundles[b] = bundles.get(b,[]) + ms
         if not requests:
             requests=['']
-        for request in requests:
+        for request in list(requests):
             if request in config:
                 add(config[request]['files'], config[request]['bundles'])
                 requests.remove(request)
-        for request in requests:
+        for request in list(requests):
             for group_name in config.keys():
                 if re.search(request, group_name):
                     self.output.write("No group named '%s', using '%s' instead.\n"
                                       % (request, group_name))
                     add(config[group_name]['files'], config[group_name]['bundles'])
                     requests.remove(request)
-        for request in requests:
+        for request in list(requests):
             for dict in config.values():
                 for (b,ms) in dict['bundles'].items():
                     (pattern, local) = b
@@ -252,7 +252,7 @@ class Fetcher(object):
                                           % (request, pattern, local))
                         add([], {(pattern, local): ms})
                         requests.remove(request)
-        for request in requests:
+        for request in list(requests):
             for dict in config.values():
                 for (pattern, local) in dict['files']:
                     if re.search(request, pattern) or (local is not None and re.search(request, local)):
@@ -261,7 +261,7 @@ class Fetcher(object):
                                           % (request, pattern, local))
                         add([(pattern, local)], {})
                         requests.remove(request)
-        for request in requests:
+        for request in list(requests):
             for dict in config.values():
                 for (b,ms) in dict['bundles'].items():
                     for (pattern, local) in ms:

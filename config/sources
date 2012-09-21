@@ -75,10 +75,14 @@ file:   ftpmatch://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_\d{6}_F52.a
 bundle: http://data.giss.nasa.gov/gistemp/sources_v3/GISTEMPv3_sources.tar.gz
 member: /STEP1/input_files/ushcn2.tbl
 
+group:  optional
 # USHCN v2 metadata (not normally required, because even when
 # the usual analysis used USHCN data (as of 2012, it doesn't) it
 # mapped stations into GHCN stations and used GHCN metadata).
 file:   ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/ushcn-v2-stations.txt
+# min and max temperature records.
+file:   ftpmatch://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_\d{6}_F52.min.gz ushcnv2-min.gz
+file:   ftpmatch://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_\d{6}_F52.max.gz ushcnv2-max.gz
 
 
 # Group for test data for ccc-gistemp itself.

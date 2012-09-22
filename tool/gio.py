@@ -462,10 +462,12 @@ def GHCNV3Reader(path=None, file=None, meta=None, year_min=None, scale=None):
     noted_element = False
     def note_element(element):
         """Print the meteorological element we are reading."""
-        friendly = dict(TAVG='average temperature')
+        friendly = dict(TAVG='average temperature',
+          TMIN='mean minimum temperature',
+          TMAX='mean maximum temperature')
         print "(Reading %s)" % friendly[element]
 
-    element_scale = dict(TAVG=0.01)
+    element_scale = dict(TAVG=0.01, TMIN=0.01, TMAX=0.01)
     # Quality-control flags that cause value to be rejected.
     # :todo: make parameter.  When using the QCA dataset
     # we shouldn't actually see any of these flags.
@@ -1379,8 +1381,12 @@ class Input:
             ushcn_meta = magic_meta(parameters.USHCN_meta)
             return read_USHCN_converted(ushcn_input_file(source),
               ushcn_map, meta=ushcn_meta)
-        if source == 'ghcn':
-            ghcn3file = 'input/ghcnm.tavg.qca.dat'
+        if (source == 'ghcn' or
+          re.match('ghcnm.(tavg|tmax|tmin)', source)):
+            if source == 'ghcn':
+                ghcn3file = 'input/ghcnm.tavg.qca.dat'
+            else:
+                ghcn3file = os.path.join('input', source+'.qca.dat')
             invfile = 'input/v3.inv'
             return GHCNV3Reader(file=open(ghcn3file),
               meta=augmented_station_metadata(invfile, format='v3'),

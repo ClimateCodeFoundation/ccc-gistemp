@@ -84,6 +84,12 @@ file:   ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/ushcn-v2-stations.txt
 file:   ftpmatch://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_\d{6}_F52.min.gz min.ushcnv2.gz
 file:   ftpmatch://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_\d{6}_F52.max.gz max.ushcnv2.gz
 
+# GHCN v3 tmin and tmax
+bundle: ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/ghcnm.tmin.latest.qca.tar.gz
+member: ghcnm.v3.*/ghcnm.tmin.*.qca.dat ghcnm.tmin.qca.dat
+bundle: ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/ghcnm.tmax.latest.qca.tar.gz
+member: ghcnm.v3.*/ghcnm.tmax.*.qca.dat ghcnm.tmax.qca.dat
+
 
 # Group for test data for ccc-gistemp itself.
 group:  test

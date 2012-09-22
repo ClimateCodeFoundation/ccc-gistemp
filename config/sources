@@ -81,8 +81,8 @@ group:  optional
 # mapped stations into GHCN stations and used GHCN metadata).
 file:   ftp://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/ushcn-v2-stations.txt
 # min and max temperature records.
-file:   ftpmatch://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_\d{6}_F52.min.gz ushcnv2-min.gz
-file:   ftpmatch://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_\d{6}_F52.max.gz ushcnv2-max.gz
+file:   ftpmatch://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_\d{6}_F52.min.gz min.ushcnv2.gz
+file:   ftpmatch://ftp.ncdc.noaa.gov/pub/data/ushcn/v2/monthly/9641C_\d{6}_F52.max.gz max.ushcnv2.gz
 
 
 # Group for test data for ccc-gistemp itself.

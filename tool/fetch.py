@@ -241,7 +241,11 @@ class Fetcher(object):
                     self.output.write("No group named '%s', using '%s' instead.\n"
                                       % (request, group_name))
                     add(config[group_name]['files'], config[group_name]['bundles'])
-                    requests.remove(request)
+                    try:
+                        requests.remove(request)
+                    except ValueError:
+                        # Happens when request matches several groups.
+                        pass
         for request in list(requests):
             for dict in config.values():
                 for (b,ms) in dict['bundles'].items():
@@ -251,7 +255,11 @@ class Fetcher(object):
                                           "    using bundle '%s:%s' instead.\n"
                                           % (request, pattern, local))
                         add([], {(pattern, local): ms})
-                        requests.remove(request)
+                        try:
+                            requests.remove(request)
+                        except ValueError:
+                            # Happens when request matches several bundles.
+                            pass
         for request in list(requests):
             for dict in config.values():
                 for (pattern, local) in dict['files']:
@@ -260,7 +268,11 @@ class Fetcher(object):
                                           "    using file '%s:%s' instead.\n"
                                           % (request, pattern, local))
                         add([(pattern, local)], {})
-                        requests.remove(request)
+                        try:
+                            requests.remove(request)
+                        except ValueError:
+                            # Happens when request matches several files.
+                            pass
         for request in list(requests):
             for dict in config.values():
                 for (b,ms) in dict['bundles'].items():
@@ -271,7 +283,11 @@ class Fetcher(object):
                                               "    of bundle '%s:%s' instead.\n"
                                               % (request, pattern, local, b[0], b[1]))
                             add([], {b: [(pattern, local)]})
-                            requests.remove(request)
+                            try:
+                                requests.remove(request)
+                            except ValueError:
+                                # Happens when request matches several members.
+                                pass
         if requests:
             raise Error("Don't know how to fetch these items: %s" % requests)
         return (bundles, files)

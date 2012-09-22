@@ -1305,9 +1305,10 @@ def read_float(s):
     except:
         return code.giss_data.MISSING
 
-def ushcn_input_file():
+def ushcn_input_file(source_name):
     """Find the USHCN input file."""
-    files =  ["input/ushcnv2",
+    files =  [os.path.join('input', source_name),
+              "input/ushcnv2",
               "input/9641C_201003_F52.avg",
               "input/9641C_201002_F52.avg",
               "input/9641C_200907_F52.avg"]
@@ -1369,14 +1370,14 @@ class Input:
         """Open the source (specified as a string), and return an
         iterator."""
 
-        if source == 'ushcn':
+        if source == 'ushcn' or source.endswith('.ushcnv2'):
             if parameters.USHCN_convert_id:
                 ushcn_map = read_USHCN_stations('input/ushcn2.tbl',
                   'input/ushcnV2_cmb.tbl')
             else:
                 ushcn_map = {}
             ushcn_meta = magic_meta(parameters.USHCN_meta)
-            return read_USHCN_converted(ushcn_input_file(),
+            return read_USHCN_converted(ushcn_input_file(source),
               ushcn_map, meta=ushcn_meta)
         if source == 'ghcn':
             ghcn3file = 'input/ghcnm.tavg.qca.dat'

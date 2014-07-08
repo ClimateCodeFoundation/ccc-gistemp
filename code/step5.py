@@ -324,16 +324,16 @@ def zonav(meta, boxed_data):
     # valid months in each zone).
     lenz, iord = sort_perm(lenz)
     for zone in range(len(band_in_zone)):
-        if lenz[0] == 0:
-            raise Error('**** NO DATA FOR ZONE %d' % bands+zone)
         # Find the longest band that is in the compound zone.
         for j1 in range(bands):
             if iord[j1] in band_in_zone[zone]:
                 break
         else:
             # Should be an assertion really.
-            raise Error('No band in compound zone %d.' % zone)
+            raise Exception('No band in compound zone %d.' % zone)
         band = iord[j1]
+        if lenz[band] == 0:
+            raise Exception('**** NO DATA FOR ZONE %d' % band)
         wtg = list(wt[band])
         avgg = list(avg[band])
         # Add in the remaining bands, in length order.

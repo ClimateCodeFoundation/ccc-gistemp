@@ -333,7 +333,7 @@ def zonav(meta, boxed_data):
             raise Exception('No band in compound zone %d.' % zone)
         band = iord[j1]
         if lenz[band] == 0:
-            raise Exception('**** NO DATA FOR ZONE %d' % band)
+            print('**** NO DATA FOR ZONE %d' % band)
         wtg = list(wt[band])
         avgg = list(avg[band])
         # Add in the remaining bands, in length order.

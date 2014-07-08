@@ -35,6 +35,7 @@ down (negative offset); its units are the same as in the data files
 (centikelvin usually).
 """
 
+import datetime
 import itertools
 import math
 
@@ -129,8 +130,9 @@ def asgooglechartURL(seq, options={}):
     data = [list(s) for s in seq]
     ymin,ymax = reasonable_yscale(data)
 
-    yearmin = min(map(lambda p:p[0], itertools.chain(*data)))
-    yearmax = max(map(lambda p:p[0], itertools.chain(*data)))
+    yearmin = min([1880] + map(lambda p:p[0], itertools.chain(*data)))
+    current_year = datetime.datetime.now().year
+    yearmax = max([current_year] + map(lambda p:p[0], itertools.chain(*data)))
     data = [pad(s, yearmin, yearmax) for s in data]
     # Let y be the list of years for the chart legend.  We include
     # the first year of the series, the last year, and every decade
@@ -202,11 +204,15 @@ def asgooglechartURL(seq, options={}):
 def pad(data, yearmin, yearmax):
     """pad so that data series starts at yearmin and ends at yearmax."""
 
+    nonelots = [None]*(yearmax-yearmin+1)
+
+    if not data:
+        return zip(range(yearmin, yearmax+1), nonelots)
+
     t0 = data[0][0]
     t1 = data[-1][0]
 
     assert yearmin <= t0 <= t1 <= yearmax
-    nonelots = [None]*(yearmax-yearmin+1)
     return (zip(range(yearmin, t0), nonelots) +
       data +
       zip(range(t1+1, yearmax+1), nonelots))

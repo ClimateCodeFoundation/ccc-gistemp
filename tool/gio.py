@@ -17,6 +17,7 @@ used by other bodies (such as NOAA's v2.mean format).
 __docformat__ = "restructuredtext"
 
 
+import copy
 import glob
 import itertools
 import math
@@ -1645,13 +1646,14 @@ def ensure_landocean(data):
         land_meta, ocean_meta = meta
     except (TypeError, ValueError):
         # Use the land meta object for both land and ocean data
-        land_meta,ocean_meta = meta, meta
+        land_meta = meta
+        ocean_meta = copy.copy(meta)
         print "No ocean data; using land data only"
         data = add_blank(data, 'ocean')
 
     if land_meta is None:
         # Synthesize land data
-        land_meta = ocean_meta
+        land_meta = copy.copy(ocean_meta)
         print "No land data; using ocean data only"
         data = add_blank(extract_ocean(data), 'land')
 

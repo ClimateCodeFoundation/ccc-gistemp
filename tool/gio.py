@@ -1604,8 +1604,12 @@ def step4_output(data):
 def step5_input(data):
     if not data:
         land = SubboxReader(open(STEP3_OUT, 'rb'))
-        ocean = SubboxReader(open('result/SBBX.HadR2', 'rb'))
-        data = itertools.izip(land, ocean)
+        try:
+            ocean = SubboxReader(open('result/SBBX.HadR2', 'rb'))
+        except IOError:
+            data = ensure_landocean(iter(land))
+        else:
+            data = itertools.izip(land, ocean)
     else:
         data = ensure_landocean(data)
     # Add optional mask.

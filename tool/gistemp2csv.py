@@ -6,7 +6,10 @@
 #
 # Filipe Fernandes, 2011-08-01
 
-"""Convert ccc-gistemp text files output to comma separated value format."""
+"""
+Convert ccc-gistemp result file in text format to
+comma separated value format.
+"""
 
 # http://docs.python.org/release/2.4.4/lib/module-os.path.html
 import os
@@ -18,7 +21,7 @@ import csv
 
 def chunks(l, n):
     """
-    return n-sized chunks from  the list l.
+    return n-sized chunks from the string (or list) *l*.
     """
     return [l[i:i + n] for i in range(0, len(l), n)]
 
@@ -26,12 +29,14 @@ def chunks(l, n):
 def non_zonal(line):
     """Break Non-Zonal file format into specified chunks."""
 
-    # The first 12 entries are 5 characters width columns.
+    # The first 12 entries (monthly anomaly) are each 5 characters wide.
     month = chunks(line[:65], 5)
-    # After 3 white spaces it becomes 4 characters width columns.
+    # After 3 spaces there are 2 entries (yearly anomaly
+    # for Jan-Dec and Dec-Nov) each 4 characters wide.
     year = chunks(line[68:76], 4)
-    # After 2 white spaces it is back to 5 characters width columns.
-    # the -5 removes the last redundant year entry.
+    # After 2 spaces there are 4 entries (seasonal anomaly)
+    # each 5 characters wide.
+    # The -5 removes the last redundant year entry.
     season = chunks(line[78:-5], 5)
     # Bundle into single row.
     row = month + year + season
@@ -40,9 +45,11 @@ def non_zonal(line):
 
 
 def gistemp2csv(fin):
-    """Write a comma separated value file from ccc-gistemp text
+    """
+    Write a comma separated value file from ccc-gistemp text
     output; such files are typically found in the result/
-    directory."""
+    directory.
+    """
 
     path, fname = os.path.split(fin)
     basename, ext = os.path.splitext(fname)
@@ -62,7 +69,7 @@ def gistemp2csv(fin):
 
     with open(fin) as lines:
         for line in lines:
-            # Data lines start with a 4 digit number.
+            # Data lines start with a 4 digit number (the year).
             if re.match(r"^\d{4}", line):
                 # Non-Zonal avg files are treated differently.
                 if not 'Zon' in basename:
@@ -73,13 +80,16 @@ def gistemp2csv(fin):
             # We assume all the header lines appear before any
             # data, so data will not be assigned yet.
             if data is None:
-                cells = line.split()[:-1]
-                if cells and 'Year' == cells[0] or 'EQU' in cells:
-                    # The header rows; need to be arranged in cells.
-                    csv_out.writerow(cells)
+                # The header and blurb lines are somewhat
+                # special cased.
+                if 'Year' in line:
+                    # Ignore final "Year" column (same as first column).
+                    cells = line.split()[:-1]
+                elif 'EQU' in line:
+                    cells = ['', '', '', ''] + line.split()
                 else:
-                    # Just a "blurb" line.  Pass as-is.
-                    csv_out.writerow([line.strip()])
+                    cells = [line.strip()]
+                csv_out.writerow(cells)
 
     return foutname
 

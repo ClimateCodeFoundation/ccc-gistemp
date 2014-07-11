@@ -3,6 +3,7 @@
 # gistemp2csv.py
 #
 # Filipe Fernandes, 2011-08-01
+# David Jones, 2014-07-11
 
 """
 Convert ccc-gistemp result file in text format to
@@ -91,8 +92,19 @@ def gistemp2csv(fin):
 
     return foutname
 
-if __name__ == '__main__':
-    import glob
-    files = glob.glob("*.txt")
-    for f in files:
+def main(argv=None):
+    import sys
+
+    if argv is None:
+        argv = sys.argv
+
+    arg = argv[1:]
+    if not arg:
+        import glob
+        arg = glob.glob("*.txt")
+
+    for f in arg:
         gistemp2csv(f)
+
+if __name__ == '__main__':
+    main()

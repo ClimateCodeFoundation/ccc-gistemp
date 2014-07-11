@@ -1,7 +1,7 @@
 CLEAR CLIMATE CODE GISTEMP
 ==========================
 
-## README FOR RELEASE 0.5.1
+## README FOR RELEASE 0.6.1
 
 - Nick Barnes, Climate Code Foundation
 - David Jones, Climate Code Foundation
@@ -24,7 +24,7 @@ CLEAR CLIMATE CODE GISTEMP
 
 ## 1. INTRODUCTION
 
-This is release 0.6.0 of the Clear Climate Code GISTEMP project
+This is release 0.6.1 of the Clear Climate Code GISTEMP project
 (ccc-gistemp).
 
 Clear Climate Code have reimplemented GISTEMP (the GISS surface

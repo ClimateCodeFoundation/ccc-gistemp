@@ -41,7 +41,7 @@ The purpose of version 0.6 is to make ccc-gistemp more useful by:
 In addition there are various bug fixes and improvements to clarity.
 
 Changes since earlier releases are described in more detail in
-release-notes.txt.
+[release-notes.txt](release-notes.txt).
 
 URLs for further information:
 

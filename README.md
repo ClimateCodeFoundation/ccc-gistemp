@@ -46,7 +46,9 @@ release-notes.txt.
 URLs for further information:
 
 http://clearclimatecode.org/ Clear Climate Code website and blog.
-http://ccc-gistemp.googlecode.com/ ccc-gistemp code repository.
+
+https://github.com/ClimateCodeFoundation/ccc-gistemp ccc-gistemp
+code repository.
 
 
 ## 2. DEPENDENCIES

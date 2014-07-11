@@ -59,10 +59,9 @@ dependencies so "any" operating system or CPU should be okay.
 
 Python comes in several versions.  We recommend Python 2.6 or Python
 2.7, but ccc-gistemp should work on any version of Python from the
-2.x branch (since 2.4).  It will not work with Python 3.x (which
-python.org calls "shiny new thing").  Support for Python 2.4 (and
-to some extent 2.5) remains fragile, and it has caused some problems
-in the past.
+2.x branch (since 2.4).  It will not work with Python 3.x.  Support for
+Python 2.4 (and to some extent 2.5) remains fragile, and it has caused
+some problems in the past.
 
 The code should run on OS X, FreeBSD, Windows, and probably a variety of
 other Unix-like operating systems.

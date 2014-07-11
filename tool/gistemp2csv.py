@@ -50,6 +50,7 @@ def gistemp2csv(fin):
     directory.
     """
 
+    # Pick an output filename by changing the extension to '.csv'
     path, fname = os.path.split(fin)
     basename, ext = os.path.splitext(fname)
     foutname = os.path.join(path, basename + '.csv')

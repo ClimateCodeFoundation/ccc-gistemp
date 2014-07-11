@@ -23,7 +23,7 @@ The options are:
   [-a] [-y]
   [-c config]
   [--colour blue,black,...]
-  [-d v2.mean]
+  [-d input/ghcnm.tavg.qca.dat]
   [--caption figure1]
   [-o file.svg]
   [--offset 0,+0.2]
@@ -32,12 +32,13 @@ The options are:
   [-s 0.01]
 
 Tool to plot the records for a station.  Stations have an 11-digit
-identifier, and in the GHCN file v2.mean they have a single digit added, the
-duplicate marker, to form a 12-digit record identifier.  One station may
-have several "duplicate" records associated with it.
+identifier. In GHCN-M v2 (now obsolete) each station can have several
+"duplicate" records, each record having a single digit added, the
+duplicate marker, to form a 12-digit record identifier.
 
-Specifying an 11-digit identifier will plot all the duplicates
-associated with that station; a 12-digit indentifier will plot only a
+Specifying an 11-digit identifier will plot the station (in the
+case of a GHCN-M v2 file, all the duplicates associated with that
+station shall be plotted); a 12-digit identifier will plot only a
 single record.
 
 Colours can be explicitly assigned using the --colour option.  A station
@@ -67,12 +68,12 @@ Normally the output is an SVG document written to the file
 station-id.svg (in other words, the first argument with ".svg" appended).
 The -o option can be used to change where it written ("-o -" specifies stdout).
 
-Normally the input is the GHCN dataset input/v2.mean; the -d option
-specifies an alternate input file ("-d -" specifies stdin).
+Normally the input is the GHCN-M v3 dataset input/ghcnm.tavg.qca.dat;
+the -d option specifies an alternate input file ("-d -" for stdin).
 
-Normally the input data is expected to be temperatures in units of 0.1 C
-(this is the convention used by GHCN v2).  The -s option can be used to
-specify a different sized unit.
+Normally the input data is scaled according to the GHCN-M TAVG
+convention (units of 0.01C for v3, 0.1C for v2).  The -s option
+can be used to specify a different sized unit.
 
 The -c option can be used to set various configuration options.  Best to
 examine the source code for details.
@@ -186,7 +187,7 @@ def curves(series, K):
         yield list(block)
 
 def plot(arg, inp, out, meta, colour=[], timewindow=None, mode='temp',
-  offset=None, scale=0.1, caption=None, title=None, axes=None):
+  offset=None, scale=None, caption=None, title=None, axes=None):
     """Read data from `inp` and create a plot of the stations specified
     in the list `arg`.  Plot is written to `out`.  Metadata (station
     name, location) is taken from the `meta` file (usually v2.inv).
@@ -678,14 +679,17 @@ def from_years(years):
         series.extend(data)
     return (series, begin)
 
-def from_lines(lines, scale=0.1):
-    """*lines* is a list of lines (strings) that comprise a station's
-    entire record.  The lines are an extract from a file in the same
-    format as the GHCN file v2.mean.Z.  The data are converted to a
-    linear array (could be a list/tuple/array/sequence, I'm not saying),
-    *series*, where series[m] gives the temperature (a floating
-    point value in degrees C) for month *m*, counting from 0 for the
-    January of the first year with data.
+def from_lines(lines, scale=None):
+    """
+    *lines* is a list of lines (strings) that comprise a station's
+    entire record.  The lines are expected to be an extract from a
+    file in the GHCN-M format (either v2 or v3).
+
+    The data are converted to a linear array (could be a
+    list/tuple/array/sequence, I'm not saying), *series*, where
+    series[m] gives the temperature (a floating point value in degrees
+    C) for month *m*, counting from 0 for the January of the first
+    year with data.
 
     (*series*,*begin*) is returned, where *begin* is
     the first year for which there is data for the station.
@@ -700,11 +704,18 @@ def from_lines(lines, scale=0.1):
     # The previous line itself.
     prevline = None
     for line in lines:
-        year = int(line[12:16])
+        if len(line) == 116:
+            # GHCN-M v3
+            year = int(line[11:15])
+        else:
+            # GHCN-M v2
+            year = int(line[12:16])
         if prev == year:
             # There is one case where there are multiple lines for the
-            # same year for a particular station.  The v2.mean input
-            # file has 3 identical lines for "8009991400101971"
+            # same year for a particular station.  Some versions
+            # of the v2.mean input file have 3 identical lines for
+            # "8009991400101971" (this bug in the data file is
+            # believe to be functionally extinct as of 2014).
             if line == prevline:
                 print "NOTE: repeated record found: Station %s year %s; data are identical" % (line[:12],line[12:16])
                 continue
@@ -717,18 +728,25 @@ def from_lines(lines, scale=0.1):
         prevline = line
         temps = []
         for m in range(12):
-            datum = int(line[16+5*m:21+5*m])
+            if len(line) == 116:
+                # GHCN-M v3
+                datum = int(line[19+8*m:24+8*m])
+                default_scale = 0.01
+            else:
+                # GHCN-M v2
+                datum = int(line[16+5*m:21+5*m])
+                default_scale = 0.1
             if datum == -9999:
                 datum = BAD
             else:
                 # Convert to floating point and degrees C.
-                datum *= scale
+                datum *= scale or default_scale
             temps.append(datum)
         years.append((year, temps))
     return from_years(years)
-        
 
-def asdict(arg, inp, mode, axes, offset=None, scale=0.1):
+
+def asdict(arg, inp, mode, axes, offset=None, scale=None):
     """`arg` should be a list of 11-digit station identifiers or
     12-digit record identifiers.  The records from `inp` are extracted
     and returned as a dictionary (that maps identifiers to (data,begin)
@@ -744,11 +762,11 @@ def asdict(arg, inp, mode, axes, offset=None, scale=0.1):
     """
 
     # Clear Climate Code, tool directory
-    import v2index
+    import ghcnm_index
     # Clear Climate Code
     from code import series
 
-    v2 = v2index.File(inp)
+    v2 = ghcnm_index.File(inp)
 
     table = {}
     if not offset:
@@ -849,7 +867,7 @@ def main(argv=None):
         argv = sys.argv
 
     try:
-        infile = 'input/v2.mean'
+        infile = 'input/ghcnm.tavg.qca.dat'
         metafile = None
         opt,arg = getopt.getopt(argv[1:], 'ac:o:d:m:s:t:y',
           ['axes=', 'caption=', 'colour=', 'offset=', 'title='])

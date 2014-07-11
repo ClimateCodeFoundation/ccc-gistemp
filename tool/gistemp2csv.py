@@ -43,12 +43,19 @@ def non_zonal(line):
     return row
 
 
-def gistemp2csv(fin):
+def gistemp2csv(fin, one_header=False):
     """
     Write a comma separated value file from ccc-gistemp text
     output; such files are typically found in the result/
     directory.
+
+    if `one_header` is true then just one header line is written
+    (the last one, appearing immediately before data).
     """
+
+    if os.path.getsize(fin) == 0:
+        # Skip empty text file.
+        return
 
     # Pick an output filename by changing the extension to '.csv'
     path, fname = os.path.split(fin)
@@ -69,6 +76,9 @@ def gistemp2csv(fin):
                     data = non_zonal(line)
                 else:
                     data = line.split()[:-1]
+                if one_header and header:
+                    csv_out.writerow(header)
+                    header = None
                 csv_out.writerow(data)
             # We assume all the header lines appear before any
             # data, so data will not be assigned yet.
@@ -82,23 +92,32 @@ def gistemp2csv(fin):
                     cells = ['', '', '', ''] + line.split()
                 else:
                     cells = [line.strip()]
-                csv_out.writerow(cells)
+                header = cells
+                if not one_header:
+                    csv_out.writerow(cells)
 
     return foutname
 
 def main(argv=None):
+    # https://docs.python.org/release/2.4.4/lib/module-getopt.html
+    import getopt
     import sys
 
     if argv is None:
         argv = sys.argv
 
-    arg = argv[1:]
+    opt,arg = getopt.getopt(argv[1:], '', ['one-header'])
+    keys = dict()
+    for o,v in opt:
+        if o == '--one-header':
+            keys['one_header'] = True
+
     if not arg:
         import glob
         arg = glob.glob("*.txt")
 
     for f in arg:
-        gistemp2csv(f)
+        gistemp2csv(f, **keys)
 
 if __name__ == '__main__':
     main()

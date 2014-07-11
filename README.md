@@ -1,7 +1,11 @@
-CLEAR CLIMATE CODE GISTEMP README FOR RELEASE 0.5.1
+CLEAR CLIMATE CODE GISTEMP
+==========================
 
-Nick Barnes, Climate Code Foundation
-David Jones, Climate Code Foundation
+## README FOR RELEASE 0.5.1
+
+- Nick Barnes, Climate Code Foundation
+- David Jones, Climate Code Foundation
+- 2014-07-11
 
 
 CONTENTS
@@ -13,11 +17,12 @@ CONTENTS
   5. Running
   6. Results
   7. Regression Testing
+
   A. References
   B. Document history
   C. Copyright and license
 
-1. INTRODUCTION
+## 1. INTRODUCTION
 
 This is release 0.6.0 of the Clear Climate Code GISTEMP project
 (ccc-gistemp).
@@ -44,7 +49,7 @@ http://clearclimatecode.org/ Clear Climate Code website and blog.
 http://ccc-gistemp.googlecode.com/ ccc-gistemp code repository.
 
 
-2. DEPENDENCIES
+## 2. DEPENDENCIES
 
 You need Python and a machine that can run it, and a network
 connection; there are no explicit operating system or CPU architecture
@@ -75,12 +80,12 @@ stable production release from the Python 2.x series (Python 3.x will
 not work).
 
 
-3. INSTALLATION
+## 3. INSTALLATION
 
 Unpack ccc-gistemp-0.6.1.tar.gz.
 
 
-4. INPUT DATA
+## 4. INPUT DATA
 
 ccc-gistemp uses input data in the subdirectory input/.  This input
 data includes large files (a few megabytes to a few dozen megabytes)
@@ -101,7 +106,7 @@ download the data "by hand" and install it in the input/ directory.  See
 doc/input.txt for more details.
 
 
-5. RUNNING
+## 5. RUNNING
 
 To run ccc-gistemp:
 
@@ -138,7 +143,7 @@ from Paul Ollis:
 http://groups.google.com/group/ccc-gistemp-discuss/browse_thread/thread/cb0409e770820680
 
 
-6. RESULTS
+## 6. RESULTS
 
 After running run.py, the GISTEMP result files are all in the result/
 directory.  A simple graphical chart is made using the Google Chart
@@ -159,7 +164,7 @@ This will produce a file called index.html in the current directory,
 including various statistical comparisons of the two result files.
 
 
-7. REGRESSION TESTING
+## 7. REGRESSION TESTING
 
 To test ccc-gistemp against GISTEMP:
 
@@ -185,12 +190,12 @@ run, edit code/parameters.py to set use_global_brightness = False
 before running tool/regression.py.
 
 
-A. REFERENCES
+## A. REFERENCES
 
 None.
 
 
-B. DOCUMENT HISTORY
+## B. DOCUMENT HISTORY
 
 Most recent changes first:
 
@@ -215,7 +220,7 @@ Most recent changes first:
 2008-09-08 NB  Created.
 
 
-C. COPYRIGHT AND LICENSE
+## C. COPYRIGHT AND LICENSE
 
 This document is copyright (C) 2009, 2010 Ravenbrook Limited; and (C)
 2010 Climate Code Foundation.  All rights reserved.

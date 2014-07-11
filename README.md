@@ -8,7 +8,7 @@ CLEAR CLIMATE CODE GISTEMP
 - 2014-07-11
 
 
-CONTENTS
+### CONTENTS
 
   1. Introduction
   2. Dependencies

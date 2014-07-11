@@ -55,10 +55,6 @@ def gistemp2csv(fin):
     basename, ext = os.path.splitext(fname)
     foutname = os.path.join(path, basename + '.csv')
 
-    header = []
-    field1 = ''
-    field2 = ''
-
     # Data for each row.  We also use this to detect the header
     # rows that come before the data.
     data = None

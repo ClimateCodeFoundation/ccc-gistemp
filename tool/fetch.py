@@ -89,8 +89,8 @@ import getopt
 import os
 # http://www.python.org/doc/2.4.4/lib/module-sys.html
 import sys
-# http://www.python.org/doc/2.4.4/lib/module-urllib.html
-import urllib
+# https://docs.python.org/2.6/library/urllib2.html
+import urllib2
 
 import itertools
 import re
@@ -309,19 +309,31 @@ class Fetcher(object):
 
     def fetch_url(self, url, local, members):
         import os
+
         if local is None:
             local=url.split('/')[-1]
         name = os.path.join(self.prefix, local.strip())
+
+        if os.path.exists(name) and os.path.getsize(name) == 0:
+            self.output.write("%s is empty; removing it.\n" % name)
+            os.remove(name)
         if os.path.exists(name) and not self.force:
             self.output.write("%s already exists.\n" % name)
         else:
             self.make_prefix()
             self.output.write("Fetching %s to %s\n" % (url, name))
-            urllib.urlretrieve(url, name, progress_hook(self.output))
-            self.output.write('\n')
-            self.output.flush()
-            if not os.path.exists(name):
-                raise Error("Fetching %s to %s failed." % (url, name))
+            # We have to set a User-Agent header in order to
+            # fetch GISTEMPv3_sources.tar.gz (the web server
+            # rejects the HTTP request otherwise). urllib2 does
+            # this, but urllib does not.
+            remote = urllib2.urlopen(url)
+            # Check getcode(), but only for HTTP.
+            if remote.getcode() and remote.getcode() != 200:
+                raise Error(
+                  "Fetching %s to %s failed (status code %s)." %
+                    (url, name, remote.getcode()))
+            with open(name, 'wb') as out:
+                copy_progress(remote, out, self.output)
         if os.path.getsize(name) == 0:
             raise Error("%s is empty." % name)
         if members:
@@ -420,10 +432,40 @@ class Fetcher(object):
         if members:
             raise Error("Couldn't find these members in '%s': %s" % (name, [member[0] for member in members]))
 
-def progress_hook(out):
-    """Return a progress hook function, suitable for passing to
-    urllib.retrieve, that writes to the file object *out*.
+def copy_progress(source, destination, progress):
     """
+    Copy the contents of open readable stream `source` to open
+    writable stream `destination`. Progress is written to the
+    open writable stream `progress`.
+
+    Typically `source` will be a remote file fetched with
+    urllib2.urlopen, and `destination` will be a local disk
+    file. `progress` will be stderr.
+    """
+
+    try:
+        content_length = int(source.info()['Content-Length'])
+    except (AttributeError, KeyError, TypeError, ValueError):
+        content_length = None
+
+    got = 0
+    while True:
+        chunk = source.read(8000)
+        got += len(chunk)
+        if content_length is not None:
+            outof = '/%d [%d%%]' % (
+              content_length, 100*got//content_length)
+        else:
+            outof = ''
+        progress.write("\r  %d%s" % (got, outof))
+        if not chunk:
+            break
+        destination.write(chunk)
+
+    progress.write('\n')
+    progress.flush()
+
+    return
 
     def it(n, bs, ts):
         got = n*bs

@@ -55,10 +55,6 @@ def gistemp2csv(fin):
     basename, ext = os.path.splitext(fname)
     foutname = os.path.join(path, basename + '.csv')
 
-    fout = open(foutname, 'wb')
-
-    csv_out = csv.writer(fout, delimiter=',')
-
     header = []
     field1 = ''
     field2 = ''
@@ -67,7 +63,8 @@ def gistemp2csv(fin):
     # rows that come before the data.
     data = None
 
-    with open(fin) as lines:
+    with open(fin) as lines, open(foutname, 'wb') as fout:
+        csv_out = csv.writer(fout, delimiter=',')
         for line in lines:
             # Data lines start with a 4 digit number (the year).
             if re.match(r"^\d{4}", line):

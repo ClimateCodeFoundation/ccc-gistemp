@@ -36,8 +36,8 @@ def non_zonal(line):
     year = chunks(line[68:76], 4)
     # After 2 spaces there are 4 entries (seasonal anomaly)
     # each 5 characters wide.
-    # The -5 removes the last redundant year entry.
-    season = chunks(line[78:-5], 5)
+    # 4 seasons, each 5 characters wide.
+    season = chunks(line[78:98], 5)
     # Bundle into single row.
     row = month + year + season
     row = [x.strip() for x in row]

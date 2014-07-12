@@ -77,6 +77,9 @@ def gistemp2csv(fin, one_header=False):
                     data = non_zonal(line)
                 else:
                     data = line.split()[:-1]
+                # If --one-header is active, we have to write
+                # the saved header immediately before the first
+                # data row, which is this one.
                 if one_header and header:
                     csv_out.writerow(header)
                     header = None
@@ -93,6 +96,9 @@ def gistemp2csv(fin, one_header=False):
                     cells = ['', '', '', ''] + line.split()
                 else:
                     cells = [line.strip()]
+                # If --one-header is active, we have to save the
+                # header so that we can write out the last
+                # header immediately before the first data row.
                 header = cells
                 if not one_header:
                     csv_out.writerow(cells)

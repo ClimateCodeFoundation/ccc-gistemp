@@ -20,7 +20,8 @@ import csv
 
 def chunks(l, n):
     """
-    return n-sized chunks from the string (or list) *l*.
+    Return n-sized chunks from the string (or list) *l*; the
+    final chunk may have fewer than `n` elements.
     """
     return [l[i:i + n] for i in range(0, len(l), n)]
 

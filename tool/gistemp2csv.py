@@ -29,17 +29,16 @@ def chunks(l, n):
 def non_zonal(line):
     """Break Non-Zonal file format into specified chunks."""
 
-    # The first 12 entries (monthly anomaly) are each 5 characters wide.
-    month = chunks(line[:65], 5)
-    # After 3 spaces there are 2 entries (yearly anomaly
-    # for Jan-Dec and Dec-Nov) each 4 characters wide.
-    year = chunks(line[68:76], 4)
-    # After 2 spaces there are 4 entries (seasonal anomaly)
-    # each 5 characters wide.
-    # 4 seasons, each 5 characters wide.
-    season = chunks(line[78:98], 5)
+    # The first 13 entries (year followed by 12 monthly anomalies)
+    # are each 5 characters wide.
+    monthlies = chunks(line[:65], 5)
+    # 2 annual anomalies (for for Jan-Dec and Dec-Nov),
+    # each 4 characters wide.
+    annuals = chunks(line[68:76], 4)
+    # 4 seasonal anomalies, each 5 characters wide.
+    seasonals = chunks(line[78:98], 5)
     # Bundle into single row.
-    row = month + year + season
+    row = monthlies + annuals + seasonals
     row = [x.strip() for x in row]
     return row
 

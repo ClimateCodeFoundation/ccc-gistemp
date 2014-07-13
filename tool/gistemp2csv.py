@@ -42,6 +42,23 @@ def non_zonal(line):
     row = [x.strip() for x in row]
     return row
 
+def scale_row(data):
+    """
+    Scale a row of data by multiplying by 0.01. The first item
+    of `data` is assumed to be year and is not modified.
+    Items that are not numbers are not modified.
+    """
+
+    def convert1(x):
+        try:
+            x = float(x)
+        except ValueError:
+            return x
+        return str(x * 0.01)
+
+    year = data[0]
+    return [year] + [convert1(item) for item in data[1:]]
+
 
 def gistemp2csv(fin, one_header=False):
     """
@@ -76,6 +93,7 @@ def gistemp2csv(fin, one_header=False):
                     data = non_zonal(line)
                 else:
                     data = line.split()[:-1]
+                data = scale_row(data)
                 # If --one-header is active, we have to write
                 # the saved header immediately before the first
                 # data row, which is this one.

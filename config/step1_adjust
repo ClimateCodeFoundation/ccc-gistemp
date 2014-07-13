@@ -6,7 +6,7 @@
 # phase.
 #
 # GISTEMP itself no longer makes these adjustments (since the change
-# to using the homogenized GHCN-M 3 source data).  ccc-gistemp may
+# to using the homogenized GHCN-M v3 source data).  ccc-gistemp may
 # retain the ability to do them.  See extension/step1.py.
 #
 # Nick Barnes 2012-05-25.

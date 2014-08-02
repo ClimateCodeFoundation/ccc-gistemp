@@ -29,6 +29,7 @@ member: /STEP0/input_files/antarc3.list
 member: /STEP0/input_files/antarc3.txt                                          
 
 # Hohenpeissenberg temperatures
+# :todo: import from HISTALP instead?
 member: /STEP0/input_files/t_hohenpeissenberg_200306.txt_as_received_July17_2003
 
 # station metadata

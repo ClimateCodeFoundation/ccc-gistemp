@@ -20,7 +20,8 @@ member: ghcnm.v3.*/ghcnm.tavg.*.qca.dat ghcnm.tavg.qca.dat
 bundle: http://data.giss.nasa.gov/gistemp/sources_v3/GISTEMPv3_sources.tar.gz
 
 # SCAR temperatures and metadata.
-# :todo: scrape these from the BAS website instead.
+# :todo: scrape these from the BAS website instead (see
+# https://github.com/drj11/scar).
 member: /STEP0/input_files/antarc1.list                                         
 member: /STEP0/input_files/antarc1.txt                                          
 member: /STEP0/input_files/antarc2.list                                         

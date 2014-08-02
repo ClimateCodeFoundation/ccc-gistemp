@@ -212,7 +212,7 @@ class Series(object):
         for all records, ensuring that they all start at the same year).
 
     When used to hold a series for a subbox, for example a record of data
-    as stored in the ``input/SBBX.HadR2`` file, then the following
+    as stored in the ``input/SBBX.ERSST`` file, then the following
     keyword arguments are traditionally supplied to the constructor:
 
     :Ivar lat_S, lat_N, lon_W, lon_E:

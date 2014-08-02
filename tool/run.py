@@ -112,14 +112,19 @@ def run_step5(data):
     return vischeck(result)
 
 def vischeck(data):
+    import glob
+    import vischeck
+
     # Suck data through pipeline.
     for _ in data:
         pass
     log("... running vischeck")
-    import vischeck
-    vischeck.chartit(
-      [open(os.path.join('result', 'mixedGLB.Ts.ho2.GHCN.CL.PA.txt'))],
-      out = open(os.path.join('result', 'google-chart.url'), 'w'))
+
+    global_land_ocean = glob.glob(
+      os.path.join('result', 'mixedGLB.Ts.*.GHCN.CL.PA.txt'))[0]
+
+    vischeck.chartit([open(global_land_ocean)],
+      out=open(os.path.join('result', 'google-chart.url'), 'w'))
 
     log("See result/google-chart.url")
     yield "vischeck completed"

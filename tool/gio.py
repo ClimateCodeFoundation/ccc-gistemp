@@ -1571,19 +1571,23 @@ def step4_load_clim():
                 clim[long][lat][month] = v
     return clim
 
-# This is used to extract the end month/year from the title of the SBBX file.
-rTitle = re.compile(r"Monthly Sea Surface Temperature anom \(C\)"
-        " Had: 1880-11/1981, oi2: 12/1981- *(\d+)/(\d+)")
+# This is used to extract the end month/year from the title of the
+# SBBX file (which can either be the traditional HadR2 file, or,
+# since about 2013, ERSST).
+rTitle = re.compile(r"Monthly Sea Surface Temperature anom \(C\) "
+        "(?:Had: 1880-11/1981, oi2: 12/1981-|ERSST 01/1880 -)"
+        " *(\d+)/(\d+)")
 
 def step4_input(land):
     import sys
 
     if land is None:
         land = SubboxReader(open(STEP3_OUT, 'rb'))
-    ocean = SubboxReader(open('input/SBBX.HadR2', 'rb'))
+    filename = 'input/SBBX.ERSST'
+    ocean = SubboxReader(open(filename, 'rb'))
     m = rTitle.match(ocean.meta.title)
     if m is None:
-        sys.stderr.write("The title in SBBX.HadR2 does not look right\n")
+        sys.stderr.write("The title in %s does not look right\n" % filename)
         sys.stderr.write("Unable to determine end month/year from:\n")
         sys.stderr.write("  %r\n" % ocean.meta.title)
         sys.exit(1)
@@ -1597,7 +1601,7 @@ def step4_output(data):
     # We only want to write the records from the right-hand item (the
     # ocean data).  The left-hand items are land data, already written
     # by Step 3.
-    out = SubboxWriter(open('result/SBBX.HadR2', 'wb'))
+    out = SubboxWriter(open('result/SBBX.ERSST', 'wb'))
     for land,ocean in data:
         out.write(ocean)
         yield land,ocean
@@ -1608,7 +1612,7 @@ def step5_input(data):
     if not data:
         land = SubboxReader(open(STEP3_OUT, 'rb'))
         try:
-            ocean = SubboxReader(open('result/SBBX.HadR2', 'rb'))
+            ocean = SubboxReader(open('result/SBBX.ERSST', 'rb'))
         except IOError:
             data = ensure_landocean(iter(land))
         else:
@@ -1726,7 +1730,32 @@ def make_filename(meta, kind):
         # file.
         radius = ''
 
-    return meta.mode + kind + '.Ts.ho2.GHCN.CL.PA' + radius
+    mode = meta.mode
+
+    return (
+      meta.mode + kind + '.Ts' + name_sources(mode) +
+      '.CL.PA' + radius)
+
+def name_sources(mode):
+    """
+    From the mode, create a filename fragment that names the
+    sources used.
+    """
+
+    land_source = ''
+    ocean_source = ''
+
+    if mode in ('land', 'mixed'):
+        land_source = '.GHCN'
+    if mode in ('ocean', 'mixed'):
+        # :todo: thread actual ocean source through so we can tell.
+        ocean_source = '.ERSST'
+
+    return ocean_source + land_source
+
+def make_text_filename(mode, part):
+    return mode+part+'.Ts'+name_sources(mode)+'.CL.PA.txt'
+    
 
 def info_from_meta(meta):
     """Take a metadata object (any object with certain fields) and
@@ -1981,7 +2010,7 @@ def open_step5_outputs(mode):
 
 
     parts = ['ZonAnn', 'GLB', 'NH', 'SH']
-    files = [open(os.path.join('result',
-                              mode+part+'.Ts.ho2.GHCN.CL.PA.txt'), 'w')
-            for part in parts]
+    files = [
+      open(os.path.join('result', make_text_filename(mode, part)), 'w')
+      for part in parts]
     return files

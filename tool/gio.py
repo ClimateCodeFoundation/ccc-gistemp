@@ -1576,6 +1576,8 @@ rTitle = re.compile(r"Monthly Sea Surface Temperature anom \(C\)"
         " Had: 1880-11/1981, oi2: 12/1981- *(\d+)/(\d+)")
 
 def step4_input(land):
+    import sys
+
     if land is None:
         land = SubboxReader(open(STEP3_OUT, 'rb'))
     ocean = SubboxReader(open('input/SBBX.HadR2', 'rb'))

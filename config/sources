@@ -22,20 +22,20 @@ bundle: http://data.giss.nasa.gov/gistemp/sources_v3/GISTEMPv3_sources.tar.gz
 # SCAR temperatures and metadata.
 # :todo: scrape these from the BAS website instead (see
 # https://github.com/drj11/scar).
-member: /STEP0/input_files/antarc1.list                                         
-member: /STEP0/input_files/antarc1.txt                                          
-member: /STEP0/input_files/antarc2.list                                         
-member: /STEP0/input_files/antarc2.txt                                          
-member: /STEP0/input_files/antarc3.list                                         
-member: /STEP0/input_files/antarc3.txt                                          
+member: /STEP0/input_files/antarc1.list
+member: /STEP0/input_files/antarc1.txt
+member: /STEP0/input_files/antarc2.list
+member: /STEP0/input_files/antarc2.txt
+member: /STEP0/input_files/antarc3.list
+member: /STEP0/input_files/antarc3.txt
 
 # Hohenpeissenberg temperatures
 # :todo: import from HISTALP instead?
 member: /STEP0/input_files/t_hohenpeissenberg_200306.txt_as_received_July17_2003
 
 # station metadata
-member: /STEP1/input_files/mcdw.tbl    
-member: /STEP1/input_files/ushcn3.tbl  
+member: /STEP1/input_files/mcdw.tbl
+member: /STEP1/input_files/ushcn3.tbl
 member: /STEP1/input_files/sumofday.tbl
 member: /STEP1/input_files/v3.inv
 
@@ -58,7 +58,7 @@ file:   http://data.giss.nasa.gov/pub/gistemp/SBBX.ERSST.gz
 
 
 # Group for analysis using GHCN v2 source data.
-# 
+#
 # This dataset is no longer in use by NASA GISS, but might still work,
 # if you can find the dataset (the link given here does not work).
 
@@ -73,7 +73,7 @@ member: /STEP1/input_files/v2.inv
 
 
 # Group for analysis using USHCN v2 source data
-# 
+#
 # This dataset is no longer in use by NASA GISS, but might still work.
 
 group:  ushcn-v2

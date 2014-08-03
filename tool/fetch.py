@@ -27,7 +27,7 @@ means the files required for normal ccc-gistemp operation.
 
 Any arguments are treated as regular expressions and matched against
 groups, bundles, files, or bundle members (in that order).  The first
-matching item for each argument is fetched.  
+matching item for each argument is fetched.
 
 Unless --force is set, no file that already exists is created.
 
@@ -502,7 +502,7 @@ def main(argv=None):
                     return 0
                 if o == '--list':
                     write_list = True
-                if o == '--force': 
+                if o == '--force':
                     kwargs.update(force=True)
                 if o == '--config':
                     kwargs.update(config_file=a)

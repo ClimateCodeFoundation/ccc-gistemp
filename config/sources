@@ -45,7 +45,6 @@ member: /STEP0/input_files/Ts.strange.v3.list.IN_full
 # SST climatology
 member: /STEP4_5/input_files/oisstv2_mod4.clim.gz
 
-
 # Smith et al 2008 Extend Reconstruction SST
 bundle: http://data.giss.nasa.gov/pub/gistemp/SBBX.ERSST.gz
 member: SBBX.ERSST
@@ -60,6 +59,29 @@ group: hadr2
 
 bundle: http://data.giss.nasa.gov/pub/gistemp/SBBX.HadR2.gz
 member: SBBX.HadR2
+
+
+# Group for using SSTs from Hadley ISST1 dataset.
+#
+# Not used in the usual analysis, but see Hansen et al 2010,
+# section 5.
+
+group: hadisst
+
+file: http://data.giss.nasa.gov/pub/gistemp/SBBX.HadISST
+
+
+# Group for using SSTs from the combined Extended Reconstruction
+# and Optimal Interpolation dataset.
+#
+# In Hansen et al 2010 this is described as the "Current GISS
+# Surface Temperature Analysis" (section 6), but has not been used
+# since 2013-04 when GISS switch to ERSST.
+
+group: eroi
+
+file: http://data.giss.nasa.gov/pub/gistemp/SBBX.ER_OISST
+
 
 
 # Group for analysis using GHCN v2 source data.

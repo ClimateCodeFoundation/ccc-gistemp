@@ -363,6 +363,10 @@ class Fetcher(object):
             self.extract_tar(name, members)
         elif exts[-1] in 'zip'.split():
             self.extract_zip(name, members)
+        elif name.endswith('.gz'):
+            self.extract_gzip(name, members)
+        else:
+            raise Error("Can't extract members from this type of file: %r", name)
 
     def extract_tar(self, name, members):
         # Could figure out compression type here, and pass it in to
@@ -431,6 +435,35 @@ class Fetcher(object):
                     src.close()
         if members:
             raise Error("Couldn't find these members in '%s': %s" % (name, [member[0] for member in members]))
+
+    def extract_gzip(self, name, members):
+        import gzip
+        import shutil
+
+        if len(members) > 1:
+            raise Error("Simple compressed file, %r, is only allowed exactly one member", name)
+
+        if not members:
+            basename = name.split('/')[-1]
+            # remove final extension (should be '.gz')
+            basename = '.'.join(basename.split('.')[:-1])
+            members.append((basename, None))
+
+        (local, _) = members[0]
+        local = os.path.join(self.prefix, local)
+        if os.path.exists(local) and os.path.getsize(local) == 0:
+            self.output.write("%s is empty; removing it.\n" % local)
+            os.remove(local)
+        if os.path.exists(local) and not self.force:
+            self.output.write("  ... %s already exists.\n" % local)
+            return
+
+        self.make_prefix()
+        out = open(local, 'wb')
+        inp = gzip.open(name)
+        shutil.copyfileobj(inp, out)
+        inp.close()
+        out.close()
 
 def copy_progress(source, destination, progress):
     """

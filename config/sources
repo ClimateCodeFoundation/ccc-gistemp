@@ -51,10 +51,12 @@ group: hadr2
 # Sea-surface temperatures
 file:   ftp://data.giss.nasa.gov/pub/gistemp/SBBX.HadR2
 
+
 # Group for using SSTs from Smith et al 2008 Extend Reconstruction
 
 group: ersst
-file:   http://data.giss.nasa.gov/pub/gistemp/SBBX.ERSST.gz
+bundle:   http://data.giss.nasa.gov/pub/gistemp/SBBX.ERSST.gz
+member: SBBX.ERSST
 
 
 # Group for analysis using GHCN v2 source data.

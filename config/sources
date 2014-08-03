@@ -45,18 +45,20 @@ member: /STEP0/input_files/Ts.strange.v3.list.IN_full
 # SST climatology
 member: /STEP4_5/input_files/oisstv2_mod4.clim.gz
 
+
+# Smith et al 2008 Extend Reconstruction SST
+bundle: http://data.giss.nasa.gov/pub/gistemp/SBBX.ERSST.gz
+member: SBBX.ERSST
+
+
 # Group for using SSTs from the combined Hadley--Reynolds dataset.
+#
+# On 2013-01 GISTEMP replaced this dataset with ERSST, and this
+# dataset is no longer used.
 
 group: hadr2
-# Sea-surface temperatures
-file:   ftp://data.giss.nasa.gov/pub/gistemp/SBBX.HadR2
 
-
-# Group for using SSTs from Smith et al 2008 Extend Reconstruction
-
-group: ersst
-bundle:   http://data.giss.nasa.gov/pub/gistemp/SBBX.ERSST.gz
-member: SBBX.ERSST
+file:  ftp://data.giss.nasa.gov/pub/gistemp/SBBX.HadR2
 
 
 # Group for analysis using GHCN v2 source data.

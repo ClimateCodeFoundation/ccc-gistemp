@@ -58,7 +58,8 @@ member: SBBX.ERSST
 
 group: hadr2
 
-file:  ftp://data.giss.nasa.gov/pub/gistemp/SBBX.HadR2
+bundle: http://data.giss.nasa.gov/pub/gistemp/SBBX.HadR2.gz
+member: SBBX.HadR2
 
 
 # Group for analysis using GHCN v2 source data.

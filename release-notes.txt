@@ -1,4 +1,4 @@
-CLEAR CLIMATE CODE RELEASE NOTES FOR RELEASE 0.5.1
+CLEAR CLIMATE CODE RELEASE NOTES FOR RELEASE 0.6.x
 
 Nick Barnes, Climate Code Foundation
 David Jones, Climate Code Foundation
@@ -31,7 +31,7 @@ CONTENTS
 
 1. INTRODUCTION
 
-These are the release notes for release 0.6.1 of the Clear Climate
+These are the release notes for release 0.6.x of the Clear Climate
 Code GISTEMP project (ccc-gistemp).
 
 Clear Climate Code have reimplemented GISTEMP (the GISS surface
@@ -57,7 +57,18 @@ support@clearclimatecode.org.
 This section lists defects that have been fixed.
 
 
-3.1. WHAT'S FIXED IN RELEASE 0.6.1
+3.1. WHAT'S FIXED IN RELEASE 0.6.x
+
+(essentially a repeat of Issue 88) After a period of neglect,
+ccc-gistemp had decayed. ccc-gistemp failed to download the
+GISTEMP sources (which contain data and tables used by
+ccc-gistemp), and it failed to download the SST file (which had
+in any case been switch from Hadley--Reynolds to Smith ERSST). Both of
+these have been fixed. SST data now comes from Smith et al's
+2008 Extended Reconstructed SST.
+
+
+3.2. WHAT'S FIXED IN RELEASE 0.6.1
 
 
 Issue 88: Fresh download and run does not work.
@@ -68,7 +79,7 @@ no previously downloaded data, did not work (but running it again
 immediately worked).  This is now fixed.
 
 
-3.2. WHAT WAS FIXED IN RELEASE 0.6.0
+3.3. WHAT WAS FIXED IN RELEASE 0.6.0
 
 
 Issue 68: Running step 4 alone crashes
@@ -139,7 +150,7 @@ By specifying 'v3' as a data source it is possibly to do a preliminary
 analysis using GHCN v3.
 
 
-3.3. WHAT WAS FIXED IN RELEASE 0.5.1
+3.4. WHAT WAS FIXED IN RELEASE 0.5.1
 
 
 Issue 73: Problem downloading input files on Python 2.5 (.1?)
@@ -148,7 +159,7 @@ A tarfile problem prevented ccc-gistemp working in Python 2.5.1 (quite
 an old version of Python now).  This is now fixed.
 
 
-3.4. WHAT WAS FIXED IN RELEASE 0.5.0
+3.5. WHAT WAS FIXED IN RELEASE 0.5.0
 
 
 Issue 47: try:yield:finally breaks on Python 2.4
@@ -195,7 +206,7 @@ more code into smaller functions, and simplifying and clarifying many of
 those functions.
 
 
-3.5. WHAT WAS FIXED IN RELEASE 0.4.1
+3.6. WHAT WAS FIXED IN RELEASE 0.4.1
 
 
 Issue 59: tool/regression.py is broken by removing a module
@@ -207,7 +218,7 @@ test tool/regression.py.  We have reworked tool/regression.py so it no
 longer uses this module.
 
 
-3.6. WHAT WAS FIXED IN RELEASE 0.4.0
+3.7. WHAT WAS FIXED IN RELEASE 0.4.0
 
 
 Issue 56: Code is unclear due to Fortran style
@@ -293,7 +304,7 @@ never occurred with actual data, and now the problem has been
 eliminating by rewriting the calculation.
 
 
-3.7. WHAT WAS FIXED IN RELEASE 0.3.0
+3.8. WHAT WAS FIXED IN RELEASE 0.3.0
 
 
 Issue 24: Doesn't work with Python 2.4
@@ -416,7 +427,7 @@ An internal program to generate Google Chart URLs broke under some
 circumstances.
 
 
-3.8. WHAT WAS FIXED IN RELEASE 0.2.0
+3.9. WHAT WAS FIXED IN RELEASE 0.2.0
 
 Issue 19: STEP2 is in Fortran
 
@@ -457,7 +468,7 @@ the annual global temperature anomalies from two sets of result data
 compare_results.py, which generates a more detailed report comparing
 two sets of results.
 
-3.9. WHAT WAS FIXED IN RELEASE 0.1.0
+3.10. WHAT WAS FIXED IN RELEASE 0.1.0
 
 ESSENTIAL
 
@@ -517,7 +528,7 @@ separate step driver scripts.  Executables live adjacent to the source
 code. It's all a bit of a mess.
 
 
-3.10. WHAT WAS FIXED IN RELEASE 0.0.3
+3.11. WHAT WAS FIXED IN RELEASE 0.0.3
 
 
 ESSENTIAL
@@ -536,7 +547,7 @@ GISTEMP STEP2/PApars.f has quite a lot of old FORTRAN code which is
 obscure.  The large header comment is also incorrect in places.
 
 
-3.11. WHAT WAS FIXED IN RELEASE 0.0.2
+3.12. WHAT WAS FIXED IN RELEASE 0.0.2
 
 
 ESSENTIAL
@@ -552,7 +563,7 @@ diagnosing a difference between the output of the FORTRAN STEP0 and
 Python step0.py.
 
 
-3.12. WHAT WAS FIXED IN RELEASE 0.0.1
+3.13. WHAT WAS FIXED IN RELEASE 0.0.1
 
 
 ESSENTIAL
@@ -580,7 +591,7 @@ path to Python in the "shebang" #! first line of the file.  This is not
 very portable to say the least.
 
 
-3.13. WHAT WAS FIXED IN RELEASE 0.0.0
+3.14. WHAT WAS FIXED IN RELEASE 0.0.0
 
 
 Nothing.  Release 0.0.0 is just GISTEMP as released on 2007-10-10,

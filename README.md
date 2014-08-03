@@ -1,7 +1,7 @@
 CLEAR CLIMATE CODE GISTEMP
 ==========================
 
-## README FOR RELEASE 0.6.1
+## README FOR RELEASE 0.6.x
 
 - Nick Barnes, Climate Code Foundation
 - David Jones, Climate Code Foundation
@@ -24,14 +24,14 @@ CLEAR CLIMATE CODE GISTEMP
 
 ## 1. INTRODUCTION
 
-This is release 0.6.1 of the Clear Climate Code GISTEMP project
+This is release 0.6.x of the Clear Climate Code GISTEMP project
 (ccc-gistemp).
 
 Clear Climate Code have reimplemented GISTEMP (the GISS surface
 temperature analysis system), to make it clearer.  Work continues
 towards making it more clear and more accessible.
 
-ccc-gistemp release 0.6.1 is a release of ccc-gistemp version 0.6.
+ccc-gistemp release 0.6.x is a release of ccc-gistemp version 0.6.
 The purpose of version 0.6 is to make ccc-gistemp more useful by:
   - allowing more flexible choices of input data.  For example: GHCN v3;
     USHCN only; ocean only.
@@ -83,7 +83,7 @@ not work).
 
 ## 3. INSTALLATION
 
-Unpack ccc-gistemp-0.6.1.tar.gz.
+Unpack ccc-gistemp-0.6.x.tar.gz.
 
 
 ## 4. INPUT DATA

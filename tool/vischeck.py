@@ -50,8 +50,15 @@ def annual_anomalies(f, extract=(65,72)):
     is an iterable over a sequence of pairs (year, datum); *datum*
     is an integer.  Years with invalid (missing) data are absent
     from the result stream.  Normally the data can be interpreted
-    as centi-Kelvin.  *extract* allows a different range of columns
-    to be extracted for the anomaly data.
+    as centi-Kelvin.
+    
+    *extract* allows a different range of columns to be extracted for
+    the anomaly data. It can either be a pair of numbers to
+    specify the start and stop of a range (Python style, starts
+    from 0, stop is not included), or it can be a string which
+    is matched against the header line that starts "Year". Thus
+    extract="JJA" will extract the series for the Northern
+    summer season.
     """
 
     import re
@@ -63,6 +70,12 @@ def annual_anomalies(f, extract=(65,72)):
     # step 5, and also with the GISS published table data (which
     # includes more decorative documentation).
     for l in f:
+        if l.startswith("Year") and isinstance(extract, basestring):
+            # Use column numbers that are matched by *extract*.
+            at = l.index(extract)
+            end = l.index(extract) + len(extract)
+            start = re.search(r' *$', l[:at]).start()
+            extract = (start, end)
         if re.match(r'\d{4}', l):
             year = int(l[:4])
             try:
@@ -398,7 +411,10 @@ def main(argv=None):
         if o == '--colour':
             options['colour'] = v.split(',')
         if o in ('-x', '--extract'):
-            options['extract'] = map(int, v.split(','))
+            try:
+                options['extract'] = map(int, v.split(','))
+            except ValueError:
+                options['extract'] = v
         if o == '--download':
             options['download'] = True
             

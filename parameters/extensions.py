@@ -15,7 +15,8 @@ features of GISTEMP, are in other parameter files.
 __docformat__ = "restructuredtext"
 
 data_sources = "ghcn hohenpeissenberg scar"
-"""Data sources that are used for the analysis (space separated string).
+"""
+Data sources that are used for the analysis (space separated string).
 'ghcn' is the Global Historical Climate Network (NOAA/NCDC), version 3;
 'hohenpeissenberg' is Wiljens data for Hohenpeissenberg;
 'scar' is the READER data from Scientific Committee on Antarctic
@@ -25,11 +26,12 @@ These sources are no longer used by GISTEMP but should still work with
 ccc-gistemp:
 
 'ghcn.v2' is GHCN version 2;
-'ushcn' is the United Stated Historical Climate Network (NOAA), version 2;
+'ushcn' is United Stated Historical Climate Network (NOAA), version 2;
 """
 
 augment_metadata = ''
-"""(In the usual analysis this parameter is empty) This parameter enables
+"""
+(In the usual analysis this parameter is empty) This parameter enables
 additional metadata fields to be read from a file.  The format is
 "name=colA,colB,colC" (with an arbitrary number of comma separated
 columuns).  The file called *name* is opened; each row is a comma
@@ -41,6 +43,7 @@ associated with the station.
 """
 
 work_file_format = "v2"
-"""The format of the intermediate files written to the 'work' directory:
+"""
+The format of the intermediate files written to the 'work' directory:
 'v2' for GHCN v2, 'v3' for GHCN v3.
 """

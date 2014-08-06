@@ -29,6 +29,12 @@ ccc-gistemp:
 'ushcn' is United Stated Historical Climate Network (NOAA), version 2;
 """
 
+ocean_source = "ersst"
+"""
+Which (single) source is used for ocean data. The file
+input/SBBX.xxxx is used (case insensitive search).
+"""
+
 augment_metadata = ''
 """
 (In the usual analysis this parameter is empty) This parameter enables

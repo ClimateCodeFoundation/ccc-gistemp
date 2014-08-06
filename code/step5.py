@@ -63,10 +63,11 @@ def land_ocean_boxes(meta, cells):
     ocean = []
     mixed = []
 
-    # It's a mistake to do the land--ocean mixed analysis using land data
-    # up to 2010-12 and ocean data only up to 2010-11 (say).  We detect
-    # that here, by keeping track of the the min and max months (with data) 
-    # for the land cells and ocean cells that are used by the mixed series.
+    # It's a mistake to do the land--ocean mixed analysis using land
+    # data up to 2010-12 and ocean data only up to 2010-11 (say).
+    # We detect that here, by keeping track of the the min and max
+    # months (with data) for the land cells and ocean cells that are
+    # used by the mixed series.
     minland = 999999
     maxland = -999999
     minocean = 999999
@@ -105,12 +106,13 @@ def land_ocean_boxes(meta, cells):
         # For the metadata for the mixed analysis, start with a copy of
         # the land metadata.
         mixed_meta = giss_data.StationMetaData(
-          land_month_range = (minland, maxland),
-          ocean_month_range = (minocean, maxocean),
+          land_month_range=(minland, maxland),
+          ocean_month_range=(minocean, maxocean),
           **land_meta.__dict__)
         mixed_meta.yrbeg = first_year
         mixed_meta.monm = max_months
         mixed_meta.mode = 'mixed'
+        mixed_meta.ocean_source = ocean_meta.ocean_source
         year_min = (min(minocean, minland)-1) // 12
         year_max = (max(maxocean, maxland)-1) // 12
         mixed_meta.title = (

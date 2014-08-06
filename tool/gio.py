@@ -1572,22 +1572,50 @@ def step4_load_clim():
     return clim
 
 # This is used to extract the end month/year from the title of the
-# SBBX file (which can either be the traditional HadR2 file, or,
-# since about 2013, ERSST).
-rTitle = re.compile(r"Monthly Sea Surface Temperature anom \(C\) "
-        "(?:Had: 1880-11/1981, oi2: 12/1981-|ERSST 01/1880 -)"
+# SBBX file. This file can either be the usual ERSST file, or a
+# variety of alternatives, including the traditional HadR2 file.
+alternatives = ("(?:" +
+  "|".join([
+    "Had: 1880-11/1981, oi2: 12/1981-", # traditional
+    "ERSST 1880-1981  OISSTadj 1982-",
+    "HadISST 01/1880 -",
+    "ERSST 01/1880 -", # since 2013, the usual analysis
+  ]) + ")")
+rTitle = re.compile(r"Monthly Sea Surface Temperature anom \(C\) " +
+        alternatives + 
         " *(\d+)/(\d+)")
+
+def find_ocean_file():
+    """
+    From parameters.ocean_source, find the filename for ocean
+    data and return it.
+    """
+
+    source = parameters.ocean_source.upper()
+    dir = 'input'
+
+    for name in os.listdir(dir):
+        if name.upper() == "SBBX." + source:
+            return os.path.join(dir, name)
+
+    raise Exception("Can't find ocean source %r." %
+      parameters.ocean_source)
 
 def step4_input(land):
     import sys
 
+    # The "land is None" check allows Step 4 to be run on its
+    # own, loading the land data from work files in that case.
     if land is None:
         land = SubboxReader(open(STEP3_OUT, 'rb'))
-    filename = 'input/SBBX.ERSST'
-    ocean = SubboxReader(open(filename, 'rb'))
+
+    ocean_file = find_ocean_file()
+    ocean = SubboxReader(open(ocean_file, 'rb'))
+    ocean.meta.ocean_source = parameters.ocean_source
+
     m = rTitle.match(ocean.meta.title)
     if m is None:
-        sys.stderr.write("The title in %s does not look right\n" % filename)
+        sys.stderr.write("The title in %s does not look right\n" % ocean_file)
         sys.stderr.write("Unable to determine end month/year from:\n")
         sys.stderr.write("  %r\n" % ocean.meta.title)
         sys.exit(1)
@@ -1601,7 +1629,7 @@ def step4_output(data):
     # We only want to write the records from the right-hand item (the
     # ocean data).  The left-hand items are land data, already written
     # by Step 3.
-    out = SubboxWriter(open('result/SBBX.ERSST', 'wb'))
+    out = SubboxWriter(open('result/SBBX.SST', 'wb'))
     for land,ocean in data:
         out.write(ocean)
         yield land,ocean
@@ -1612,7 +1640,7 @@ def step5_input(data):
     if not data:
         land = SubboxReader(open(STEP3_OUT, 'rb'))
         try:
-            ocean = SubboxReader(open('result/SBBX.ERSST', 'rb'))
+            ocean = SubboxReader(open('result/SBBX.SST', 'rb'))
         except IOError:
             data = ensure_landocean(iter(land))
         else:
@@ -1721,6 +1749,9 @@ def step5_bx_output(meta, data):
 def make_filename(meta, kind):
     """Using the metadata in *meta* make a filename for an output file
     of type *kind*.  *kind* is usually one of 'ZON' or 'BX'.
+
+    A typical filename is 
+      result/mixedBX.Ts.ERSST.GHCN.CL.PA.1200
     """
 
     if hasattr(meta, 'gridding_radius'):
@@ -1733,28 +1764,28 @@ def make_filename(meta, kind):
     mode = meta.mode
 
     return (
-      meta.mode + kind + '.Ts' + name_sources(mode) +
+      meta.mode + kind + '.Ts' + name_sources(meta, mode) +
       '.CL.PA' + radius)
 
-def name_sources(mode):
+def name_sources(meta, mode):
     """
-    From the mode, create a filename fragment that names the
-    sources used.
+    From the meta data and the mode, create a filename fragment
+    that names the sources used.
     """
 
     land_source = ''
     ocean_source = ''
 
     if mode in ('land', 'mixed'):
+        # :todo: thread actual land source through so we can tell.
         land_source = '.GHCN'
     if mode in ('ocean', 'mixed'):
-        # :todo: thread actual ocean source through so we can tell.
-        ocean_source = '.ERSST'
+        ocean_source = '.' + meta.ocean_source.upper()
 
     return ocean_source + land_source
 
-def make_text_filename(mode, part):
-    return mode+part+'.Ts'+name_sources(mode)+'.CL.PA.txt'
+def make_text_filename(meta, mode, part):
+    return mode+part+'.Ts'+name_sources(meta, mode)+'.CL.PA.txt'
     
 
 def info_from_meta(meta):
@@ -1852,7 +1883,7 @@ def step5_output_one(item):
     monm = iyrs * 12
     
     mode = meta.mode
-    out = open_step5_outputs(mode)
+    out = open_step5_outputs(meta, mode)
     if mode == 'mixed':
         # Check that land and ocean have same range, otherwise, divert
         # output.
@@ -1860,7 +1891,7 @@ def step5_output_one(item):
             # Send output to a set of files starting with "tainted".
             # Note that the original, "mixed", files will have been
             # truncated: This stops anyone using their contents.
-            out = open_step5_outputs('tainted')
+            out = open_step5_outputs(meta, 'tainted')
 
     bos = '>'
 
@@ -2002,15 +2033,16 @@ Year  Glob  NHem  SHem    -90N  -24N  -24S    -90N  -64N  -44N  -24N  -EQU  -24S
                        zone_titles[jz])
     zono.close()
 
-def open_step5_outputs(mode):
-    """Open the Step 5 output files (there are 4) and return a list of
-    the open file objects.  *mode* is a prefix used for the names, it is
+def open_step5_outputs(meta, mode):
+    """
+    Open a set of Step 5 output files (there are 4) and return a list of
+    the open file objects.  *meta* is the metadata for this
+    analysis.  *mode* is a prefix used for the names, it is
     usually one of 'land', 'ocean', or 'mixed'.
     """
 
-
     parts = ['ZonAnn', 'GLB', 'NH', 'SH']
     files = [
-      open(os.path.join('result', make_text_filename(mode, part)), 'w')
+      open(os.path.join('result', make_text_filename(meta, mode, part)), 'w')
       for part in parts]
     return files

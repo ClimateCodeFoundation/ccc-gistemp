@@ -43,7 +43,8 @@ class Error(Exception):
     """Some sort of problem."""
 
 def annual_anomalies(f, extract=(65,72)):
-    """Convert the text file *f* into a sequence of annual anomalies.
+    """
+    Convert the text file *f* into a sequence of annual anomalies.
     An input file is expected to be one of the NH.*, SH.*, or GLB.*
     files that are the results of GISTEMP step 5.  The return value
     is an iterable over a sequence of pairs (year, datum); *datum*

@@ -382,7 +382,7 @@ def main(argv=None):
     options={}
     try:
         opt,arg = getopt.getopt(argv[1:], 'x:o:',
-          ['offset=', 'size=', 'colour=', 'download'])
+          ['extract=', 'offset=', 'size=', 'colour=', 'download'])
     except getopt.GetoptError, e:
         print >> sys.stderr, e.msg
         print >> sys.stderr, __doc__
@@ -396,7 +396,7 @@ def main(argv=None):
                 raise Error("--size w,h is required")
         if o == '--colour':
             options['colour'] = v.split(',')
-        if o == '-x':
+        if o in ('-x', '--extract'):
             options['extract'] = map(int, v.split(','))
         if o == '--download':
             options['download'] = True

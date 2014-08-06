@@ -67,6 +67,13 @@ in any case been switch from Hadley--Reynolds to Smith ERSST). Both of
 these have been fixed. SST data now comes from Smith et al's
 2008 Extended Reconstructed SST.
 
+Not possible to vary the ocean data source.
+
+Now it is possible, using the "ocean_source" parameter, to
+select a different source the ocean data. Example:
+
+    tool/run.py -p ocean_source=hadr2 -s 4,5
+
 
 3.2. WHAT'S FIXED IN RELEASE 0.6.1
 

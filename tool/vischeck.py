@@ -63,7 +63,9 @@ arbitrary fixed-width column.
 import datetime
 import itertools
 import math
+# http://www.python.org/doc/2.4.4/lib/module-urllib.html
 import urllib
+import urllib2
 
 class Error(Exception):
     """Some sort of problem."""
@@ -405,7 +407,6 @@ def chartit(fs, options={}, out=sys.stdout):
     """
 
     import re
-    import urllib
 
     k = {}
     if 'extract' in options:
@@ -422,10 +423,13 @@ def chartit(fs, options={}, out=sys.stdout):
     else:
         print >>out, url
 
+def open_file_or_url(thing):
+    if ':' in thing[:6]:
+        return urllib2.urlopen(thing)
+    return open(thing)
+
 def main(argv=None):
     import getopt
-    # http://www.python.org/doc/2.4.4/lib/module-urllib.html
-    import urllib
 
     if argv is None:
         argv = sys.argv
@@ -465,7 +469,7 @@ def main(argv=None):
         print >> sys.stderr, __doc__
         return 2
 
-    fs = map(urllib.urlopen, arg)
+    fs = map(open_file_or_url, arg)
     chartit(fs, options)
     return 0
 

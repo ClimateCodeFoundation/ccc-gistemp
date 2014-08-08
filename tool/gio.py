@@ -460,9 +460,23 @@ def GHCNV3Reader(path=None, file=None, meta=None, year_min=None, scale=None):
         """Extract the 11-digit station identifier."""
         return l[:11]
 
-    noted_element = False
+    noted_element = {}
     def note_element(element):
-        """Print the meteorological element we are reading."""
+        """
+        Print the meteorological element we are reading (the
+        first time we see it). Also, abort if we see more than
+        one sort of element (for example, we try reading an ISTI
+        file that has TAVG, TMIN, TMAX, without specifying which
+        one we want).
+        """
+
+        if element in noted_element:
+            return
+        noted_element[element] = True
+
+        if len(noted_element) > 1:
+            raise Exception("File contains more than one sort of element: %r" % noted_element.keys())
+
         friendly = dict(TAVG='average temperature',
           TMIN='mean minimum temperature',
           TMAX='mean maximum temperature')
@@ -503,9 +517,7 @@ def GHCNV3Reader(path=None, file=None, meta=None, year_min=None, scale=None):
         for line in lines:
             year = int(line[11:15])
             element = line[15:19]
-            if not noted_element:
-                note_element(element)
-                noted_element = True
+            note_element(element)
             if scale:
                 multiplier = scale
             else:

@@ -14,6 +14,7 @@ Option Summary
   --colour 00ff00,555555 # specify colours for lines
   --download             # download the PNG (to stdout)
   --extract JJA          # extract single season / month
+  --legend NH|SH         # add legend ('|' as separator)
   -o offset              # offset to see overlapping lines
   --size 400,300         # size in pixels
   --title ccc-gistemp    # add a title
@@ -244,6 +245,8 @@ def asgooglechartURL(seq, options={}):
     params = ['cht=lxy',chds,chd,chxt,chxl,chco,chls,chm,chs] 
     if options.get('title'):
         params.append(urllib.urlencode(dict(chtt=options['title'])))
+    if options.get('legend'):
+        params.append(urllib.urlencode(dict(chdlp='t', chdl=options['legend'])))
 
     return prefix + '?' + '&'.join(params)
 
@@ -430,12 +433,14 @@ def main(argv=None):
     options={}
     try:
         opt,arg = getopt.getopt(argv[1:], 'x:o:',
-          ['extract=', 'offset=', 'size=', 'title=', 'trend=', 'colour=', 'download'])
+          ['extract=', 'legend=', 'offset=', 'size=', 'title=', 'trend=', 'colour=', 'download'])
     except getopt.GetoptError, e:
         print >> sys.stderr, e.msg
         print >> sys.stderr, __doc__
         return 2
     for o,v in opt:
+        if o == '--legend':
+            options['legend'] = v
         if o in ('-o', '--offset'):
             options['offset'] = float(v)
         if o == '--size':

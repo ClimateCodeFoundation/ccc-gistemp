@@ -7,7 +7,7 @@
 # Script to produce a visual check of the results (of STEP 5).
 
 """
-vischeck.py [--colour 00ff00] [--extract JJA] [-o offset] [--size 400,300] [--download] GLB.txt [...]
+vischeck.py [--colour 00ff00] [--extract JJA] [-o offset] [--size 400,300] [--title ccc-gistemp] [--trend none] [--download] GLB.txt [...]
 
 Visually check a file of global anomalies, by converting it to a Google
 Chart.  A URL is output (on stdout), visit/display that URL to see the
@@ -42,12 +42,17 @@ season as it appears in the header line (for example --extract MAM)
 or a comma separated pair of (0-based) character positions to extract an
 arbitrary fixed-width column.
 
---size change the size of the resulting graphic.
+--size changes the size of the resulting graphic.
+
+--title "Global Temperature Anomaly" allows a title to be set.
+
+"--trend none" avoids drawing the short and long trends.
 """
 
 import datetime
 import itertools
 import math
+import urllib
 
 class Error(Exception):
     """Some sort of problem."""
@@ -143,6 +148,7 @@ def asgooglechartURL(seq, options={}):
     default_options = dict(offset=0,
                            size=(600,500),
                            colour=['ff0000', '000000', '0000ff', 'ff00ff'],
+                           trend=True
                            )
     default_options.update(options)
     options = default_options
@@ -167,10 +173,14 @@ def asgooglechartURL(seq, options={}):
             y[i]=''
     xaxis = '|' + '|'.join(map(str, y))
 
-    # Trendlines returns a trend object (describing the 2 trend lines
-    # (short and long)); get one for each data series.
-    trends = [trendlines(l) for l in data]
-    trendfrags = [t.urlfrag for t in trends]
+    if options['trend'] != 'none':
+        # trendlines() returns a trend object (describing the 2 trend
+        # lines (short and long)); get one for each data series.
+        trends = [trendlines(l) for l in data]
+        trendfrags = [t.urlfrag for t in trends]
+    else:
+        trends = []
+        trendfrags = []
 
     # Arrange the series for the "chd=" parameter of the URL.
     # In an X-Y chart (cht=lxy) each series as drawn consists of a
@@ -221,9 +231,11 @@ def asgooglechartURL(seq, options={}):
     chco = 'chco=' + ','.join(series_colours)
     # Line Style
     chls = 'chls=' + '|'.join(['1']*len(data) + ['1,8,2', '1']*len(data))
+    params = ['cht=lxy',chds,chd,chxt,chxl,chco,chls,chm,chs] 
+    if options.get('title'):
+        params.append(urllib.urlencode(dict(chtt=options['title'])))
 
-    return prefix + '?' + '&'.join(
-      ['cht=lxy',chds,chd,chxt,chxl,chco,chls,chm,chs])
+    return prefix + '?' + '&'.join(params)
 
 def pad(data, yearmin, yearmax):
     """pad so that data series starts at yearmin and ends at yearmax."""
@@ -280,7 +292,9 @@ def slope_markers(trends, colours):
     of trend objects as returned by *trendlines*.  Returns a list."""
 
     import itertools
-    import urllib
+
+    if not trends:
+        return []
 
     l = [u'Trend in \N{DEGREE SIGN}C/century (R\N{SUPERSCRIPT TWO})'.encode('utf-8')]
     rowcolours = ['000000']
@@ -406,7 +420,7 @@ def main(argv=None):
     options={}
     try:
         opt,arg = getopt.getopt(argv[1:], 'x:o:',
-          ['extract=', 'offset=', 'size=', 'colour=', 'download'])
+          ['extract=', 'offset=', 'size=', 'title=', 'trend=', 'colour=', 'download'])
     except getopt.GetoptError, e:
         print >> sys.stderr, e.msg
         print >> sys.stderr, __doc__
@@ -418,6 +432,10 @@ def main(argv=None):
             options['size'] = v.split(',')
             if len(options['size']) != 2:
                 raise Error("--size w,h is required")
+        if o == '--title':
+            options['title'] = v
+        if o == '--trend':
+            options['trend'] = v
         if o == '--colour':
             options['colour'] = v.split(',')
         if o in ('-x', '--extract'):

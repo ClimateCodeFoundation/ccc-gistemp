@@ -1,10 +1,8 @@
 #!/usr/bin/env python
-# $URL$
-# $Rev$
 #
 # vischeck.py - Visual Check
 #
-# David Jones, Ravenbrook Limited
+# David Jones, Climate Code Foundation
 #
 # Script to produce a visual check of the results (of STEP 5).
 

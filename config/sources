@@ -83,6 +83,14 @@ group: eroi
 file: http://data.giss.nasa.gov/pub/gistemp/SBBX.ER_OISST
 
 
+# International Surface Temperature Initiative
+
+group: isti
+
+bundle: ftpmatch://ftp.ncdc.noaa.gov/pub/data/globaldatabank/monthly/stage3/recommended/results/recommended-ghcn_format.monthly.stage3.v1.\d+.\d+.\d+.tar.gz isti.v1.tar.gz
+member: merged.monthly.stage3.v1.*.*.dat isti.merged.dat
+member: merged.monthly.stage3.v1.*.*.inv isti.merged.inv
+
 
 # Group for analysis using GHCN v2 source data.
 #

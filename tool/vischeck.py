@@ -418,10 +418,11 @@ def main(argv=None):
         if o == '--download':
             options['download'] = True
             
-    if len(arg):
-        fs = map(urllib.urlopen, arg)
-    else:
-        fs = [sys.stdin]
+    if not arg:
+        print >> sys.stderr, __doc__
+        return 2
+
+    fs = map(urllib.urlopen, arg)
     chartit(fs, options)
     return 0
 

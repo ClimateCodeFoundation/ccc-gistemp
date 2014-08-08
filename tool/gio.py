@@ -428,7 +428,8 @@ class StationTsWriter(object):
     def close(self):
         self.f.close()
 
-def GHCNV3Reader(path=None, file=None, meta=None, year_min=None, scale=None):
+def GHCNV3Reader(path=None, file=None, meta=None,
+  year_min=None, scale=None, element=None):
     """Reads a file in GHCN V3 .dat format and yields each station
     record (as a giss_data.Series instance).  For now, this treats
     all the data for a station as a single record (contrast with GHCN V2
@@ -446,6 +447,16 @@ def GHCNV3Reader(path=None, file=None, meta=None, year_min=None, scale=None):
     specified (the normal case), the scale is derived from the element
     specified in the file (normally for monthly means this is "TAVG" and
     the scale implied by that is 0.01 (degrees C)).
+
+    The default behaviour for *element* (when None) is to assume
+    that the input file contains exactly one sort of element and the
+    values for this element are returned. In the usual analysis this
+    is a GHCN-M v3 file containing TAVG. If the input file
+    contains more than one sort of element (such as an ISTI
+    file) then an exception will be raised. In order to read
+    from a file containing more than one sort of element,
+    specify the element with this argument. For example,
+    element='TMIN'.
 
     See ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/README for format
     of this file.
@@ -516,12 +527,14 @@ def GHCNV3Reader(path=None, file=None, meta=None, year_min=None, scale=None):
         record = code.giss_data.Series(**key)
         for line in lines:
             year = int(line[11:15])
-            element = line[15:19]
-            note_element(element)
+            found_element = line[15:19]
+            if element and element != found_element:
+                continue
+            note_element(found_element)
             if scale:
                 multiplier = scale
             else:
-                multiplier = element_scale[element]
+                multiplier = element_scale[found_element]
             values = [convert(line[i:i+8]) for i in range(19,115,8)]
             if values != all_missing:
                 record.add_year(year, values)
@@ -999,11 +1012,12 @@ def read_USHCN_stations(ushcn_v1_station_path, ushcn_v2_station_path):
     return stations
 
 
-def station_metadata(path=None, file=None, format='v3'):
+def station_metadata(path=None, file=None, format='giss_v3'):
     """Read station metadata from file, return it as a dictionary.
     *format* specifies the format of the metadata can be:
     'v2' for GHCN v2 (with some GISTEMP modifications);
-    'v3' for GHCN v3 (with some GISTEMP modifications);
+    'giss_v3' for GHCN v3 (with some GISTEMP modifications);
+    'v3' for GHCN v3 (with some blank field variations allowed);
     'ushcnv2' for USHCN v2.
 
     GHCN v2
@@ -1067,7 +1081,7 @@ def station_metadata(path=None, file=None, format='v3'):
     # Do not supply both arguments!
     assert not (file and path)
 
-    assert format in ('v2', 'v3', 'ushcnv2')
+    assert format in ('giss_v3', 'v2', 'v3', 'ushcnv2')
     if path:
         try:
             file = open(path)
@@ -1077,14 +1091,17 @@ def station_metadata(path=None, file=None, format='v3'):
             return {}
     assert file
 
-    # With the beta GHCN V3 metadata, several fields are blank for some
-    # stations.  When processed as ints, these will get converted to
-    # None."""
+    # In order to process metadata which is nearly in GHCN-M v3
+    # format (such as metadata GHCN-M v3 beta, or from ISTI, or
+    # from github.com/drj11/scar) we allow the derived metadata
+    # fields (grelev, popsiz, and so on) to be blank or absent.
+    # When processed as ints, these will get converted to None.
     def blank_int(s):
-        """Convert a field to an int, or if it is blank, convert to
-        None."""
+        """
+        Convert a field to int, or if it is blank, convert to None.
+        """
 
-        if s.isspace():
+        if s == '' or s.isspace():
             return None
         return int(s)
 
@@ -1179,10 +1196,12 @@ def station_metadata(path=None, file=None, format='v3'):
         name=    (36,66, str),
     )
         
-    if 'v2' == format:
+    if 'giss_v3' == format:
+        fields = v3fields
+    elif 'v2' == format:
         fields = v2fields
     elif 'v3' == format:
-        fields = v3fields
+        fields = v3_ghcn_fields
     elif 'ushcnv2' == format:
         fields = ushcnv2fields
 
@@ -1248,7 +1267,32 @@ def read_hohenpeissenberg(path, meta=None, year_min=None):
             record.add_year(year, temps)
     yield record
 
-def read_generic(name):
+def read_generic_v3(name):
+    """
+    Reads a "generic" source in GHCN-M v3 format.
+
+    *name* should be the name of the .dat file, in the input/
+    directory.  The .inv file found alongside will be used for
+    metadata.
+    """
+
+    filename = os.path.join("input", name)
+    if not name.endswith('.dat'):
+        raise Exception("Don't know where to look for .inv file for GHCN-M v2 format file: %r" % name)
+
+    if parameters.element:
+        element = parameters.element
+    else:
+        element = None
+
+    invfile = name[:-4] + '.inv'
+    invfile = os.path.join("input", invfile)
+    return GHCNV3Reader(file=open(filename),
+      meta=augmented_station_metadata(invfile, format='v3'),
+      year_min=code.giss_data.BASE_YEAR,
+      element=element)
+
+def read_generic_v2(name):
     """Reads a "generic" source.  *name* should be a prefix, generally
     ending in '.v2', example: "ca.v2".  In the input directory the data
     file "foo.v2.mean" will be opened (where *name* is "foo.v2") and
@@ -1347,7 +1391,7 @@ def v3meta():
 
     v3inv = os.path.join('input', 'v3.inv')
     if not _v3meta:
-        _v3meta = augmented_station_metadata(v3inv, format='v3')
+        _v3meta = augmented_station_metadata(v3inv, format='giss_v3')
     return _v3meta
 
 def magic_meta(path):
@@ -1402,7 +1446,7 @@ class Input:
                 ghcn3file = os.path.join('input', source+'.qca.dat')
             invfile = 'input/v3.inv'
             return GHCNV3Reader(file=open(ghcn3file),
-              meta=augmented_station_metadata(invfile, format='v3'),
+              meta=augmented_station_metadata(invfile, format='giss_v3'),
               year_min=code.giss_data.BASE_YEAR)
         if source == 'ghcn.v2':
             return GHCNV2Reader("input/v2.mean",
@@ -1424,7 +1468,11 @@ class Input:
         if source.endswith('.v2'):
             # A "generic" source.  "ca.v2" will look for ca.v2.mean,
             # ca.v2.inv, ca.tbl (all in the input directory).
-            return read_generic(source)
+            return read_generic_v2(source)
+        if source.endswith('.dat'):
+            # A "generic" v3 source. metadata for "isti.dat"
+            # will come from "isti.inv".
+            return read_generic_v3(source)
         raise Exception("Cannot open source %r" % source)
             
 # Each of the stepN_input functions below produces an iterator that

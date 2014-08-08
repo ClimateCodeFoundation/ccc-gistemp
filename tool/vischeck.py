@@ -7,7 +7,17 @@
 # Script to produce a visual check of the results (of STEP 5).
 
 """
-vischeck.py [--colour 00ff00] [--extract JJA] [-o offset] [--size 400,300] [--title ccc-gistemp] [--trend none] [--download] GLB.txt [...]
+vischeck.py [--options ...] GLB.txt [...]
+
+Option Summary
+
+  --colour 00ff00,555555 # specify colours for lines
+  --download             # download the PNG (to stdout)
+  --extract JJA          # extract single season / month
+  -o offset              # offset to see overlapping lines
+  --size 400,300         # size in pixels
+  --title ccc-gistemp    # add a title
+  --trend none           # avoid showing trends
 
 Visually check a file of global anomalies, by converting it to a Google
 Chart.  A URL is output (on stdout), visit/display that URL to see the

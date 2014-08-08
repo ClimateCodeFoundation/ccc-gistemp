@@ -7,7 +7,7 @@
 # Script to produce a visual check of the results (of STEP 5).
 
 """
-vischeck.py [-o offset] GLB.txt [...]
+vischeck.py [--colour 00ff00] [--extract JJA] [-o offset] [--size 400,300] GLB.txt [...]
 
 Visually check a file of global anomalies, by converting it to a Google
 Chart.  A URL is output (on stdout), visit/display that URL to see the

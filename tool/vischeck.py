@@ -7,7 +7,7 @@
 # Script to produce a visual check of the results (of STEP 5).
 
 """
-vischeck.py [--colour 00ff00] [--extract JJA] [-o offset] [--size 400,300] GLB.txt [...]
+vischeck.py [--colour 00ff00] [--extract JJA] [-o offset] [--size 400,300] [--download] GLB.txt [...]
 
 Visually check a file of global anomalies, by converting it to a Google
 Chart.  A URL is output (on stdout), visit/display that URL to see the
@@ -23,6 +23,10 @@ Multiple series (one per file) can be displayed on the same chart,
 simply specify all the files on the command line (although more than 2
 may run into problems with long URLs and the Google Chart API).
 
+The --download option will download the graph from the URL and
+write it to stdout. This is particular useful for long URLs (many
+charts overlaid) as it uses POST which allows for longer parameters.
+
 Two trend lines are drawn for each series: one for the entire series
 and one for the last thirty years of data.
 
@@ -31,6 +35,14 @@ An offset can be introduced between each series to shift it up the
 chart.  -o offset will shift each series up (for a positive offset) or
 down (negative offset); its units are the same as in the data files
 (centikelvin usually).
+
+--extract allows a particular season (or month) to be plotted
+(instead of the usual, calendar year). Specify the name of the
+season as it appears in the header line (for example --extract MAM)
+or a comma separated pair of (0-based) character positions to extract an
+arbitrary fixed-width column.
+
+--size change the size of the resulting graphic.
 """
 
 import datetime

@@ -5,8 +5,10 @@
 # Nick Barnes, David Jones.  Climate Code Foundation.
 
 """
-Converts (fortran binary) ZON.* file to GHCN v2 format (which is a plain
-text format).  Can also convert BX.* files.
+zontotext.py *{BX,ZON}*
+
+Converts (fortran binary) BX.* or ZON.* file to GHCN v2 format
+(which is a plain text format).
 """
 
 

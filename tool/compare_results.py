@@ -318,14 +318,16 @@ def compare_regions(dirs, labels, o):
     regions: Global, Northern Hemisphere, Southern Hemisphere.
     """
 
-    anomaly_file = '%s.Ts.ho2.GHCN.CL.PA.txt'
+    surface = 'land'
+    anomaly_file = '%s%s.Ts.GHCN.CL.PA.txt'
     for region, code in [
         ('global',              'GLB'), 
         ('northern hemisphere', 'NH'),
         ('southern hemisphere', 'SH'),
     ]:
         # Annual series
-        fs = map(lambda d: open(os.path.join(d, anomaly_file % code), 'r'), dirs)
+        fs = map(lambda d:
+          open(os.path.join(d, anomaly_file % (surface, code)), 'r'), dirs)
         anns = map(list, map(vischeck.annual_anomalies, fs))
         url = vischeck.asgooglechartURL(anns)
         print >>o, '<h2>%s annual temperature anomaly</h2>' % region.capitalize()
@@ -348,7 +350,8 @@ def compare_regions(dirs, labels, o):
             lambda k, v: "%04d: %g" % (k, v))
 
         # Monthly series
-        fs = map(lambda d: open(os.path.join(d, anomaly_file % code), 'r'), dirs)
+        fs = map(lambda d:
+          open(os.path.join(d, anomaly_file % (surface, code)), 'r'), dirs)
         mons = map(asmon, fs)
         diffs = list(difference(mons, 0.01))
         d = map(lambda a: a[1], diffs)
@@ -367,7 +370,7 @@ def compare_zones(dirs, labels, o):
     (from the binary ZON.* file).
     """
 
-    zone_file = 'ZON.Ts.ho2.GHCN.CL.PA.1200'
+    zone_file = 'landZON.Ts.GHCN.CL.PA.1200'
     fs = [open(os.path.join(d, zone_file), 'rb') for d in dirs]
     all_zones = [list(zone_series(f)) for f in fs]
     diffs = list(difference(all_zones))
@@ -380,7 +383,7 @@ def compare_boxes(dirs, labels, o):
     (from the binary BX.* file).
     """
     # Box series
-    box_file = 'BX.Ts.ho2.GHCN.CL.PA.1200'
+    box_file = 'landBX.Ts.GHCN.CL.PA.1200'
     fs = map(lambda d: open(os.path.join(d, box_file), 'rb'), dirs)
     boxes = map(list, map(box_series, fs))
     diffs = list(difference(boxes))

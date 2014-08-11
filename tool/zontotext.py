@@ -7,7 +7,7 @@
 """
 zontotext.py *{BX,ZON}*
 
-Converts (fortran binary) BX.* or ZON.* file to GHCN v2 format
+Converts (fortran binary) BX.* or ZON.* file to GHCN v3 format
 (which is a plain text format).
 """
 
@@ -25,8 +25,9 @@ class Error(Exception):
     """Some problem."""
 
 def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
-  bos='>', format='v2'):
-    """Convert monthly averages to text format; *inp* is the input file
+  bos='>', format='v3'):
+    """
+    Convert monthly averages to text format; *inp* is the input file
     and should be either a binary zone file (ZON.*) or a binary box file
     (BX.*).
     
@@ -34,7 +35,7 @@ def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
     time series are not.
     """
 
-    # The width of a standard word according to Python's struct module...
+    # The width of a standard word according to Python's struct module.
     w = len(struct.pack('=I', 0))
 
     f = fort.File(inp, bos=bos)
@@ -49,13 +50,13 @@ def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
     else:
         content = 'boxes'
 
-    if metaonly or 'v2' != format:
+    if metaonly or 'v3' != format:
         output.write(repr(info))
         output.write('\n' + title + '\n')
     if metaonly:
         return
-    if 'v2' == format:
-        v2out = gio.GHCNV2Writer(file=output, scale=0.01)
+    if 'v3' == format:
+        ghcnm_out = gio.GHCNV3Writer(file=output, scale=0.01)
 
     # m: time frames per year
     if info[2] == 6:
@@ -80,7 +81,7 @@ def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
     for i,r in enumerate(f):
         data = struct.unpack(descriptor, r)
         suffix = data[-1]
-        if format == 'v2':
+        if format == 'v3':
             if 'zones' == content:
                 title = id11fromzone(suffix)
             else:
@@ -89,15 +90,16 @@ def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
             title = suffix
             output.write(title + '\n')
         for idx in range(2):
-            if 'v2' == format and idx > 0:
+            if 'v3' == format and idx > 0:
                 # Only output temps, not weights. :todo: fix this.
                 continue
             for year in range(first_year, last_year+1):
                 offset = (year-first_year)*m + (months * idx)
                 temps = data[offset:offset+m]
-                if 'v2' == format:
+                if 'v3' == format:
                     assert 12 == m
-                    v2out.writeyear(title+('TW'[idx]), year, temps)
+                    element = ['TAVG', 'WGHT'][idx]
+                    ghcnm_out.writeyear(title, element, year, temps)
                 else:
                     output.write('%s[%4d]: %s\n' %
                       (['AR','WT'][idx],
@@ -111,8 +113,9 @@ def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
         raise Error('Too many records.')
 
 def id11fromzone(s):
-    """Convert a title as it appears in the ZON file into an 11
-    character V2 Mean style station identifier.
+    """
+    Convert a title as it appears in the ZON file into an 11
+    character GHCN-M style station identifier.
 
     The returned strings will be of the form "Z+SS.S+NN.N".
     """
@@ -140,7 +143,9 @@ def id11fromzone(s):
         raise ValueError("Cannot convert zone title string: %s" % s)
     bound = m.groups()
     def cvt(x):
-        """Convert "DD.D n" to "+DD.D" and "DD.D s" to "-DD.D"."""
+        """
+        Convert "DD.D n" to "+DD.D" and "DD.D s" to "-DD.D".
+        """
 
         x = x.replace('s', '-')
         x = x.replace('n', '+')
@@ -148,8 +153,9 @@ def id11fromzone(s):
     return 'Z' + ''.join(cvt(b) for b in bound)
 
 def id11frombox(s, bos):
-    """Convert a record suffix (5 words) as it appears in the BX file
-    into an 11 character V2 Mean style station identifier.
+    """
+    Convert a record suffix (5 words) as it appears in the BX file
+    into an 11 character GHCN-M style station identifier.
 
     The returned strings will be of the form BOX@+NN+EEE where "+NN" and
     "+EEE" gives the lat/lon of the box centre.

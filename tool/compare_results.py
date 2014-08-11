@@ -423,6 +423,9 @@ def compare_boxes(dirs, labels, o):
         lambda k, v: "Box %02d: %g" % (k, v))
 
     print >>o, '<h3>Geographic distribution of per-box monthly residue statistics</h3>'
+    print >>o, """<p>Each box has two values:
+ the percentage of differences that are 0;
+ the standard deviation of the differences.</p>"""
     print >>o, '<table border="1" style="border-collapse:collapse; border-width:1px; border-color:#cccccc; border-style:solid; font-size:small">'
     box = 0
     for band in range(8):

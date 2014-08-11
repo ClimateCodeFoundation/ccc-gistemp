@@ -158,6 +158,9 @@ def id11frombox(s, bos):
     centre = eqarea.centre(box)
     return "BOX@%+03.0f%+04.0f" % centre
 
+def usage(out):
+    out.write(__doc__)
+
 def main(argv=None):
     import getopt
 
@@ -175,10 +178,11 @@ def main(argv=None):
             k['format'] = 'text'
             
     if len(arg) == 0:
-        totext(sys.stdin, **k)
+        usage(sys.stderr)
+        return 4
     else:
         for n in arg:
             totext(open(n, 'rb'), **k)
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

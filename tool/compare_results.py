@@ -397,6 +397,9 @@ def compare_boxes(dirs, labels, o):
         box = d[0][0]
         box_table[box] = box_table.get(box,[])
         box_table[box].append(d[1])
+
+    # Convert box_table to table of stats: each entry will be
+    # the value (a tuple) returned by stats().
     box_std_devs = []
     max_std_dev = 0.0
     for (box, box_diffs) in box_table.items():

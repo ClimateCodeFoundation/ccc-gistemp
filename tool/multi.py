@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-# $URL$
-# $Rev$
 
 """
 Multi-tool.  A collection of miscellaneous commands and procedures.

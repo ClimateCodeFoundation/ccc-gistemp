@@ -138,8 +138,10 @@ def asmon(f):
                     pass
 
 def stats(seq):
-    """Return the zero count, length, mean, and standard deviation of
-    the numbers in the non-empty sequence *seq*."""
+    """
+    Return the zero count, length, mean, and standard deviation of
+    the numbers in the non-empty sequence *seq*.
+    """
     assert seq
     n = float(len(seq))
     mean = sum(seq) / n
@@ -147,8 +149,11 @@ def stats(seq):
     return seq.count(0), n, mean, math.sqrt(variance)
 
 def difference(seqs, scale=1.0):
-    """Return a sequence of differences between the second (data) items
-    of the pairs in the two sequences *seqs*, multiplied by *scale*."""
+    """
+    Return a sequence of differences between the second (data) items
+    of the pairs in the two sequences *seqs*, multiplied by *scale*.
+    """
+
     assert len(seqs) == 2
     seqs = map(iter, seqs)
     newa = True

@@ -105,7 +105,7 @@ def counts(out, dir='.', mask=None):
     log = os.path.join(dir, 'log', 'step3.log')
     step2 = os.path.join(dir, 'work', 'step2.v2')
 
-    for row in stations_logged(mask, log=log):
+    for row in stations_logged(cells=cells_masked(mask), log=log):
         stations = json.loads(row[2])
         for station,weight,months in stations:
             stationmonths[station] = monthset(months) | stationmonths.get(
@@ -174,7 +174,9 @@ input = os.path.join(parent, 'input')
 
 def where_stations(stations=[], out=None,
   inv=os.path.join(input, 'v2.inv')):
-    """Implementation of whatstations command."""
+    """
+    Implementation of where_stations command.
+    """
 
     from code import eqarea
     from code import giss_data
@@ -211,24 +213,44 @@ def where_cells(cells=[], out=None):
         out.write("%sMASK%.3f\n" % (giss_data.boxuid(cell), m))
 
 def whatstations(argv):
-    """[command] [--mask maskfile] [--log step3.log] Determines
-    what (land) stations are used for a particular area.
-
-    whatstations --mask maskfile
+    """[command] [--box LND@-NN+EEET] [--mask maskfile] [--log step3.log]
+    Determines what (land) stations are used for a particular area.
 
     Works by examining the Step 3 log file, which can be specified with
     --log option.
+
+    --box shows all stations used in a particular box (it opens
+    log/step5.log and uses that to generate a mask).
     """
 
-    opts,arg = getopt.getopt(argv[1:], '', ['log=', 'mask='])
+    opts,arg = getopt.getopt(argv[1:], '', ['box=', 'log=', 'mask='])
     option = dict((o[2:],v) for o,v in opts)
     stations(out=sys.stdout, **option)
 
-def stations_logged(mask=None, log='log/step3.log'):
-    """An iterator that yields each of the log records from step3 that
-    identify the stations used (that is, the second item in the row is
-    "stations").  *mask* (optionally) specifies the name of a cell mask
-    file; when used only the cells present in the mask are examined.
+def cells_logged(box, log='log/step5.log'):
+    """
+    Return the set of cells that are used in a particular box
+    (by examining the step5 log file `log`).
+    """
+
+    with open(log) as log:
+        for row in log:
+            row = row.split(' ', 2)
+            if row[1] != 'cells':
+                continue
+            if row[0] == box:
+                cells = json.loads(row[2])
+                return set(cell[0] for cell in cells if cell[1] > 0)
+
+def stations_logged(cells=None, log='log/step3.log'):
+    """
+    An iterator that yields each of the log records from Step 3
+    that identify the stations used (that is, the second
+    item in the row is "stations").
+    
+    *cells* (optionally) specifies a set of cells to examine. If
+    None, the default, then all cells are examined.
+
     *log* specifies the name of the log file to examine.
 
     Each log record is yielded as a triple (cellid, 'stations',
@@ -237,23 +259,32 @@ def stations_logged(mask=None, log='log/step3.log'):
     """
 
     log = open(log)
-    if mask:
-        cells = cellsofmask(open(mask))
 
     for row in log:
         row = row.split(' ', 2)
         if row[1] != 'stations':
             continue
-        if not mask or row[0] in cells:
+        if cells is None or row[0] in cells:
             yield row
 
-def stations(out, log='log/step3.log', mask=None):
+def stations(out, log=None, mask=None, box=None):
     """Print to *out* a list of the stations used."""
+
+    if not log:
+        log = 'log/step3.log'
 
     station_weight = dict()
     station_months = dict()
+
+    if box:
+        cells = cells_logged(box=box, log='log/step5.log')
+    elif mask:
+        cells = cells_masked(mask)
+    else:
+        cells = None
+
     cellcount = 0
-    for row in stations_logged(log=log, mask=mask):
+    for row in stations_logged(log=log, cells=cells):
         stations = json.loads(row[2])
         for item in stations:
             station,weight,months = item[:3]
@@ -278,10 +309,16 @@ def stations(out, log='log/step3.log', mask=None):
     for station,weight in sorted(station_weight.iteritems()):
         print >>out, station, asstr(station_months[station]), weight
 
+def cells_masked(mask_file):
+    with open(mask_file) as mask:
+        return cellsofmask(mask)
+
 def cellsofmask(inp):
-    """*inp* is an open mask file.  The returned value is a set of all
+    """*
+    inp* is an open mask file.  The returned value is a set of all
     the cells (identified by their 12-character ID) that have a non-zero
-    value."""
+    value.
+    """
 
     return set(row[:12] for row in inp if float(row[16:21]))
 

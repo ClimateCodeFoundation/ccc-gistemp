@@ -76,7 +76,7 @@ def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
     descriptor = bos + '%df%ds' % (months*2, rest)
 
     # Number of records following header.
-    N = dict(zones=14, boxes=80)[content]
+    N = dict(zones=16, boxes=80)[content]
     i = None
     for i,r in enumerate(f):
         data = struct.unpack(descriptor, r)

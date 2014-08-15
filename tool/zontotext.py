@@ -107,10 +107,10 @@ def totext(inp, output=sys.stdout, log=sys.stderr, metaonly=False,
                       ' '.join(map(repr, temps))))
     if i is None:
         raise Error('No records found in file %r.' % inp.name)
-    if i < N-1:
-        raise Error('Unexpected end of file.')
-    if i >= N:
-        raise Error('Too many records.')
+    if i !=  N-1:
+        way = "many" if i >= N else "few"
+        raise Error('Too %s records. Expected %d, found %d.' %
+          (way, N, i+1))
 
 def id11fromzone(s):
     """

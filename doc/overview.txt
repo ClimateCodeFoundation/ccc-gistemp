@@ -136,12 +136,12 @@ area.
 
 REFERENCES
 
-Hansen and Lebedeff 1987 http://pubs.giss.nasa.gov/abstracts/1987/Hansen_Lebedeff.html
-Hansen et al 1996 http://pubs.giss.nasa.gov/abstracts/1996/Hansen_etal_1.html
-Hansen et al 1999 http://pubs.giss.nasa.gov/abstracts/1999/Hansen_etal.html
-Hansen et al 2001 http://pubs.giss.nasa.gov/abstracts/2001/Hansen_etal.html
-Hansen et al 2006 http://pubs.giss.nasa.gov/abstracts/2006/Hansen_etal_1.html
-Hansen et al 2010 http://pubs.giss.nasa.gov/cgi-bin/abstract.cgi?id=ha00510u
+Hansen and Lebedeff 1987 http://pubs.giss.nasa.gov/abs/ha00700d.html
+Hansen et al 1996 http://pubs.giss.nasa.gov/abs/ha04000r.html
+Hansen et al 1999 http://pubs.giss.nasa.gov/abs/ha03200f.html
+Hansen et al 2001 http://pubs.giss.nasa.gov/abs/ha02300a.html
+Hansen et al 2006 http://pubs.giss.nasa.gov/abs/ha07110b.html
+Hansen et al 2010 http://pubs.giss.nasa.gov/abs/ha00510u.html
 
 HISTORY
 

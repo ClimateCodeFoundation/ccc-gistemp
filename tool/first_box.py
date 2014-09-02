@@ -77,7 +77,9 @@ def as_html(datas):
             starts = [str(p[1]) for p in pairs]
             box_content = '<br />'.join(starts)
             print '<td align="center" colspan="%d">' % (box_span, )
-            print '%s</td>' % box_content
+            print box_content
+            print '<span class="label" style="text-align: right; display: block; font-size: smaller">%d</span>' % (box_index + 1)
+            print '</td>'
         print "</tr>"
     print "</table>"
 

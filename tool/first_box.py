@@ -24,33 +24,60 @@ import sys
 from compare_results import box_series
 
 def box_starts(inp):
+    """
+    Return a sequence of (box, first_year) pairs for each of 80
+    boxes (from 0 to 79). If a box has no data (so no first
+    year) then `first_year` is None for that box.
+    """
+
     def get_box(p):
         return p[0][0]
+    # First year for each box
+    starts = [None] * 80
     for box, data in itertools.groupby(box_series(inp), get_box):
-        yield box, list(data)[0][0][1]
+        starts[box] = list(data)[0][0][1]
+    return enumerate(starts)
 
-def as_text(data):
-    for box, year in data:
+def multi_box_files(inps):
+    result = []
+    for inp in inps:
+        result.append(box_starts(inp))
+    return result
+
+def as_text(datas):
+    for pairs in zip(*datas):
+        boxes = set(p[0] for p in pairs)
+        # All pairs should have the same box number.
+        assert len(boxes) == 1
+        (box,) = boxes
+        years = [p[1] for p in pairs]
         # To be commensurate with [HANSENLEBEDEFF1987] figure 2,
         # we start numbering boxes from 1.
-        print box+1, year
+        out = sys.stdout
+        out.write("%d" % (box+1))
+        for year in years:
+            out.write(" %d" % year)
+        out.write("\n")
 
-def as_html(data):
-    # `data` is a sequence, with potentially missing data.
-    box_first = dict(data)
+def as_html(datas):
+    # A sequence of pairs, one pair for each input file.
+    zippers = itertools.izip(*datas)
     n_boxes_in_band = [4, 8, 12, 16, 16, 12, 8, 4]
 
     print '<table border="1" style="border-collapse:collapse; border-width:1px; border-color:#cccccc; border-style:solid; font-size:small">'
 
-    box = 0
     for band, n_boxes in enumerate(n_boxes_in_band):
         box_span = 48 / n_boxes
         print "<tr>"
         for i in range(n_boxes):
-            box_content = box_first.get(box, '')
+            pairs = next(zippers)
+            box_index = set(p[0] for p in pairs)
+            assert len(box_index) == 1
+            box_index, = box_index
+            starts = [str(p[1]) for p in pairs]
+            box_content = '<br />'.join(starts)
             print '<td align="center" colspan="%d">' % (box_span, )
             print '%s</td>' % box_content
-            box += 1
         print "</tr>"
     print "</table>"
 
@@ -65,10 +92,13 @@ def main(argv=None):
         if k == '--html':
             show = as_html
 
-    box_file = glob.glob(os.path.join('result', 'landBX*'))[0]
-    sys.stderr.write("Using %s\n" % box_file)
-    with open(box_file, 'rb') as inp:
-        show(box_starts(inp))
+    if not arg:
+        box_files = [glob.glob(os.path.join('result', 'landBX*'))[0]]
+    else:
+        box_files = arg
+    sys.stderr.write("Using %s\n" % box_files)
+    inps = [open(f, 'rb') for f in box_files]
+    show(multi_box_files(inps))
 
 
 if __name__ == '__main__':

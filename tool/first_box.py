@@ -76,12 +76,31 @@ def as_html(datas):
             box_index, = box_index
             starts = [str(p[1]) for p in pairs]
             box_content = '<br />'.join(starts)
-            print '<td align="center" colspan="%d">' % (box_span, )
+            bgcolor = pick_color(starts)
+            print '<td align="center" colspan="%d" bgcolor="%s">' % (
+              box_span, bgcolor)
             print box_content
             print '<span class="label" style="text-align: right; display: block; font-size: smaller">%d</span>' % (box_index + 1)
             print '</td>'
         print "</tr>"
     print "</table>"
+
+def pick_color(starts):
+    """
+    Pick a background colour for a cell.
+    """
+
+    if len(starts) != 2:
+        return "#fff"
+    if set(starts) == set([None]):
+        return "#ccc"
+    if starts[0] == None or starts[1] < starts[0]:
+        # starts[1] is "better" (earlier or present)
+        return "#fcf"
+    if starts[1] == None or starts[0] < starts[1]:
+        return "#ccf"
+    return "#fff"
+
 
 def main(argv=None):
     if argv is None:

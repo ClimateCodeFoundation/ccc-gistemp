@@ -112,7 +112,8 @@ def annual_anomalies(f, extract=(65,72)):
                 pass
 
 def trend(data):
-    """Computes linear regression parameters (a,b) on the *data*.  The
+    """
+    Computes linear regression parameters (a,b) on the *data*.  The
     line y = a + b*x gives the best fit line to data.
     """
     sxx = sxy = syy = sx = sy = n = 0
@@ -126,9 +127,9 @@ def trend(data):
             n += 1
     if n < 2:
         return None,None,None
-    # Make n a float. This contaminates all the subsequent divisions, making
-    # them floating point divisions with floating point answers, which
-    # is what we want.
+    # Make n a float. This contaminates all the subsequent divisions,
+    # making them floating point divisions with floating point answers,
+    # which is what we want.
     n = float(n)
     xbar = sx / n
     ybar = sy / n
@@ -150,19 +151,20 @@ def asgooglechartURL(seq, options={}):
 
     *options* is a dict mapping keywords to optional attributes:
 
-    options.offset: specifies the inter-chart offset, as per the -o option
-    (see module docstring).  The default is zero.
+    options.offset: specifies the inter-chart offset, as per the
+    -o option (see module docstring).  The default is zero.
 
     options.size: specifies the chart size as a tuple (width,
     height). The default is (600, 500).
     """
 
     # default options
-    default_options = dict(offset=0,
-                           size=(600,500),
-                           colour=['ff0000', '000000', '0000ff', 'ff00ff'],
-                           trend=True
-                           )
+    default_options = dict(
+      offset=0,
+      size=(600,500),
+      colour=['ff0000', '000000', '0000ff', 'ff00ff'],
+      trend=True
+                          )
     default_options.update(options)
     options = default_options
 
@@ -175,7 +177,8 @@ def asgooglechartURL(seq, options={}):
 
     yearmin = min([1880] + map(lambda p:p[0], itertools.chain(*data)))
     current_year = datetime.datetime.now().year
-    yearmax = max([current_year] + map(lambda p:p[0], itertools.chain(*data)))
+    yearmax = max([current_year] + map(lambda p:p[0],
+                                       itertools.chain(*data)))
     data = [pad(s, yearmin, yearmax) for s in data]
     # Let y be the list of years for the chart legend.  We include
     # the first year of the series, the last year, and every decade
@@ -253,7 +256,9 @@ def asgooglechartURL(seq, options={}):
     return prefix + '?' + '&'.join(params)
 
 def pad(data, yearmin, yearmax):
-    """pad so that data series starts at yearmin and ends at yearmax."""
+    """
+    Pad so that data series starts at yearmin and ends at yearmax.
+    """
 
     nonelots = [None]*(yearmax-yearmin+1)
 
@@ -269,8 +274,10 @@ def pad(data, yearmin, yearmax):
       zip(range(t1+1, yearmax+1), nonelots))
 
 def reasonable_yscale(data):
-    """Examine the data and return a reasonable y scale as a min and max
-    value."""
+    """
+    Examine the data and return a reasonable y scale as a min and max
+    value.
+    """
 
     tick = 50
     # Ensures subsequent divisions are in floating point.
@@ -303,8 +310,10 @@ def vaxis_labels(ymin,ymax):
     return '|'.join([''] + l)
 
 def slope_markers(trends, colours):
-    """Create the markers to denote slopes / trends.  *trends* is a list
-    of trend objects as returned by *trendlines*.  Returns a list."""
+    """
+    Create the markers to denote slopes / trends.  *trends* is a list
+    of trend objects as returned by *trendlines*.  Returns a list.
+    """
 
     import itertools
 
@@ -330,13 +339,15 @@ def slope_markers(trends, colours):
 def format_slope(texts, slopes, coefficients):
     """Return a string for the slopes and coefficients."""
 
-    return '; '.join('%s: %.2f (%.2f)' % p for p in zip(texts, slopes, coefficients))
+    return '; '.join('%s: %.2f (%.2f)' % p
+      for p in zip(texts, slopes, coefficients))
 
 class Struct:
     pass
 
 def trendlines(data):
-    """Return a a triple of (url,slopelong,slopeshort) for
+    """
+    Return a a triple of (url,slopelong,slopeshort) for
     the full and 30-year trend lines (url is a fragment).
     """
 
@@ -381,8 +392,10 @@ def trendlines(data):
     return result
 
 def chartsingle(l):
-    """Take a list and return a URL fragment for its Google
-    chart."""
+    """
+    Take a list and return a URL fragment for its Google
+    chart.
+    """
 
     d = map(lambda x:x[1], l)
 
@@ -400,8 +413,9 @@ def chartsingle(l):
 import sys
 
 def chartit(fs, options={}, out=sys.stdout):
-    """Convert the list of files *fs* to a Google Chart API url and print it
-    on *out*.
+    """
+    Convert the list of files *fs* to a Google Chart API url and
+    print it on *out*.
     
     For documentation on *options* see `asgooglechartURL`.
     """

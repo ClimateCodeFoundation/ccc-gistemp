@@ -244,7 +244,6 @@ def cells_logged(box, log='log/step5.log'):
         bounds = boxes[box_i-1]
         centre = eqarea.centre(bounds)
         box = "LND@%+03.0f%+04.0fT" % tuple(centre)
-        print box
 
     with open(log) as log:
         for row in log:
@@ -317,8 +316,7 @@ def stations(out, log=None, mask=None, box=None):
         ncells = len(cellsofmask(open(mask)))
     else:
         ncells = 8000
-    print >>out, "Cells: %d/%d" % (cellcount, ncells)
-    print >>out, "Stations: %d" % len(station_weight)
+    # print >>out, "Cells: %d/%d" % (cellcount, ncells)
     for station,weight in sorted(station_weight.iteritems()):
         print >>out, station, asstr(station_months[station]), weight
 

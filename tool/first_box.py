@@ -26,16 +26,35 @@ from compare_results import box_series
 def box_starts(inp):
     """
     Return a sequence of (box, first_year) pairs for each of 80
-    boxes (from 0 to 79). If a box has no data (so no first
+    boxes (from 0 to 79). The first_year is the first year of
+    continuous reporting. If a box has no data (so no first
     year) then `first_year` is None for that box.
+
+    If a box has data before the first year of continuous
+    reporting (typically, an early fragment of data before
+    continuous reporting starts), then "(year)" is returned.
     """
 
     def get_box(p):
         return p[0][0]
     # First year for each box
     starts = [None] * 80
+    # Recall that box_series() returns a sequence of
+    # ((box, year, month), datum) pairs.
     for box, data in itertools.groupby(box_series(inp), get_box):
-        starts[box] = list(data)[0][0][1]
+        # The years that have data.
+        years = sorted(set(p[0][1] for p in data))
+        # Find the earliest year of "continuous reporting".
+        prev = None
+        for year in reversed(years):
+            if prev is None or year == prev - 1:
+                prev = year
+            else:
+                break
+        if years[0] < prev:
+            starts[box] = "(%d)" % prev
+        else:
+            starts[box] = prev
     return enumerate(starts)
 
 def multi_box_files(inps):
@@ -60,8 +79,12 @@ def as_text(datas):
         out.write("\n")
 
 def as_html(datas):
-    # A sequence of pairs, one pair for each input file.
+
+    # One sequence for each box (80 boxes, so 80 sequences usually).
+    # Each sequence is a sequence of pairs (box, start), one pair
+    # for each input file.
     zippers = itertools.izip(*datas)
+
     n_boxes_in_band = [4, 8, 12, 16, 16, 12, 8, 4]
 
     print '<table border="1" style="border-collapse:collapse; border-width:1px; border-color:#cccccc; border-style:solid; font-size:small">'
@@ -94,6 +117,17 @@ def pick_color(starts):
         return "#fff"
     if set(starts) == set([None]):
         return "#ccc"
+
+    def as_int(x):
+        if x is None:
+            return x
+        try:
+            return int(x)
+        except ValueError:
+            return int(x[1:-1])
+
+    starts = [as_int(x) for x in starts]
+
     if starts[0] == None or starts[1] < starts[0]:
         # starts[1] is "better" (earlier or present)
         return "#fcf"

@@ -51,6 +51,27 @@ def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg_dict):
                 # years.
                 record.set_series(cut * 12 + 1, new_data)
 
+def earthly(records):
+    """
+    `records` is a dict of records. records for stations that
+    have no lat/lon metadata ("not on Earth") are removed. The
+    input dict is not modified, a fresh sequence of (id, record)
+    pairs dict is returned.
+
+    Normally (with GHCN-M and so on as inputs) there are no such
+    stations, but the crutem4.dat file has many stations with
+    invalid latitude and/or longitude.
+    """
+
+    for id, record in records.iteritems():
+        station = record.station
+        if (-90.0 <= station.lat <= 90.0) and (
+          -180.0 <= station.lon <= 180.0):
+            yield id, record
+        else:
+            print "%s has invalid latitude/longitude" % station.uid
+
+
 def step0(input):
     """
     An iterator for Step 0.  Produces a stream of `giss_data.Series`
@@ -72,10 +93,11 @@ def step0(input):
     if 'ghcn' in data and 'hohenpeissenberg' in data:
             correct_Hohenpeissenberg(data['ghcn'], data['hohenpeissenberg'])
 
-    # Join all data sources together.
+    # Join all data sources together; and remove stations with
+    # no lat/lon metadata.
     records = {}
     for source in input.sources:
-        records.update(data[source])
+        records.update(earthly(data[source]))
 
     # We sort here - as does GISTEMP - so that all the records for a
     # given 11-digit station ID are grouped together, ready for

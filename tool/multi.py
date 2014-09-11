@@ -233,12 +233,25 @@ def cells_logged(box, log='log/step5.log'):
     (by examining the step5 log file `log`).
     """
 
+    try:
+        box_i = int(box)
+    except ValueError:
+        pass
+    else:
+        from code import eqarea
+        boxes = list(eqarea.grid())
+        # Note: use Hansen's 1-based convention.
+        bounds = boxes[box_i-1]
+        centre = eqarea.centre(bounds)
+        box = "LND@%+03.0f%+04.0fT" % tuple(centre)
+        print box
+
     with open(log) as log:
         for row in log:
             row = row.split(' ', 2)
             if row[1] != 'cells':
                 continue
-            if row[0] == box:
+            if box in row[0]:
                 cells = json.loads(row[2])
                 return set(cell[0] for cell in cells if cell[1] > 0)
 

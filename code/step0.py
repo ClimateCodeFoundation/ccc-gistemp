@@ -1,9 +1,5 @@
 #! /usr/bin/env python
 # step0.py
-# $URL$
-# $Rev$
-#
-# step1.py
 #
 # Nick Barnes and David Jones.
 # Copyright (C) Ravenbrook Limited, 2008-2010.
@@ -20,8 +16,11 @@ diverse inputs into a single dataset.
 import os
 
 def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg_dict):
-    """Replace Hohenpeissenberg data from 1880 to 2002 in the GHCN
-    dataset with the priv. comm. data."""
+    """
+    Replace Hohenpeissenberg data from 1880 to 2002 in the GHCN
+    dataset with the priv. comm. data.
+    """
+
     print "Correct the GHCN Hohenpeissenberg record."
 
     # We expect the hohenpeissenberg_dict to contain a single record.
@@ -53,9 +52,10 @@ def correct_Hohenpeissenberg(ghcn_records, hohenpeissenberg_dict):
                 record.set_series(cut * 12 + 1, new_data)
 
 def step0(input):
-    """An iterator for Step 0.  Produces a stream of
-    `giss_data.Series` instances.  *input* should be an instance that
-    has an open() method.  input.open(x) is called for each data source x.
+    """
+    An iterator for Step 0.  Produces a stream of `giss_data.Series`
+    instances.  *input* should be an instance that has an open()
+    method.  input.open(x) is called for each data source x.
     (typically, this input object is made by the tool.io.step0_input()
     function).
     """
@@ -67,7 +67,8 @@ def step0(input):
         records = input.open(source)
         data[source] = dict((record.uid, record) for record in records)
 
-    # If we're using GHCN and Hohenpeissenberg then we correct one with the other.
+    # If we're using GHCN and Hohenpeissenberg then we correct
+    # one with the other.
     if 'ghcn' in data and 'hohenpeissenberg' in data:
             correct_Hohenpeissenberg(data['ghcn'], data['hohenpeissenberg'])
 

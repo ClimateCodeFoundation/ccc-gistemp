@@ -54,7 +54,7 @@ single subbox.  Comprising:
      - single-precision floats.
 
 The single-precision floats are the record data.  For untrimmed files
-their are MONM floats (see header for MONM); for trimmed files the
+there are MONM floats (see header for MONM); for trimmed files the
 number of floats is given by the first word in the previous record
 (denoted NMi above).  For either trimmed or untrimmed the metadata is
 the same (but where it appears in the record differs):

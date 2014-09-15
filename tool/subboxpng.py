@@ -3,10 +3,11 @@
 # subboxtopng.py
 #
 # David Jones, Clear Climate Code, 2010-08-26
+# David Jones, Climate Code Foundation, 2014-09-15
 #
 # REQUIREMENTS
 #
-# pypng, from http://code.google.com/p/pypng/
+# pypng, from https://github.com/drj11/pypng
 
 """
 Convert subbox files to PNG image files.

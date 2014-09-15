@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-# $URL$
-# $Rev$
 #
 # subboxtopng.py
 #
@@ -40,9 +38,13 @@ from code.giss_data import MISSING
 import gio
 
 def topng(inp, date=None):
-    """Convert *inp* into a PNG file.  Input file can be a step5mask
+    """
+    Convert *inp* into a PNG file.  Input file can be a step5mask
     file (produces greyscale PNG), or if *date* is supplied it can be a
-    subbox file."""
+    subbox file.
+    """
+
+    values = cells(inp, date)
 
     # :todo: move into proper module.
     from landmask import centrein
@@ -55,18 +57,12 @@ def topng(inp, date=None):
     width = int(width)
     height = int(height)
 
-    cells = eqarea.grid8k()
     if not date:
-        # Mask file in text format.
-        values = gio.maskboxes(inp, cells)
         colour = greyscale
-        isgrey = True
     else:
-        values = extractdate(inp, cells, date)
         colour = colourscale
-        isgrey = False
 
-    if isgrey:
+    if colour == greyscale:
         black = 0
     else:
         black = (0,0,0)
@@ -81,7 +77,7 @@ def topng(inp, date=None):
     # For colour images each row of *a* is of the form:
     # [(R,G,B), (R,G,B), ...] we want to flatten it to:
     # [R,G,B,R,G,B,...]
-    if not isgrey:
+    if colour != greyscale:
         a = [list(itertools.chain(*row)) for row in a]
 
     try:
@@ -89,18 +85,33 @@ def topng(inp, date=None):
     except:
         outpath = 'out.png'
     w = png.Writer(width=width, height=height,
-      greyscale=isgrey, alpha=False,
+      greyscale=(colour == greyscale), alpha=False,
       bitdepth=8)
     w.write(open(outpath, 'wb'), a)
 
+def cells(inp, date=None):
+    """
+    Yield a series of (value, rect) pairs.
+    """
+    subboxes = eqarea.grid8k()
+    if not date:
+        # Mask file in text format.
+        values = gio.maskboxes(inp, subboxes)
+    else:
+        values = extractdate(inp, subboxes, date)
+
+    return values
+
 def greyscale(v):
-    """Convert value *v* in range 0 to 1 to a greyscale.  0 is white.
+    """
+    Convert value *v* in range 0 to 1 to a greyscale.  0 is white.
     """
 
     return 255-int(round(v*255))
 
 def extractdate(inp, cells, date):
-    """*date* should be a string in ISO 8601 format: 'YYYY-MM'.  From
+    """
+    *date* should be a string in ISO 8601 format: 'YYYY-MM'.  From
     the binary subbox file *inp* extract the values corresponding to the
     date box by box.
     """
@@ -120,7 +131,9 @@ def extractdate(inp, cells, date):
             yield record.series[i], box
 
 def colourscale(v):
-    """Convert value *v* to a colour scale."""
+    """
+    Convert value *v* to a colour scale.
+    """
 
     scale = [(-4, (0,0,255)), (0, (255,255,255)), (4, (255,0,0))]
 
@@ -149,7 +162,8 @@ def colourscale(v):
     return c
 
 def lerp(t, a, b):
-    """Interpolate between *a* and *b*.  Result is *a* when *t* is 0;
+    """
+    Interpolate between *a* and *b*.  Result is *a* when *t* is 0;
     result is *b* when *t* is 1.
     """
 

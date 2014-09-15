@@ -186,10 +186,12 @@ def main(argv=None):
             k['date'] = v
 
     if arg:
-        for p in arg:
-            to_image(open(p), **k)
+        arg = [open(p) for p in arg]
     else:
-        to_image(sys.stdin)
+        arg = [sys.stdin]
+
+    for a in arg:
+        to_image(a, **k)
 
 if __name__ == '__main__':
     main()

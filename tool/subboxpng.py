@@ -29,6 +29,8 @@ and black for 1.000 (use land).
 # http://docs.python.org/release/2.4.4/lib/module-itertools.html
 import itertools
 
+import math
+
 # http://code.google.com/p/pypng/
 import png
 
@@ -37,6 +39,73 @@ import extend_path
 from code import eqarea
 from code.giss_data import MISSING
 import gio
+
+def to_polar_svg(inp, date=None):
+    project = polar_project
+
+    values = cells(inp, date)
+
+    if not date:
+        colour = greyscale
+    else:
+        colour = colourscale
+
+    print """<svg
+  xmlns="http://www.w3.org/2000/svg"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  version="1.1">
+"""
+    print """<g transform="translate(270 270)">"""
+    for v, rect in values:
+        (s, n, w, e) = rect
+        # :todo:(drj) For now, Northern Hemisphere only.
+        if s < 0:
+            continue
+        ps = [(n, w), (n, e), (s, e), (s, w)]
+        qs = [project(p) for p in ps]
+        cell_svg(qs, colour(v))
+    print "</g></svg>"
+
+def polar_project(p):
+    lat, lon = [math.radians(c) for c in p]
+    # z = math.sin(lat)
+    r = math.cos(lat)
+    x = math.cos(lon) * r
+    y = math.sin(lon) * r
+    return x, y
+
+def cell_svg(qs, fill_arg):
+    """
+    The argument qs is a list of 4 corners of a latitudinally
+    oriented rectangular cell. Each corner is an (x,y)
+    coordinate on a unit disc.
+
+    Output a fragment of SVG.
+    """
+
+    import math
+
+    s = 250
+
+    # Radius of Northern edge.
+    rn = math.hypot(*qs[0])
+    # Radius of Southern edge.
+    rs = math.hypot(*qs[-1])
+
+    rn *= s
+    rs *= s
+    qs = [(x*s, y*s) for x,y in qs]
+
+    d = "M {:.1f} {:.1f} A {:.1f} {:.1f} {} {} {} {:.1f} {:.1f} L {:.1f} {:.1f} A {:.1f} {:.1f} {} {} {} {:.1f} {:.1f} z".format(
+      qs[0][0], qs[0][1],
+      rn, rn, 0, 0, 1, qs[1][0], qs[1][1],
+      qs[2][0], qs[2][1],
+      rs, rs, 0, 0, 1, qs[3][0], qs[3][1])
+
+    fill = "#{:02x}{:02x}{:02x}".format(*fill_arg)
+
+    print """<path fill="{}" stroke="none" stroke-width='1px' d='{}' />""".format(fill, d)
+
 
 def to_rect_png(inp, date=None):
     """
@@ -184,6 +253,8 @@ def main(argv=None):
     for o,v in opt:
         if o == '--date':
             k['date'] = v
+        if o == '--polar':
+            to_image = to_polar_svg
 
     if arg:
         arg = [open(p) for p in arg]

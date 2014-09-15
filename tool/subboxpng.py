@@ -177,16 +177,19 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
+    to_image = to_rect_png
+
     k = {}
-    opt, arg = getopt.getopt(argv[1:], '', ['date='])
+    opt, arg = getopt.getopt(argv[1:], '', ['date=', 'polar'])
     for o,v in opt:
         if o == '--date':
             k['date'] = v
+
     if arg:
         for p in arg:
-            to_rect_png(open(p), **k)
+            to_image(open(p), **k)
     else:
-        to_rect_png(sys.stdin)
+        to_image(sys.stdin)
 
 if __name__ == '__main__':
     main()

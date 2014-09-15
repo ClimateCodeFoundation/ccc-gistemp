@@ -38,7 +38,7 @@ from code import eqarea
 from code.giss_data import MISSING
 import gio
 
-def topng(inp, date=None):
+def to_rect_png(inp, date=None):
     """
     Convert *inp* into a PNG file.  Input file can be a step5mask
     file (produces greyscale PNG), or if *date* is supplied it can be a
@@ -184,9 +184,9 @@ def main(argv=None):
             k['date'] = v
     if arg:
         for p in arg:
-            topng(open(p), **k)
+            to_rect_png(open(p), **k)
     else:
-        topng(sys.stdin)
+        to_rect_png(sys.stdin)
 
 if __name__ == '__main__':
     main()

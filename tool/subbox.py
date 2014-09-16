@@ -53,6 +53,7 @@ def to_polar_svg(inp, date=None):
   xmlns:xlink="http://www.w3.org/1999/xlink"
   version="1.1">
 """
+    scale = 250
     print """<g transform="translate(270 270)">"""
     for v, rect in values:
         (s, n, w, e) = rect
@@ -61,8 +62,16 @@ def to_polar_svg(inp, date=None):
             continue
         ps = [(n, w), (n, e), (s, e), (s, w)]
         qs = [project(p) for p in ps]
-        cell_svg(qs, colour(v))
-    print "</g></svg>"
+        cell_svg(qs, colour(v), scale=scale)
+
+    print """<g class="grid">"""
+    for d in [30, 60]:
+        print """<circle r="{:.1f}"
+          fill="none" stroke-width="0.7" stroke="black" />""".format(math.cos(math.radians(d)) * scale)
+    print "</g>"
+    print "</g>"
+
+    print "</svg>"
 
 def polar_project(p):
     lat, lon = [math.radians(c) for c in p]
@@ -72,7 +81,7 @@ def polar_project(p):
     y = math.sin(lon) * r
     return x, y
 
-def cell_svg(qs, fill_arg):
+def cell_svg(qs, fill_arg, scale):
     """
     The argument qs is a list of 4 corners of a latitudinally
     oriented rectangular cell. Each corner is an (x,y)
@@ -83,16 +92,14 @@ def cell_svg(qs, fill_arg):
 
     import math
 
-    s = 250
-
     # Radius of Northern edge.
     rn = math.hypot(*qs[0])
     # Radius of Southern edge.
     rs = math.hypot(*qs[-1])
 
-    rn *= s
-    rs *= s
-    qs = [(x*s, -y*s) for x,y in qs]
+    rn *= scale
+    rs *= scale
+    qs = [(x*scale, -y*scale) for x,y in qs]
 
     d = "M {:.1f} {:.1f} A {:.1f} {:.1f} {} {} {} {:.1f} {:.1f} L {:.1f} {:.1f} A {:.1f} {:.1f} {} {} {} {:.1f} {:.1f} z".format(
       qs[0][0], qs[0][1],

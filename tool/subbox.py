@@ -57,12 +57,13 @@ def to_polar_svg(inp, date=None):
     print """<g transform="translate(270 270)">"""
     for v, rect in values:
         (s, n, w, e) = rect
+        id = id11(rect)
         # :todo:(drj) For now, Northern Hemisphere only.
         if s < 0:
             continue
         ps = [(n, w), (n, e), (s, e), (s, w)]
         qs = [project(p) for p in ps]
-        cell_svg(qs, colour(v), scale=scale)
+        cell_svg(qs, colour(v), scale=scale, id=id)
 
     print """<g class="grid">"""
     for d in [30, 60]:
@@ -81,7 +82,7 @@ def polar_project(p):
     y = math.sin(lon) * r
     return x, y
 
-def cell_svg(qs, fill_arg, scale):
+def cell_svg(qs, fill_arg, scale, id=None):
     """
     The argument qs is a list of 4 corners of a latitudinally
     oriented rectangular cell. Each corner is an (x,y)
@@ -109,7 +110,13 @@ def cell_svg(qs, fill_arg, scale):
 
     fill = "#{:02x}{:02x}{:02x}".format(*fill_arg)
 
-    print """<path fill="{}" stroke="none" d='{}' />""".format(fill, d)
+    if id:
+        onclick = """onclick="console.log('{}')" """.format(id)
+    else:
+        onclick = ""
+
+    print """<path {} fill="{}" stroke="none" d='{}' />""".format(
+      onclick, fill, d)
 
 
 def to_rect_png(inp, date=None):
@@ -262,10 +269,17 @@ def to_ghcnm(inp):
     # First record is metadata, which we ignore.
     subbox.next()
     for record in subbox:
-        lat,lon = eqarea.centre(record.box)
-        record.uid = '%+05.1f%+06.1f' % (lat,lon)
+        record.uid = id11(record.box)
         w.write(record)
     w.close()
+
+def id11(box):
+    """
+    Given a 4-tuple of (s, n, w, e), return
+    an 11 character ID.
+    """
+    lat,lon = eqarea.centre(box)
+    return '%+05.1f%+06.1f' % (lat,lon)
 
 def main(argv=None):
     import sys

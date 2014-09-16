@@ -240,6 +240,26 @@ def lerp(t, a, b):
 
     return (1-t)*a + t*b
 
+def to_ghcnm(inp):
+    """
+    Convert a file inp from subbox to GHCN-M (v3) format.
+    """
+
+    import sys
+
+    out = sys.stdout
+
+    w = gio.GHCNV3Writer(file=out)
+
+    subbox = iter(gio.SubboxReader(inp))
+    # First record is metadata, which we ignore.
+    subbox.next()
+    for record in subbox:
+        lat,lon = eqarea.centre(record.box)
+        record.uid = '%+05.1f%+06.1f' % (lat,lon)
+        w.write(record)
+    w.close()
+
 def main(argv=None):
     import sys
     import getopt
@@ -247,15 +267,18 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
-    to_image = to_rect_png
+    command = to_rect_png
 
     k = {}
-    opt, arg = getopt.getopt(argv[1:], '', ['date=', 'polar'])
+    opt, arg = getopt.getopt(argv[1:], '', ['ghcnm', 'date=', 'polar'])
     for o,v in opt:
         if o == '--date':
             k['date'] = v
         if o == '--polar':
-            to_image = to_polar_svg
+            command = to_polar_svg
+        if o == '--ghcnm':
+            command = to_ghcnm
+
 
     if arg:
         arg = [open(p) for p in arg]
@@ -263,7 +286,7 @@ def main(argv=None):
         arg = [sys.stdin]
 
     for a in arg:
-        to_image(a, **k)
+        command(a, **k)
 
 if __name__ == '__main__':
     main()

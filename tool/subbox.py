@@ -38,7 +38,7 @@ from code import eqarea
 from code.giss_data import MISSING
 import gio
 
-def to_polar_svg(inp, date=None):
+def to_polar_svg(inp, date=None, inv=None):
     project = polar_project
 
     values = cells(inp, date)
@@ -70,7 +70,11 @@ def to_polar_svg(inp, date=None):
         print """<circle r="{:.1f}"
           fill="none" stroke-width="0.7" stroke="black" />""".format(math.cos(math.radians(d)) * scale)
     print "</g>"
-    print "</g>"
+
+    if inv:
+        station_svg(inv, scale=scale)
+
+    print "</g>" # transform()
 
     print "</svg>"
 
@@ -81,6 +85,37 @@ def polar_project(p):
     x = math.cos(lon) * r
     y = math.sin(lon) * r
     return x, y
+
+def station_svg(inv, scale):
+    """
+    Plot marker for each station in inv.
+    """
+
+    print """<g class="station">"""
+
+    with open(inv) as inp:
+        for row in inp:
+            id11 = row[:11]
+            lat = float(row[12:20])
+            lon = float(row[21:30])
+            if not (-90 <= lat <= 90):
+                continue
+            if not (-180 <= lon <= 180):
+                continue
+            elev = row[31:37]
+            name = row[38:68].strip()
+
+            if lat < 0:
+                continue
+
+            x,y = polar_project((lat, lon))
+            x *= scale
+            y *= -scale
+            print """<circle r="3" cx="{:.1f}" cy="{:.1f}"
+              stroke-width="0.7" stroke="green" fill="none" />""".format(
+                x, y)
+
+    print """</g>"""
 
 def cell_svg(qs, fill_arg, scale, id=None):
     """
@@ -291,10 +326,12 @@ def main(argv=None):
     command = to_rect_png
 
     k = {}
-    opt, arg = getopt.getopt(argv[1:], '', ['ghcnm', 'date=', 'polar'])
+    opt, arg = getopt.getopt(argv[1:], '', ['inv=', 'ghcnm', 'date=', 'polar'])
     for o,v in opt:
         if o == '--date':
             k['date'] = v
+        if o == '--inv':
+            k['inv'] = v
         if o == '--polar':
             command = to_polar_svg
         if o == '--ghcnm':

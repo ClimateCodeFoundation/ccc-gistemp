@@ -92,7 +92,7 @@ def cell_svg(qs, fill_arg):
 
     rn *= s
     rs *= s
-    qs = [(x*s, y*s) for x,y in qs]
+    qs = [(x*s, -y*s) for x,y in qs]
 
     d = "M {:.1f} {:.1f} A {:.1f} {:.1f} {} {} {} {:.1f} {:.1f} L {:.1f} {:.1f} A {:.1f} {:.1f} {} {} {} {:.1f} {:.1f} z".format(
       qs[0][0], qs[0][1],

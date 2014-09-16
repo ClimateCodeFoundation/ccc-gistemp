@@ -13,7 +13,7 @@
 Map a subbox file. Converts to rectangular PNG image; or,
 when --polar is used, to a polar SVG image.
 
-subbox.py [--polar] [--date YYYY-MM] [mask-or-subbox]
+subbox.py [--inv cru.inv] [--polar] [--date YYYY-MM] [mask-or-subbox]
 
 Converts either a mask file (text format, see work/step5mask for
 example) or a subbox file (binary format,
@@ -25,6 +25,9 @@ converted.
 
 When converting a step5mask file the output is white for 0.000 (no land)
 and black for 1.000 (use land).
+
+If --inv is used to name a GHCN-M v3 format .inv file, then the
+stations from it are plotted.
 """
 
 # http://docs.python.org/release/2.4.4/lib/module-itertools.html
@@ -336,7 +339,6 @@ def main(argv=None):
             command = to_polar_svg
         if o == '--ghcnm':
             command = to_ghcnm
-
 
     if arg:
         arg = [open(p) for p in arg]

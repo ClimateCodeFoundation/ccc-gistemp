@@ -102,7 +102,7 @@ def cell_svg(qs, fill_arg):
 
     fill = "#{:02x}{:02x}{:02x}".format(*fill_arg)
 
-    print """<path fill="{}" stroke="none" stroke-width='1px' d='{}' />""".format(fill, d)
+    print """<path fill="{}" stroke="none" d='{}' />""".format(fill, d)
 
 
 def to_rect_png(inp, date=None):

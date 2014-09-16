@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# subboxtopng.py
+# subbox.py
 #
 # David Jones, Clear Climate Code, 2010-08-26
 # David Jones, Climate Code Foundation, 2014-09-15
@@ -10,9 +10,10 @@
 # pypng, from https://github.com/drj11/pypng
 
 """
-Convert subbox files to PNG image files.
+Map a subbox file. Converts to rectangular PNG image; or,
+when --polar is used, to a polar SVG image.
 
-subboxpng.py [--date YYYY-MM] [mask-or-subbox]
+subbox.py [--polar] [--date YYYY-MM] [mask-or-subbox]
 
 Converts either a mask file (text format, see work/step5mask for
 example) or a subbox file (binary format,

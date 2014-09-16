@@ -32,9 +32,6 @@ import itertools
 
 import math
 
-# http://code.google.com/p/pypng/
-import png
-
 # Clear Climate Code
 import extend_path
 from code import eqarea
@@ -114,6 +111,9 @@ def to_rect_png(inp, date=None):
     file (produces greyscale PNG), or if *date* is supplied it can be a
     subbox file.
     """
+
+    # http://code.google.com/p/pypng/
+    import png
 
     values = cells(inp, date)
 

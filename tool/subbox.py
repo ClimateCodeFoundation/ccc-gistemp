@@ -334,6 +334,11 @@ def id11(box):
     lat,lon = eqarea.centre(box)
     return '%+05.1f%+06.1f' % (lat,lon)
 
+def bad(*l, **k):
+    import sys
+    print >> sys.stderr, __doc__
+    sys.exit(2)
+
 def main(argv=None):
     import sys
     import getopt
@@ -341,10 +346,10 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
-    command = to_rect_png
+    command = bad
 
     k = {}
-    opt, arg = getopt.getopt(argv[1:], '', ['date=', 'ghcnm', 'inv=', 'lat=', 'polar'])
+    opt, arg = getopt.getopt(argv[1:], '', ['date=', 'ghcnm', 'inv=', 'lat=', 'polar', 'rect'])
     for o,v in opt:
         if o == '--date':
             k['date'] = v
@@ -352,10 +357,12 @@ def main(argv=None):
             k['inv'] = v
         if o == '--lat':
             k['lat'] = float(v)
-        if o == '--polar':
-            command = to_polar_svg
         if o == '--ghcnm':
             command = to_ghcnm
+        if o == '--polar':
+            command = to_polar_svg
+        if o == '--rect':
+            command = to_rect_png
 
     if arg:
         arg = [open(p) for p in arg]

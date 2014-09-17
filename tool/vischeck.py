@@ -67,6 +67,8 @@ import math
 import urllib
 import urllib2
 
+import trend
+
 class Error(Exception):
     """Some sort of problem."""
 
@@ -110,36 +112,6 @@ def annual_anomalies(f, extract=(65,72)):
                 yield (year, int(l[extract[0]:extract[1]]))
             except ValueError:
                 pass
-
-def trend(data):
-    """
-    Computes linear regression parameters (a,b) on the *data*.  The
-    line y = a + b*x gives the best fit line to data.
-    """
-    sxx = sxy = syy = sx = sy = n = 0
-    for (x,y) in data:
-        if y is not None:
-            sxx += x*x
-            syy += y*y
-            sx += x
-            sy += y
-            sxy += x * y
-            n += 1
-    if n < 2:
-        return None,None,None
-    # Make n a float. This contaminates all the subsequent divisions,
-    # making them floating point divisions with floating point answers,
-    # which is what we want.
-    n = float(n)
-    xbar = sx / n
-    ybar = sy / n
-    ssxx = sxx - (sx * sx) / n
-    ssyy = syy - (sy * sy) / n
-    ssxy = sxy - (sx * sy) / n
-    b = ssxy / ssxx
-    a = ybar - b * xbar
-    r2 = (ssxy * ssxy) / (ssxx * ssyy)
-    return (a,b, r2)
 
 def asgooglechartURL(seq, options={}):
     """*seq* is a sequence of iterables (each one assumed to be the
@@ -353,7 +325,7 @@ def trendlines(data):
 
     result = Struct()
     # full trend
-    (a,b,r2) = trend(data)
+    (a,b,r2) = trend.lm1(data)
     if a is not None:
         yearmin = data[0][0]
         yearmax = data[-1][0]
@@ -370,7 +342,7 @@ def trendlines(data):
             valid_count += 1
             if valid_count >= 30:
                 break
-        (a_30,b_30,r2_30) = trend(data[i:])
+        (a_30,b_30,r2_30) = trend.lm1(data[i:])
         left_y = int(round(a_30 + (yearmin+i) * b_30))
         left_x = -100 + 200*float(i)/(yearmax-yearmin)
         right_y = int(round(a_30 + (yearmin+last_valid) * b_30))

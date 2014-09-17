@@ -213,7 +213,7 @@ def where_cells(cells=[], out=None):
         out.write("%sMASK%.3f\n" % (giss_data.boxuid(cell), m))
 
 def whatstations(argv):
-    """[command] [--box LND@-NN+EEET] [--mask maskfile] [--log step3.log]
+    """[command] [--cell -NN.N+EEE.EQ] [--box LND@-NN+EEET] [--mask maskfile] [--log step3.log]
     Determines what (land) stations are used for a particular area.
 
     Works by examining the Step 3 log file, which can be specified with
@@ -221,9 +221,12 @@ def whatstations(argv):
 
     --box shows all stations used in a particular box (it opens
     log/step5.log and uses that to generate a mask).
+
+    --cell shows all stations used in a particular cell (subbox).
     """
 
-    opts,arg = getopt.getopt(argv[1:], '', ['box=', 'log=', 'mask='])
+    opts,arg = getopt.getopt(argv[1:], '',
+      ['box=', 'cell=', 'log=', 'mask='])
     option = dict((o[2:],v) for o,v in opts)
     stations(out=sys.stdout, **option)
 
@@ -279,7 +282,7 @@ def stations_logged(cells=None, log='log/step3.log'):
         if cells is None or row[0] in cells:
             yield row
 
-def stations(out, log=None, mask=None, box=None):
+def stations(out, log=None, mask=None, box=None, cell=None):
     """Print to *out* a list of the stations used."""
 
     if not log:
@@ -290,6 +293,8 @@ def stations(out, log=None, mask=None, box=None):
 
     if box:
         cells = cells_logged(box=box, log='log/step5.log')
+    elif cell:
+        cells = set([cell])
     elif mask:
         cells = cells_masked(mask)
     else:

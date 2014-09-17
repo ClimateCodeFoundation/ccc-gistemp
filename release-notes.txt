@@ -63,11 +63,11 @@ This section lists defects that have been fixed.
 ccc-gistemp had decayed. ccc-gistemp failed to download the
 GISTEMP sources (which contain data and tables used by
 ccc-gistemp), and it failed to download the SST file (which had
-in any case been switch from Hadley--Reynolds to Smith ERSST). Both of
+in any case been switched from Hadley--Reynolds to Smith ERSST). Both of
 these have been fixed. SST data now comes from Smith et al's
 2008 Extended Reconstructed SST.
 
-Not possible to vary the ocean data source.
+Issue: Not possible to vary the ocean data source.
 
 Now it is possible, using the "ocean_source" parameter, to
 select a different source the ocean data. Example:

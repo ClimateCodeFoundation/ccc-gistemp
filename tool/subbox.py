@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# encoding: utf-8
 #
 # subbox.py
 #
@@ -10,24 +11,30 @@
 # pypng, from https://github.com/drj11/pypng
 
 """
-Map a subbox file. Converts to rectangular PNG image; or,
-when --polar is used, to a polar SVG image.
+subbox.py [--ghcnm] [subbox]
+subbox.py [--polar] [--date YYYY-MM] [--inv cru.inv] [mask-or-subbox]
+subbox.py [--rect] [--date YYYY-MM] [mask-or-subbox]
 
-subbox.py [--inv cru.inv] [--polar] [--date YYYY-MM] [mask-or-subbox]
+Convert subbox file (or mask), to:
 
-Converts either a mask file (text format, see work/step5mask for
-example) or a subbox file (binary format,
-result/SBBX1880.Ts.GHCN.CL.PA.1200 for example) into a PNG file.
+--ghcnm GHCN-M v3 file.
+
+--polar polar orthographic SVG file (northern hemisphere).
+station locations are plotted if --inv option is used (it should
+specify the name of a GHCN-M v3 format .inv file).
+
+--rect rectangular (plate carrée) PNG file.
+
+For --polar and --rect (mapping) this tool maps a single
+month extracted from a subbox file (a GISS Fortran binary format,
+result/SBBX1880.Ts.GHCN.CL.PA.1200 for example). It can also map
+a mask file (text format, see work/step5mask for example).
 
 Specifying a month with the --date option means that a subbox file is
-converted, the PNG represents the specified date.  Otherwise a mask is
-converted.
+converted.  Otherwise a mask is converted.
 
 When converting a step5mask file the output is white for 0.000 (no land)
 and black for 1.000 (use land).
-
-If --inv is used to name a GHCN-M v3 format .inv file, then the
-stations from it are plotted.
 """
 
 # http://docs.python.org/release/2.4.4/lib/module-itertools.html

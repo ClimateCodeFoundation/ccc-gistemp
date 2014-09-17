@@ -41,7 +41,17 @@ from code import eqarea
 from code.giss_data import MISSING
 import gio
 
-def to_polar_svg(inp, date=None, inv=None):
+def to_polar_svg(inp, date=None, inv=None, lat=None):
+    """
+    if date is used then a SBBX file is read, and a single month
+    extracted.
+
+    if inv is used then station locations are plotted.
+
+    if lat is used then the map is zoomed in to show only a
+    portion.
+    """
+
     project = polar_project
 
     values = cells(inp, date)
@@ -56,7 +66,11 @@ def to_polar_svg(inp, date=None, inv=None):
   xmlns:xlink="http://www.w3.org/1999/xlink"
   version="1.1">
 """
+    # half-width
+    hw = 250
     scale = 250
+    if lat:
+        scale /= math.cos(math.radians(lat))
     print """<g transform="translate(270 270)">"""
     for v, rect in values:
         (s, n, w, e) = rect
@@ -115,8 +129,9 @@ def station_svg(inv, scale):
             x *= scale
             y *= -scale
             print """<circle r="3" cx="{:.1f}" cy="{:.1f}"
+              onclick="console.log('{}')"
               stroke-width="0.7" stroke="green" fill="none" />""".format(
-                x, y)
+                x, y, id11)
 
     print """</g>"""
 
@@ -329,12 +344,14 @@ def main(argv=None):
     command = to_rect_png
 
     k = {}
-    opt, arg = getopt.getopt(argv[1:], '', ['inv=', 'ghcnm', 'date=', 'polar'])
+    opt, arg = getopt.getopt(argv[1:], '', ['date=', 'ghcnm', 'inv=', 'lat=', 'polar'])
     for o,v in opt:
         if o == '--date':
             k['date'] = v
         if o == '--inv':
             k['inv'] = v
+        if o == '--lat':
+            k['lat'] = float(v)
         if o == '--polar':
             command = to_polar_svg
         if o == '--ghcnm':

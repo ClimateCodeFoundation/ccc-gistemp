@@ -343,7 +343,7 @@ def id11(box):
 
 def bad(*l, **k):
     import sys
-    print >> sys.stderr, __doc__
+    print >> sys.stderr, __doc__.strip()
     sys.exit(2)
 
 def main(argv=None):

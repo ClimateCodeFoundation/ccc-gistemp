@@ -28,6 +28,8 @@ def lm1(data):
     ssxx = sxx - (sx * sx) / n
     ssyy = syy - (sy * sy) / n
     ssxy = sxy - (sx * sy) / n
+    if ssxx == 0:
+        return None, None, None
     b = ssxy / ssxx
     a = ybar - b * xbar
     r2 = (ssxy * ssxy) / (ssxx * ssyy)

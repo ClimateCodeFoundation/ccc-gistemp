@@ -12,8 +12,8 @@
 
 """
 subbox.py [--ghcnm] [subbox]
-subbox.py [--polar] [--date YYYY-MM] [--inv cru.inv] [mask-or-subbox]
-subbox.py [--rect] [--date YYYY-MM] [mask-or-subbox]
+subbox.py [--polar] [--date YYYY-MM] [--trend] [--inv cru.inv] [mask-or-subbox]
+subbox.py [--rect] [--date YYYY-MM] [--trend] [mask-or-subbox]
 
 Convert subbox file (or mask), to:
 
@@ -25,13 +25,14 @@ specify the name of a GHCN-M v3 format .inv file).
 
 --rect rectangular (plate carrée) PNG file.
 
-For --polar and --rect (mapping) this tool maps a single
-month extracted from a subbox file (a GISS Fortran binary format,
-result/SBBX1880.Ts.GHCN.CL.PA.1200 for example). It can also map
-a mask file (text format, see work/step5mask for example).
-
-Specifying a month with the --date option means that a subbox file is
-converted.  Otherwise a mask is converted.
+For --polar and --rect (mapping) this tool maps a
+subbox file (a GISS Fortran binary format,
+result/SBBX1880.Ts.GHCN.CL.PA.1200 for example), or a mask file.
+The --date option extracts a single month from a subbox file and
+maps it. The --trend option computes the trend in each cell of a
+subbox file and maps it. If neither option is given a mask file
+is mapped. The mask files are in a text format, see work/step5mask
+for example).
 
 When converting a step5mask file the output is white for 0.000 (no land)
 and black for 1.000 (use land).
@@ -48,7 +49,7 @@ from code import eqarea
 from code.giss_data import MISSING
 import gio
 
-def to_polar_svg(inp, date=None, inv=None, lat=None):
+def to_polar_svg(inp, date=None, inv=None, lat=None, trend=False):
     """
     if date is used then a SBBX file is read, and a single month
     extracted.
@@ -57,13 +58,16 @@ def to_polar_svg(inp, date=None, inv=None, lat=None):
 
     if lat is used then the map is zoomed in to show only a
     portion.
+
+    if trend is true then the cells are converted to a trend
+    over the last 30 years before mapping.
     """
 
     project = polar_project
 
-    values = cells(inp, date)
+    values = cells(inp, date, trend)
 
-    if not date:
+    if not date and not trend:
         colour = greyscale
     else:
         colour = colourscale
@@ -234,16 +238,22 @@ def to_rect_png(inp, date=None):
       bitdepth=8)
     w.write(open(outpath, 'wb'), a)
 
-def cells(inp, date=None):
+def cells(inp, date=None, trend=True):
     """
     Yield a series of (value, rect) pairs.
     """
     subboxes = eqarea.grid8k()
-    if not date:
+    if not date and not trend:
         # Mask file in text format.
         values = gio.maskboxes(inp, subboxes)
-    else:
-        values = extractdate(inp, subboxes, date)
+        return values
+
+    assert not (date and trend)
+
+    if date:
+        values = extract_date(inp, subboxes, date)
+    elif trend:
+        values = extract_trend(inp, subboxes)
 
     return values
 
@@ -254,7 +264,7 @@ def greyscale(v):
 
     return 255-int(round(v*255))
 
-def extractdate(inp, cells, date):
+def extract_date(inp, cells, date):
     """
     *date* should be a string in ISO 8601 format: 'YYYY-MM'.  From
     the binary subbox file *inp* extract the values corresponding to the
@@ -274,6 +284,25 @@ def extractdate(inp, cells, date):
             yield MISSING, box
         else:
             yield record.series[i], box
+
+def extract_trend(inp, cells):
+    import trend
+
+    records = iter(gio.SubboxReader(inp))
+    meta = records.next()
+    base_year = meta.yrbeg
+
+    for record,box in itertools.izip(records, cells):
+        assert record.first_year == base_year
+
+        series = record.series[-360:]
+        data = [(i//12, v) for i, v in enumerate(series) if v != MISSING]
+        (a, b, r2) = trend.lm1(data)
+        if b is None:
+            b = MISSING
+        else:
+            b *= 100
+        yield b, box
 
 def colourscale(v):
     """
@@ -356,7 +385,7 @@ def main(argv=None):
     command = bad
 
     k = {}
-    opt, arg = getopt.getopt(argv[1:], '', ['date=', 'ghcnm', 'inv=', 'lat=', 'polar', 'rect'])
+    opt, arg = getopt.getopt(argv[1:], '', ['date=', 'ghcnm', 'inv=', 'lat=', 'trend', 'polar', 'rect'])
     for o,v in opt:
         if o == '--date':
             k['date'] = v
@@ -364,6 +393,8 @@ def main(argv=None):
             k['inv'] = v
         if o == '--lat':
             k['lat'] = float(v)
+        if o == '--trend':
+            k['trend'] = True
         if o == '--ghcnm':
             command = to_ghcnm
         if o == '--polar':

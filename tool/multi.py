@@ -317,16 +317,15 @@ def stations(out, log=None, mask=None, box=None, cell=None):
 
         return ''.join('01'[i in s] for i in range(12))
 
-    if mask:
-        ncells = len(cellsofmask(open(mask)))
-    else:
-        ncells = 8000
-    # print >>out, "Cells: %d/%d" % (cellcount, ncells)
     for station,weight in sorted(station_weight.iteritems()):
         print >>out, station, asstr(station_months[station]), weight
 
 def cells_masked(mask_file):
-    with open(mask_file) as mask:
+    if mask_file == '-':
+        mask = sys.stdin
+    else:
+        mask = open(mask_file)
+    with mask:
         return cellsofmask(mask)
 
 def cellsofmask(inp):

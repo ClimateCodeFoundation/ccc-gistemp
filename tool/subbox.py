@@ -38,9 +38,9 @@ When converting a step5mask file the output is white for 0.000 (no land)
 and black for 1.000 (use land).
 """
 
+import csv
 # http://docs.python.org/release/2.4.4/lib/module-itertools.html
 import itertools
-
 import math
 
 # Clear Climate Code
@@ -292,17 +292,24 @@ def extract_trend(inp, cells):
     meta = records.next()
     base_year = meta.yrbeg
 
-    for record,box in itertools.izip(records, cells):
-        assert record.first_year == base_year
+    name = inp.name
+    csv_name = name + '.csv'
 
-        series = record.series[-360:]
-        data = [(i//12, v) for i, v in enumerate(series) if v != MISSING]
-        (a, b, r2) = trend.lm1(data)
-        if b is None:
-            b = MISSING
-        else:
-            b *= 100
-        yield b, box
+    with open(csv_name, 'w') as csv_out:
+        csv_file = csv.writer(csv_out)
+
+        for record,box in itertools.izip(records, cells):
+            assert record.first_year == base_year
+
+            series = record.series[-360:]
+            data = [(i//12, v) for i, v in enumerate(series) if v != MISSING]
+            (a, b, r2) = trend.lm1(data)
+            csv_file.writerow([id11(box), b])
+            if b is None:
+                b = MISSING
+            else:
+                b *= 100
+            yield b, box
 
 def colourscale(v):
     """

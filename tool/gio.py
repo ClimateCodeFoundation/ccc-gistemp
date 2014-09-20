@@ -1443,7 +1443,11 @@ class Input:
             if source == 'ghcn':
                 ghcn3file = 'input/ghcnm.tavg.qca.dat'
             else:
-                ghcn3file = os.path.join('input', source+'.qca.dat')
+                if source.endswith('.dat'):
+                    pass
+                else:
+                    source += '.qca.dat'
+                ghcn3file = os.path.join('input', source)
             invfile = 'input/v3.inv'
             return GHCNV3Reader(file=open(ghcn3file),
               meta=augmented_station_metadata(invfile, format='giss_v3'),

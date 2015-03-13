@@ -368,15 +368,20 @@ class Fetcher(object):
         else:
             raise Error("Can't extract members from this type of file: %r", name)
 
-    def extract_tar(self, name, members):
+    def extract_tar(self, archive, members):
+        """
+        `archive` is the name of a tar file (possibly
+        compressed). `members` is a list of members to extract
+        from it.
+        """
+
         # Could figure out compression type here, and pass it in to
         # tarfile.open, but apparently these days the tarfile module
         # does it for us.
 
-        # The first argument, an empty string, is a dummy which works around
-        # a bug in Python 2.5.1.  See
-        # http://code.google.com/p/ccc-gistemp/issues/detail?id=26
-        tar = tarfile.open('', mode='r', fileobj=open(name,'r'))
+        # Watch out for bugs in some version of Python.
+        # See http://code.google.com/p/ccc-gistemp/issues/detail?id=26
+        tar = tarfile.open(name=archive, mode='r')
         for info in tar:
             # would like to use 'any', but that requires Python 2.5
             matches = [member for member in members if re.search(member[0]+'$', info.name)]
@@ -404,7 +409,7 @@ class Fetcher(object):
                             break
                         out.write(buf)
         if members:
-            raise Error("Couldn't find these members in '%s': %s" % (name, [member[0] for member in members]))
+            raise Error("Couldn't find these members in '%s': %s" % (archive, [member[0] for member in members]))
 
     def extract_zip(self, name, members):
         z = zipfile.ZipFile(name)
